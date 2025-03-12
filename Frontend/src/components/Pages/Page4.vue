@@ -1,81 +1,90 @@
 <template>
   <div class="container">
-    <div v-for="(page, index) in pages" :key="index" :id="'page' + (index + 1)" class="page" :style="{ display: activePage === index + 1 ? 'block' : 'none' }">
+    <div class="page" :style="{ display: 'block' }">
       <!-- Cím rész -->
       <h2>
-        <span>{{ page.title }}</span>
+        <span>A RENDEZVÉNY RÉSZLETES ADATAI</span>
         <i class="bi bi-info-circle" title="A * részek kötelezőek"></i>
       </h2>
 
-      <!-- Megrendelő (jogi háttér esetén) adatai -->
-      <div v-if="page.type === 'client'" class="client-details">
-        <!-- Név/Cégnév -->
-        <div class="row">
-          <div class="col-md-12">
-            <input
-              type="text"
-              placeholder="Név/Cégnév *"
-              class="form-control mb-3"
-              v-model="clientDetails.name"
-              required
-            />
-            <span v-if="errors.name" class="error">{{ errors.name }}</span>
-          </div>
-        </div>
-
-        <!-- Cím -->
-        <div class="row">
-          <div class="col-md-12">
-            <input
-              type="text"
-              placeholder="Cím *"
-              class="form-control mb-3"
-              v-model="clientDetails.address"
-              required
-            />
-            <span v-if="errors.address" class="error">{{ errors.address }}</span>
-          </div>
-        </div>
-
-        <!-- Adószám -->
-        <div class="row">
-          <div class="col-md-12">
-            <input
-              type="text"
-              placeholder="Adószám *"
-              class="form-control mb-3"
-              v-model="clientDetails.taxNumber"
-              required
-            />
-            <span v-if="errors.taxNumber" class="error">{{ errors.taxNumber }}</span>
-          </div>
-        </div>
-
-        <!-- Telefonszám -->
-        <div class="row">
-          <div class="col-md-12">
-            <input
-              type="tel"
-              placeholder="Telefonszám *"
-              class="form-control mb-3"
-              v-model="clientDetails.phoneNumber"
-              required
-            />
-            <span v-if="errors.phoneNumber" class="error">{{ errors.phoneNumber }}</span>
-          </div>
-        </div>
-
-        <!-- E-mail cím -->
-        <div class="row">
-          <div class="col-md-12">
-            <input
-              type="email"
-              placeholder="E-mail cím *"
-              class="form-control mb-3"
-              v-model="clientDetails.email"
-              required
-            />
-            <span v-if="errors.email" class="error">{{ errors.email }}</span>
+      <!-- Igen/Nem választó mezők közvetlenül -->
+      <div class="row">
+        <div class="col-md-6" v-for="field in yesNoFields" :key="field.id">
+          <div class="form-group mb-4">
+            <label>{{ field.label }} *</label>
+            <div class="radio-group">
+              <input
+                type="radio"
+                :id="field.id + '_igen'"
+                :name="field.id"
+                value="igen"
+                v-model="field.value"
+              />
+              <label :for="field.id + '_igen'">Igen</label>
+              <input
+                type="radio"
+                :id="field.id + '_nem'"
+                :name="field.id"
+                value="nem"
+                v-model="field.value"
+                class="ms-3"
+              />
+              <label :for="field.id + '_nem'">Nem</label>
+            </div>
+            <!-- Szállásigény létszám mezője, ha az "Igen" opció van kiválasztva -->
+            <div v-if="field.id === 'accommodation' && field.value === 'igen'" class="form-group mt-3">
+              <label for="accommodationCount">Szállásigény várható létszáma *</label>
+              <input
+                type="number"
+                id="accommodationCount"
+                v-model="accommodationCount"
+                placeholder="Adja meg a létszámot"
+                class="form-control uniform-input"
+                required
+              />
+              <span v-if="errors.accommodationCount" class="error">{{ errors.accommodationCount }}</span>
+            </div>
+            <!-- Parkolóhely igény részletei, ha az "Igen" opció van kiválasztva -->
+            <div v-if="field.id === 'parking' && field.value === 'igen'" class="form-group mt-3">
+              <label for="parkingDetails">Várható gépkocsiforgalom és parkolóhely igény *</label>
+              <textarea
+                id="parkingDetails"
+                v-model="parkingDetails"
+                placeholder="Adja meg a várható gépkocsiforgalom és parkolóhely igény részleteit"
+                class="form-control uniform-input"
+                required
+              ></textarea>
+              <span v-if="errors.parkingDetails" class="error">{{ errors.parkingDetails }}</span>
+            </div>
+            <!-- Hulladék elszállításának módja, ha az "Igen" opció van kiválasztva -->
+            <div v-if="field.id === 'waste' && field.value === 'igen'" class="form-group mt-3">
+              <label for="wasteDisposalMethod">Hulladék elszállításának módja *</label>
+              <select
+                id="wasteDisposalMethod"
+                v-model="wasteDisposalMethod"
+                class="form-control uniform-input"
+                required
+              >
+                <option value="" disabled>Válasszon egy opciót</option>
+                <option value="sajat">Saját úton</option>
+                <option value="egyetem">Egyetem által biztosítva</option>
+              </select>
+              <span v-if="errors.wasteDisposalMethod" class="error">{{ errors.wasteDisposalMethod }}</span>
+              <!-- Ha a "Saját úton" opció van kiválasztva -->
+              <div v-if="wasteDisposalMethod === 'sajat'" class="form-group mt-3">
+                <label for="wasteDisposalResponsible">Ki végzi a hulladék elszállítását? *</label>
+                <input
+                  type="text"
+                  id="wasteDisposalResponsible"
+                  v-model="wasteDisposalResponsible"
+                  placeholder="Adja meg a felelős személyt vagy céget"
+                  class="form-control uniform-input"
+                  required
+                />
+                <span v-if="errors.wasteDisposalResponsible" class="error">{{ errors.wasteDisposalResponsible }}</span>
+              </div>
+            </div>
+            <span v-if="errors[field.id]" class="error">{{ errors[field.id] }}</span>
           </div>
         </div>
       </div>
@@ -87,62 +96,76 @@
 export default {
   data() {
     return {
-      activePage: 1,
-      clientDetails: {
-        name: '',
-        address: '',
-        taxNumber: '',
-        phoneNumber: '',
-        email: ''
-      },
+      yesNoFields: [
+        { id: "accommodation", label: "Van a rendezvény idejére szállásigénye?", value: "" },
+        { id: "parking", label: "Van parkolóhely igénye?", value: "" },
+        { id: "waste", label: "Keletkezik hulladék?", value: "" },
+        { id: "internet", label: "Szükséges internetkapcsolat (WiFi) a rendezvény idejére?", value: "" },
+      ],
+      accommodationCount: "", // Szállásigény létszáma
+      parkingDetails: "", // Parkolóhely részletei
+      wasteDisposalMethod: "", // Hulladék elszállításának módja
+      wasteDisposalResponsible: "", // Ki végzi a hulladék elszállítását
       errors: {},
-      pages: [
-        {
-          title: 'MEGRENDELŐ (JOGI HÁTTÉR ESETÉN) ADATAI',
-          type: 'client'
-        }
-      ]
     };
   },
   methods: {
-    validatePage() {
+    validateForm() {
       this.errors = {};
-      let isValid = true;
 
-      // Név/Cégnév validálása
-      if (!this.clientDetails.name) {
-        this.errors.name = 'A név/cégnév kötelező.';
-        isValid = false;
+      // Szállásigény validáció
+      const accommodationField = this.yesNoFields.find(field => field.id === "accommodation");
+      if (accommodationField && accommodationField.value === "igen" && !this.accommodationCount) {
+        this.errors.accommodationCount = "Kötelező megadni a szállásigény várható létszámát.";
       }
 
-      // Cím validálása
-      if (!this.clientDetails.address) {
-        this.errors.address = 'A cím kötelező.';
-        isValid = false;
+      // Parkolóhely validáció
+      const parkingField = this.yesNoFields.find(field => field.id === "parking");
+      if (parkingField && parkingField.value === "igen" && !this.parkingDetails) {
+        this.errors.parkingDetails = "Kötelező megadni a várható gépkocsiforgalom és parkolóhely igény részleteit.";
       }
 
-      // Adószám validálása
-      if (!this.clientDetails.taxNumber) {
-        this.errors.taxNumber = 'Az adószám kötelező.';
-        isValid = false;
+      // Hulladék validáció
+      const wasteField = this.yesNoFields.find(field => field.id === "waste");
+      if (wasteField && wasteField.value === "igen") {
+        if (!this.wasteDisposalMethod) {
+          this.errors.wasteDisposalMethod = "Kötelező megadni a hulladék elszállításának módját.";
+        }
+        if (this.wasteDisposalMethod === "sajat" && !this.wasteDisposalResponsible) {
+          this.errors.wasteDisposalResponsible = "Kötelező megadni, ki végzi a hulladék elszállítását.";
+        }
       }
 
-      // Telefonszám validálása
-      if (!this.clientDetails.phoneNumber) {
-        this.errors.phoneNumber = 'A telefonszám kötelező.';
-        isValid = false;
-      }
+      // További validációk...
 
-      // E-mail cím validálása
-      if (!this.clientDetails.email) {
-        this.errors.email = 'Az e-mail cím kötelező.';
-        isValid = false;
-      }
-
-      return isValid;
-    }
-  }
+      return Object.keys(this.errors).length === 0;
+    },
+  },
 };
 </script>
 
 <style src="/src/assets/css/style_pages.css"></style>
+<style scoped>
+.uniform-input {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 20px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 1rem;
+}
+
+.uniform-input::placeholder {
+  color: #888;
+  opacity: 0.5;
+}
+
+.form-group {
+  margin-bottom: 30px; /* Larger margin between form groups */
+}
+
+.error {
+  color: red;
+  font-size: 0.875rem;
+}
+</style>

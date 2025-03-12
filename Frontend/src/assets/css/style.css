@@ -455,3 +455,27 @@ body.dark-mode nav {
     font-size: 20px;
     color: #333;
 }
+
+
+/* Áttetsző placeholder */
+::placeholder {
+    opacity: 0.6; /* Állítsd be az áttetszőséget (0-1 közötti érték) */
+}
+
+/* Ha több specifikusabb esetet szeretnél, akkor például: */
+input::placeholder,
+textarea::placeholder {
+    opacity: 0.6; /* Állíthatod más értékre is, ha szükséges */
+}
+
+
+.flex-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px; /* Adjust the gap as needed */
+  }
+  
+  .flex-item {
+    flex: 1 1 calc(33.333% - 20px); /* Adjust the percentage as needed */
+    min-width: 300px; /* Adjust the minimum width as needed */
+  }

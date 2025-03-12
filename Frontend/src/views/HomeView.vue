@@ -2,7 +2,7 @@
   <div id="app">
     <Navbar /> <!-- Navbar komponens -->
 
-    <!-- Dinamikus komponens váltás -->
+    <!-- komponens váltás -->
     <component :is="currentPage" />
 
     <!-- Navigáció és kitöltési csík -->
@@ -12,7 +12,7 @@
         @click="navigate(activePage - 1)"
         class="nav-button btn btn-primary"
       >
-        <i class="bi bi-arrow-left"></i> <!-- Balra nyíl ikon -->
+        <i class="bi bi-arrow-left"></i> 
       </button>
 
       <!-- Kitöltési csík -->
@@ -47,6 +47,11 @@ import Pages2 from '../components/Pages/Page2.vue';
 import Pages3 from '../components/Pages/Page3.vue';
 import Pages4 from '../components/Pages/Page4.vue';
 import Pages5 from '../components/Pages/Page5.vue';
+import Pages6 from '../components/Pages/Page6.vue';
+import Pages7 from '../components/Pages/Page7.vue';
+import Pages8 from '../components/Pages/Page8.vue';
+import Pages9 from '../components/Pages/Page9.vue';
+import Pages10 from '../components/Pages/Page10.vue';
 
 export default {
   components: {
@@ -56,18 +61,26 @@ export default {
     Pages3,
     Pages4,
     Pages5,
+    Pages6,
+    Pages7,
+    Pages8,
+    Pages9,
+    Pages10,
   },
   data() {
     return {
-      currentPage: 'Pages', // Alapértelmezett komponens
-      activePage: 1, // Aktuális oldal sorszáma
-      totalPages: 5, // Összes oldal száma
+      currentPage: 'Pages', 
+      activePage: 1,
+      totalPages: 10, 
     };
   },
   computed: {
     // Kitöltési százalék számítása
     progress() {
-      return ((this.activePage - 1) / (this.totalPages - 1)) * 100;
+      if (this.totalPages === 1) {
+        return 100;
+      }
+      return Math.round(((this.activePage - 1) / (this.totalPages - 1)) * 100);
     },
   },
   methods: {
@@ -80,12 +93,12 @@ export default {
     },
     // Oldal nevének lekérése az index alapján
     getPageName(index) {
-      const pages = ['Pages', 'Pages2', 'Pages3', 'Pages4', 'Pages5'];
+      const pages = ['Pages', 'Pages2', 'Pages3', 'Pages4', 'Pages5', 'Pages6', 'Pages7', 'Pages8', 'Pages9', 'Pages10'];
       return pages[index - 1];
     },
     // Küldés gomb eseménykezelője
     submit() {
-      alert('Adatok elküldve!'); // Példa: helyettesíthető valós logikával
+      alert('Adatok elküldve!'); 
       // Itt lehet API hívást vagy más műveletet végrehajtani
     },
   },
@@ -115,7 +128,7 @@ html {
   gap: 20px;
   width: 100%;
   padding: 10px;
-  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1); /* Árnyék hozzáadása */
+  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1); 
 }
 
 /* Kitöltési csík */
@@ -123,13 +136,14 @@ html {
   display: flex;
   align-items: center;
   gap: 10px;
+margin-top: 10px; 
 }
 
 .custom-progress {
-  width: 400px; /* Hosszabb csík */
+  width: 400px; 
   height: 10px;
   border-radius: 5px;
-  pointer-events: none; /* Letiltja a felhasználói interakciót */
+  pointer-events: none; 
 }
 
 .custom-progress::-webkit-progress-bar {

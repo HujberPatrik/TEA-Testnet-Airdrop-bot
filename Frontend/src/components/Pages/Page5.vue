@@ -1,144 +1,174 @@
 <template>
-    <div class="container">
-      <div v-for="(page, index) in pages" :key="index" :id="'page' + (index + 1)" class="page" :style="{ display: activePage === index + 1 ? 'block' : 'none' }">
-        <!-- Cím rész -->
-        <h2>
-          <span>{{ page.title }}</span>
-          <i class="bi bi-info-circle" title="A * részek kötelezőek"></i>
-        </h2>
-  
-        <!-- Megrendelő (jogi háttér esetén) adatai -->
-        <div v-if="page.type === 'client'" class="client-details">
-          <div class="row" v-for="(field, index) in clientFields" :key="index">
-            <div class="col-md-12">
+  <div class="container">
+    <div class="page" :style="{ display: 'block' }">
+      <!-- Cím rész -->
+      <h2>
+        <span>A RENDEZVÉNY RÉSZLETES ADATAI</span>
+        <i class="bi bi-info-circle" title="A * részek kötelezőek"></i>
+      </h2>
+
+      <!-- Igen/Nem választó mezők közvetlenül -->
+      <div class="row">
+        <div class="col-md-6" v-for="field in yesNoFields" :key="field.id">
+          <div class="form-group mb-4">
+            <label>{{ field.label }} *</label>
+            <div class="radio-group">
               <input
-                :type="field.type"
-                :placeholder="field.placeholder"
-                class="form-control mb-3"
-                v-model="clientDetails[field.model]"
-                :required="field.required"
+                type="radio"
+                :id="field.id + '_igen'"
+                :name="field.id"
+                value="igen"
+                v-model="field.value"
               />
-              <span v-if="errors[field.model]" class="error">{{ errors[field.model] }}</span>
+              <label :for="field.id + '_igen'">Igen</label>
+              <input
+                type="radio"
+                :id="field.id + '_nem'"
+                :name="field.id"
+                value="nem"
+                v-model="field.value"
+                class="ms-3"
+              />
+              <label :for="field.id + '_nem'">Nem</label>
             </div>
-          </div>
-  
-          <!-- Fájl feltöltés -->
-          <div class="row">
-            <div class="col-md-12">
-              <label for="fileUpload">Helyszín berendezési rajz (nem kötelező)</label>
-              <input
-                type="file"
-                id="fileUpload"
-                class="form-control mb-3"
-                @change="handleFileUpload"
-              />
-              <div v-if="fileName" class="file-info">
-                <p>{{ fileName }}</p>
+            <!-- Fotó és/vagy videófelvétel készül-e a rendezvényen -->
+            <div v-if="field.id === 'photography' && field.value === 'igen'" class="form-group">
+              <label for="photographyDetails">Milyen eszközzel fog történni? *</label>
+              <textarea
+                id="photographyDetails"
+                v-model="photographyDetails"
+                placeholder="Fényképezőgép, videokamera, GoPro, drón, stb."
+                class="form-control"
+                required
+              ></textarea>
+              <span v-if="errors.photographyDetails" class="error">{{ errors.photographyDetails }}</span>
+            </div>
+            <!-- Catering típusa -->
+            <div v-if="field.id === 'catering' && field.value === 'igen'" class="form-group">
+              <label title="Az egyetemen tartandó rendezvények esetében a catering szolgáltatásában az egyetem partnerei állnak rendelkezésre. Kollégáink felveszik Önnel a kapcsolatot és bővebb tájékoztatást küldenek.">Catering típusa *</label>
+              <div>
+                <input type="checkbox" id="coldFood" value="hideg étel" v-model="cateringTypes" />
+                <label for="coldFood" class="checkbox-label">hideg étel</label>
               </div>
-              <p class="max-size-text">Max. méret 6Mb</p> <!-- Max. méret szöveg -->
+              <div>
+                <input type="checkbox" id="hotFood" value="meleg étel" v-model="cateringTypes" />
+                <label for="hotFood" class="checkbox-label">meleg étel</label>
+              </div>
+              <div>
+                <input type="checkbox" id="drinks" value="kávé, tea, üdítő" v-model="cateringTypes" />
+                <label for="drinks" class="checkbox-label">kávé, tea, üdítő</label>
+              </div>
+              <span v-if="errors.cateringTypes" class="error">{{ errors.cateringTypes }}</span>
             </div>
+            <!-- Oktatástechnikai eszközigény mezője, ha az "Igen" opció van kiválasztva -->
+            <div v-if="field.id === 'technicalSupport' && field.value === 'igen'" class="form-group mt-3">
+              <label for="technicalEquipmentNeeds">Oktatástechnikai eszközigény *</label>
+              <input
+                type="text"
+                id="technicalEquipmentNeeds"
+                v-model="technicalEquipmentNeeds"
+                placeholder="laptop, projektor, prezenter, stb."
+                class="form-control uniform-input"
+                required
+              />
+              <span v-if="errors.technicalEquipmentNeeds" class="error">{{ errors.technicalEquipmentNeeds }}</span>
+            </div>
+            <!-- Korlátozott mozgású személyek részvételének mezője, ha az "Igen" opció van kiválasztva -->
+            <div v-if="field.id === 'disabledAccess' && field.value === 'igen'" class="form-group mt-3">
+              <label for="disabledAccessDetails">Korlátozott mozgású személyek részvételének részletei *</label>
+              <textarea
+                id="disabledAccessDetails"
+                v-model="disabledAccessDetails"
+                placeholder="Adja meg a részleteket"
+                class="form-control uniform-input"
+                required
+              ></textarea>
+              <span v-if="errors.disabledAccessDetails" class="error">{{ errors.disabledAccessDetails }}</span>
+            </div>
+            <span v-if="errors[field.id]" class="error">{{ errors[field.id] }}</span>
           </div>
-  
-          <!-- Nyilatkozatok -->
-          <div class="form-check">
-            <input
-              type="checkbox"
-              id="dataDeclaration"
-              v-model="clientDetails.dataDeclaration"
-              required
-              class="form-check-input"
-            />
-            <label for="dataDeclaration" class="form-check-label">
-              Az űrlap kitöltésével és elküldésével büntetőjogi felelősségem teljes tudatában kijelentem, hogy az általam megadott adatok a valóságnak teljes mértékben megfelelnek és saját akaratomból adtam meg azokat. Továbbá hozzájárulok ahhoz, hogy adataimat a Széchenyi István Egyetem nevében eljáró személyek a személyi adatok védelméről és a közérdekű adatok nyilvánosságáról szóló 1992. évi LXIII. törvénynek megfelelően kezelje.
-            </label>
-            <span v-if="errors.dataDeclaration" class="error">{{ errors.dataDeclaration }}</span>
-          </div>
-  
-          <div class="form-check">
-            <input
-              type="checkbox"
-              id="regulationAcceptance"
-              v-model="clientDetails.regulationAcceptance"
-              required
-              class="form-check-input"
-            />
-            <label for="regulationAcceptance" class="form-check-label">
-              A Széchenyi István Egyetem hatályban lévő Rendezvényszabályzatát elfogadom.
-            </label>
-          </div>
-  
-          <div class="form-check">
-            <a href="https://munkatars.sze.hu/downloadmanager/details/id/43020/m/13936" target="_blank">A Rendezvényszabályzat ide kattintva érhető el</a>
-          </div>
-  
         </div>
-  
       </div>
     </div>
-  </template>
-  
-  
-  
-  <script>
-  export default {
-    data() {
-      return {
-        activePage: 1,
-        clientDetails: {
-          name: '',
-          address: '',
-          taxNumber: '',
-          phoneNumber: '',
-          email: ''
-        },
-        errors: {},
-        pages: [
-          {
-            title: 'FÁJLFELTÖLTÉS ÉS FELHASZNÁLÓI SZERZŐDÉS',
-            type: 'client'
-          }
-        ]
-      };
-    },
-    methods: {
-      validatePage() {
-        this.errors = {};
-        let isValid = true;
-  
-        // Név/Cégnév validálása
-        if (!this.clientDetails.name) {
-          this.errors.name = 'A név/cégnév kötelező.';
-          isValid = false;
-        }
-  
-        // Cím validálása
-        if (!this.clientDetails.address) {
-          this.errors.address = 'A cím kötelező.';
-          isValid = false;
-        }
-  
-        // Adószám validálása
-        if (!this.clientDetails.taxNumber) {
-          this.errors.taxNumber = 'Az adószám kötelező.';
-          isValid = false;
-        }
-  
-        // Telefonszám validálása
-        if (!this.clientDetails.phoneNumber) {
-          this.errors.phoneNumber = 'A telefonszám kötelező.';
-          isValid = false;
-        }
-  
-        // E-mail cím validálása
-        if (!this.clientDetails.email) {
-          this.errors.email = 'Az e-mail cím kötelező.';
-          isValid = false;
-        }
-  
-        return isValid;
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      yesNoFields: [
+        { id: "photography", label: "Fotó és/vagy videófelvétel készül-e a rendezvényen?", value: "" },
+        { id: "catering", label: "Lesz a rendezvény területén catering?\n", value: "" },
+        { id: "technicalSupport", label: "Szükséges-e oktatástechnikai támogatás?", value: "" },
+        { id: "disabledAccess", label: "Korlátozott mozgású személyek részt vesznek?", value: "" },
+      ],
+      photographyDetails: "", // Fotó és/vagy videófelvétel részletei
+      cateringTypes: [], // Catering típusok
+      technicalEquipmentNeeds: "", // Oktatástechnikai eszközigény
+      disabledAccessDetails: "", // Korlátozott mozgású személyek részvételének részletei
+      errors: {},
+    };
+  },
+  methods: {
+    validateForm() {
+      this.errors = {};
+
+      // Fotó és/vagy videófelvétel validáció
+      const photographyField = this.yesNoFields.find(field => field.id === "photography");
+      if (photographyField && photographyField.value === "igen" && !this.photographyDetails) {
+        this.errors.photographyDetails = "Kötelező megadni a fotó és/vagy videófelvétel részleteit.";
       }
-    }
-  };
-  </script>
-  
-  <style src="/src/assets/css/style_pages.css"></style>
+
+      // Catering validáció
+      const cateringField = this.yesNoFields.find(field => field.id === "catering");
+      if (cateringField && cateringField.value === "igen" && this.cateringTypes.length === 0) {
+        this.errors.cateringTypes = "Kötelező megadni a catering típusát.";
+      }
+
+      // Oktatástechnikai támogatás validáció
+      const technicalSupportField = this.yesNoFields.find(field => field.id === "technicalSupport");
+      if (technicalSupportField && technicalSupportField.value === "igen" && !this.technicalEquipmentNeeds) {
+        this.errors.technicalEquipmentNeeds = "Kötelező megadni az oktatástechnikai eszközigényt.";
+      }
+
+      // Korlátozott mozgású személyek részvételének validáció
+      const disabledAccessField = this.yesNoFields.find(field => field.id === "disabledAccess");
+      if (disabledAccessField && disabledAccessField.value === "igen" && !this.disabledAccessDetails) {
+        this.errors.disabledAccessDetails = "Kötelező megadni a korlátozott mozgású személyek részvételének részleteit.";
+      }
+
+      // További validációk...
+
+      return Object.keys(this.errors).length === 0;
+    },
+  },
+};
+</script>
+
+<style src="/src/assets/css/style_pages.css"></style>
+<style scoped>
+.uniform-input {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 20px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 1rem;
+}
+
+.uniform-input::placeholder {
+  color: #888;
+  opacity: 0.5;
+}
+
+.form-group {
+  margin-bottom: 30px; /* Larger margin between form groups */
+}
+
+.error {
+  color: red;
+  font-size: 0.875rem;
+}
+</style>
+
