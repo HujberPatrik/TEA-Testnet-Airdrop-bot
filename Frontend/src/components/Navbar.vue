@@ -1,6 +1,6 @@
 <template>
   <nav class="navbar navbar-expand-lg navbar-light sticky-top px-4 py-3 bg-light">
-    <a href="index.html" class="navbar-brand d-flex" aria-label="Home">
+    <a href="/" class="navbar-brand d-flex" aria-label="Home">
       <img
         src="../img/egyetemi logo/fekvo_RGB/sze_logo_fekvo_RGB_white_bg.png"
         alt="SZE Logó"
