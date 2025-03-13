@@ -123,12 +123,13 @@ html {
 /* Navigációs konténer */
 .navigation-container {
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
   gap: 20px;
   width: 100%;
   padding: 10px;
   box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1); 
+  flex-wrap: nowrap; /* Flexbox nowrap */
 }
 
 /* Kitöltési csík */
@@ -136,11 +137,12 @@ html {
   display: flex;
   align-items: center;
   gap: 10px;
-margin-top: 10px; 
+  margin-top: 10px; 
+  flex-grow: 1; /* Flexbox grow */
 }
 
 .custom-progress {
-  width: 400px; 
+  width: 100%; /* Full width */
   height: 10px;
   border-radius: 5px;
   pointer-events: none; 
@@ -154,5 +156,55 @@ margin-top: 10px;
 .custom-progress::-webkit-progress-value {
   background-color: #50adc9;
   border-radius: 5px;
+}
+
+/* Gombok színezése */
+.nav-button, .submit-button {
+  background-color: #50adc9; /* Gombok színe */
+  border-color: #50adc9; /* Gombok szegélyének színe */
+}
+
+/* Média lekérdezések kisebb képernyőkhöz */
+@media (max-width: 768px) {
+  .navigation-container {
+    flex-direction: row; /* Always row */
+    align-items: center;
+    flex-wrap: nowrap; /* Prevent wrapping */
+  }
+
+  .progress-container {
+    margin-top: 0; /* No margin top */
+  }
+
+  .nav-button, .submit-button {
+    width: auto; /* Auto width */
+    margin-top: 0; /* No margin top */
+  }
+}
+
+/* Kitöltési csík elrejtése nagyon kicsi kijelzőnél */
+@media (max-width: 100px) {
+  .progress-container {
+    display: none;
+  }
+}
+
+.dark-mode {
+  background-color: #121212;
+  color: #ffffff;
+}
+
+.dark-mode .navigation-container {
+  background-color: #1e1e1e;
+}
+
+.dark-mode .custom-progress::-webkit-progress-bar {
+  background-color: #333;
+}
+
+
+
+.dark-mode .bg-light {
+  background-color: #242943 !important; /* Override bg-light in dark mode */
 }
 </style>

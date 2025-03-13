@@ -12,6 +12,11 @@ html {
   font-size: 1vw; /* Base font size relative to viewport width */
 }
 
+body.dark-mode {
+  background-color: #333;
+  color: #e0e0e0;
+}
+
 .container {
   display: flex;
   flex-direction: column;
@@ -39,6 +44,12 @@ html {
   overflow-y: auto; 
 }
 
+body.dark-mode .page {
+  background-color: #1e1e1e;
+  color: #e0e0e0;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
 .page h2 {
   font-size: 30px; /* Base size */
   margin-bottom: 20px;
@@ -52,6 +63,11 @@ html {
   display: flex;
   justify-content: center;
   align-items: center;
+}
+
+body.dark-mode .page h2 {
+  background-color: #333;
+  color: #e0e0e0;
 }
 
 .page h2 i {
@@ -73,11 +89,27 @@ html {
   font-size: 1rem; /* Base size */
 }
 
+body.dark-mode .page input[type="text"],
+body.dark-mode .page input[type="number"],
+body.dark-mode .page select,
+body.dark-mode .page textarea {
+  background-color: #333;
+  color: #e0e0e0;
+  border: 1px solid #555;
+}
+
 .page input[type="text"]::placeholder,
 .page input[type="number"]::placeholder,
 .page select::placeholder,
 .page textarea::placeholder {
   opacity: 0.5; 
+}
+
+body.dark-mode .page input[type="text"]::placeholder,
+body.dark-mode .page input[type="number"]::placeholder,
+body.dark-mode .page select::placeholder,
+body.dark-mode .page textarea::placeholder {
+  color: #bbb;
 }
 
 .page select {
@@ -86,11 +118,19 @@ html {
   cursor: pointer;
 }
 
+body.dark-mode .page select {
+  background-color: #333;
+}
+
 .page label {
   font-weight: bold;
   margin-bottom: 8px;
   display: block;
   color: #333;
+}
+
+body.dark-mode .page label {
+  color: #e0e0e0;
 }
 
 .radio-group {
@@ -165,7 +205,7 @@ html {
 }
 
 .navigation button {
-  background-color: #4caf50;
+  background-color: #242943;
   color: white;
   border: none;
   border-radius: 50%;
@@ -179,7 +219,7 @@ html {
 }
 
 .navigation button:hover {
-  background-color: #45a049;
+  background-color: #242943;
 }
 
 .navigation button:disabled {
@@ -368,3 +408,26 @@ html {
     font-size: 0.8rem; /* Adjust font size for smaller screens */
   }
 }
+
+.uniform-input {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 20px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 1rem;
+}
+
+.uniform-input::placeholder {
+  color: #888;
+  opacity: 0.5;
+}
+
+/* Média lekérdezések kisebb képernyőkhöz */
+@media (max-width: 800px) {
+  .bi-info-circle {
+    display: none; /* Infó gomb elrejtése */
+  }
+}
+
+

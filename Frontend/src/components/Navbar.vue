@@ -1,5 +1,5 @@
 <template>
-  <nav class="navbar navbar-expand-lg navbar-light sticky-top px-4 py-3 bg-light">
+  <nav :class="['navbar', 'navbar-expand-lg', 'sticky-top', 'px-4', 'py-3', darkMode ? 'navbar-dark' : 'navbar-light', darkMode ? 'bg-dark' : 'bg-light']">
     <a href="/" class="navbar-brand d-flex" aria-label="Home">
       <img
         src="../img/egyetemi logo/fekvo_RGB/sze_logo_fekvo_RGB_white_bg.png"
@@ -78,7 +78,6 @@ export default {
 <style scoped>
 /* Navbar styles */
 .navbar {
-  background-color: #f8f9fa;
   border-bottom: 1px solid #ddd;
 }
 
@@ -142,15 +141,28 @@ body.dark-mode {
 }
 
 body.dark-mode .navbar {
-  background-color: #242943;
+  background-color: #242943; /* Updated color */
+  border-bottom: 1px solid #444;
+}
+
+body.dark-mode .navbar-text {
+  color: #fff;
 }
 
 body.dark-mode .navbar .btn {
-  background-color: #333;
+  background-color: #444;
 }
 
 body.dark-mode .navbar .btn:hover {
+  background-color: #555;
+}
+
+body.dark-mode .custom-toggler {
   background-color: #444;
+}
+
+body.dark-mode .custom-toggler .navbar-toggler-icon {
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg viewBox='0 0 30 30' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke='rgba(255, 255, 255, 1)' stroke-width='2' stroke-linecap='round' stroke-miterlimit='10' d='M4 7h22M4 15h22M4 23h22'/%3E%3C/svg%3E");
 }
 
 .navbar-text {
