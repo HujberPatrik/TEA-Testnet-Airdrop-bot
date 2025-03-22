@@ -11,7 +11,7 @@
 
     <!-- Navbar Text -->
     <div class="navbar-text ms-3" style="font-size: clamp(1rem, 4vw, 1.5rem); font-weight: 500">
-      Rendezvénybejelentő űrlap!!!
+      Rendezvénybejelentő űrlap
     </div>
     <button
       class="navbar-toggler custom-toggler"
