@@ -10,46 +10,6 @@
         }, 1);
     };
     spinner();
-    
-
-
-
-
-
-
-
-
-    
-
-    
-    
-    // Back to top button
-    $(window).scroll(function () {
-        if ($(this).scrollTop() > 300) {
-            $('.back-to-top').fadeIn('slow');
-        } else {
-            $('.back-to-top').fadeOut('slow');
-        }
-    });
-    $('.back-to-top').click(function () {
-        $('html, body').animate({scrollTop: 0}, 1500, 'easeInOutExpo');
-        return false;
-    });
-
-
-    // Sidebar Toggler
-    $('.sidebar-toggler').click(function () {
-        $('.sidebar, .content').toggleClass("open");
-        return false;
-    });
-
-
-    // Progress Bar
-    $('.pg-bar').waypoint(function () {
-        $('.progress .progress-bar').each(function () {
-            $(this).css("width", $(this).attr("aria-valuenow") + '%');
-        });
-    }, {offset: '80%'});
 
 
     // Calender
@@ -69,6 +29,26 @@
         nav : false
     });
 
+       
+ // Sidebar Toggler
+ $('.sidebar-toggler').click(function () {
+    if ($('.sidebar').length && $('.content').length) {
+        $('.sidebar, .content').toggleClass("open");
+        console.log("Sidebar toggled"); // Hibakeresési üzenet
+    } else {
+        console.error("Sidebar or content element not found");
+    }
+    return false;
+});
+
+
+// Progress Bar
+$('.pg-bar').waypoint(function () {
+    $('.progress .progress-bar').each(function () {
+        const progressValue = $(this).attr("aria-valuenow") + '%';
+        $(this).addClass('animate-progress').css("width", progressValue); // CSS osztály hozzáadása
+    });
+}, {offset: '80%'});
 
     // Worldwide Sales Chart
     var ctx1 = $("#worldwide-sales").get(0).getContext("2d");
@@ -99,8 +79,6 @@
     });
 
 
-  
-
 // Dark mode toggle
 const darkModeToggle = document.getElementById('dark-mode-toggle');
 const modeIcon = document.getElementById('mode-icon');
@@ -109,16 +87,12 @@ const body = document.body;
 darkModeToggle.addEventListener('click', () => {
     body.classList.toggle('dark-mode');
     
-    // Ellenőrizze, hogy a sötét mód aktív-e, és módosítsa az ikont
     if (body.classList.contains('dark-mode')) {
-        modeIcon.classList.remove('fa-moon'); 
-        modeIcon.classList.add('fa-sun'); 
-        modeIcon.style.color = '#242943'; 
+        modeIcon.classList.replace('fa-moon', 'fa-sun'); 
     } else {
-        modeIcon.classList.remove('fa-sun'); 
-        modeIcon.classList.add('fa-moon'); 
-        modeIcon.style.color = '#242943'; 
+        modeIcon.classList.replace('fa-sun', 'fa-moon'); 
     }
+    modeIcon.style.color = '#242943'; 
 });
 
 
@@ -146,6 +120,7 @@ darkModeToggle.addEventListener('click', () => {
         }
     });
 
-    
+ 
+
 })(jQuery);
 
