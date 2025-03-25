@@ -87,8 +87,6 @@
           />
         </div>
       </div>
-
-      <!-- Beküldés gomb eltávolítva -->
     </div>
   </div>
 </template>
@@ -104,27 +102,10 @@ export default {
       expectedActivity: "",
       otherActivity: "",
       activities: ["por", "füst", "páraképződés", "egyik sem várható", "egyéb"],
-      activeAccordion: 0,
       errors: {},
     };
   },
-  computed: {
-    groupedYesNoFields() {
-      const groupSize = 4;
-      return this.yesNoFields.reduce((groups, field, index) => {
-        const groupIndex = Math.floor(index / groupSize);
-        if (!groups[groupIndex]) {
-          groups[groupIndex] = [];
-        }
-        groups[groupIndex].push(field);
-        return groups;
-      }, []);
-    },
-  },
   methods: {
-    toggleAccordion(index) {
-      this.activeAccordion = this.activeAccordion === index ? null : index;
-    },
     saveDataToLocalStorage() {
       const formData = {
         eventNature: this.eventNature,
@@ -134,8 +115,21 @@ export default {
         expectedActivity: this.expectedActivity,
         otherActivity: this.otherActivity,
       };
-      localStorage.setItem('formData', JSON.stringify(formData));
-      console.log('Adatok mentve a localStorage-ba:', formData);
+      localStorage.setItem('formDataPage3', JSON.stringify(formData));
+      console.log('Adatok mentve a localStorage-ba (Page3):', formData);
+    },
+    loadDataFromLocalStorage() {
+      const savedData = localStorage.getItem('formDataPage3');
+      if (savedData) {
+        const data = JSON.parse(savedData);
+        this.eventNature = data.eventNature || "";
+        this.eventProgram = data.eventProgram || "";
+        this.venueSetup = data.venueSetup || "";
+        this.electricianDuty = data.electricianDuty || "";
+        this.expectedActivity = data.expectedActivity || "";
+        this.otherActivity = data.otherActivity || "";
+        console.log('Adatok betöltve a localStorage-ból (Page3):', data);
+      }
     },
     validateForm() {
       this.errors = {};
@@ -159,6 +153,10 @@ export default {
         alert('Adatok sikeresen mentve!');
       }
     },
+  },
+  mounted() {
+    // Az oldal betöltésekor automatikusan betölti az adatokat a localStorage-ból
+    this.loadDataFromLocalStorage();
   },
 };
 </script>

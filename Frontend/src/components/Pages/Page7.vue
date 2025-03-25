@@ -7,7 +7,7 @@
         <i class="bi bi-info-circle" title="A * részek kötelezőek"></i>
       </h2>
 
-      <!-- Igen/Nem választó mezők közvetlenül -->
+      <!-- Igen/Nem választó mezők -->
       <div class="row">
         <div class="col-md-6" v-for="field in yesNoFields" :key="field.id">
           <div class="form-group mb-4">
@@ -31,6 +31,7 @@
               />
               <label :for="field.id + '_nem'">Nem</label>
             </div>
+
             <!-- Tűzveszélyes tevékenység leírása -->
             <div v-if="field.id === 'fireHazard' && field.value === 'igen'" class="form-group">
               <label for="fireHazardDetails">Tűzveszélyes tevékenység leírása *</label>
@@ -43,6 +44,7 @@
               ></textarea>
               <span v-if="errors.fireHazardDetails" class="error">{{ errors.fireHazardDetails }}</span>
             </div>
+
             <!-- Vegyi anyag felhasználása várható-e -->
             <div v-if="field.id === 'chemicals' && field.value === 'igen'" class="form-group">
               <label for="chemicalsDetails">Tevékenység leírása *</label>
@@ -55,7 +57,20 @@
               ></textarea>
               <span v-if="errors.chemicalsDetails" class="error">{{ errors.chemicalsDetails }}</span>
             </div>
-            
+
+            <!-- Dekoráció részletei -->
+            <div v-if="field.id === 'decoration' && field.value === 'igen'" class="form-group">
+              <label for="decorationDetails">Dekoráció részletei *</label>
+              <textarea
+                id="decorationDetails"
+                v-model="decorationDetails"
+                placeholder="Írja le a dekoráció részleteit"
+                class="form-control"
+                required
+              ></textarea>
+              <span v-if="errors.decorationDetails" class="error">{{ errors.decorationDetails }}</span>
+            </div>
+
             <span v-if="errors[field.id]" class="error">{{ errors[field.id] }}</span>
           </div>
         </div>
@@ -87,34 +102,47 @@ export default {
         chemicalsDetails: this.chemicalsDetails,
         decorationDetails: this.decorationDetails,
       };
-      localStorage.setItem('formDataPage7', JSON.stringify(formData));
-      console.log('Adatok mentve a localStorage-ba (Page7):', formData);
+      localStorage.setItem("formDataPage7", JSON.stringify(formData));
+      console.log("Adatok mentve a localStorage-ba (Page7):", formData);
+    },
+    loadDataFromLocalStorage() {
+      const savedData = localStorage.getItem("formDataPage7");
+      if (savedData) {
+        const data = JSON.parse(savedData);
+        this.yesNoFields = data.yesNoFields || this.yesNoFields;
+        this.fireHazardDetails = data.fireHazardDetails || "";
+        this.chemicalsDetails = data.chemicalsDetails || "";
+        this.decorationDetails = data.decorationDetails || "";
+        console.log("Adatok betöltve a localStorage-ból (Page7):", data);
+      }
     },
     validateForm() {
       this.errors = {};
 
       // Tűzveszélyes tevékenység validáció
-      const fireHazardField = this.yesNoFields.find(field => field.id === "fireHazard");
+      const fireHazardField = this.yesNoFields.find((field) => field.id === "fireHazard");
       if (fireHazardField && fireHazardField.value === "igen" && !this.fireHazardDetails) {
         this.errors.fireHazardDetails = "Kötelező megadni a tűzveszélyes tevékenység leírását.";
       }
 
       // Vegyi anyag felhasználása validáció
-      const chemicalsField = this.yesNoFields.find(field => field.id === "chemicals");
+      const chemicalsField = this.yesNoFields.find((field) => field.id === "chemicals");
       if (chemicalsField && chemicalsField.value === "igen" && !this.chemicalsDetails) {
         this.errors.chemicalsDetails = "Kötelező megadni a vegyi anyag felhasználásával kapcsolatos tevékenység leírását.";
       }
 
       // Dekoráció validáció
-      const decorationField = this.yesNoFields.find(field => field.id === "decoration");
+      const decorationField = this.yesNoFields.find((field) => field.id === "decoration");
       if (decorationField && decorationField.value === "igen" && !this.decorationDetails) {
         this.errors.decorationDetails = "Kötelező megadni a dekoráció részleteit.";
       }
 
-      // További validációk...
-
       return Object.keys(this.errors).length === 0;
     },
+  },
+  mounted() {
+    // Az oldal betöltésekor automatikusan betölti az adatokat a localStorage-ból
+    this.loadDataFromLocalStorage();
   },
 };
 </script>

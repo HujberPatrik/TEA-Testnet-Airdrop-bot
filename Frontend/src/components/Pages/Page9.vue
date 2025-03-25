@@ -94,15 +94,15 @@ export default {
         address: '',
         taxNumber: '',
         phoneNumber: '',
-        email: ''
+        email: '',
       },
       errors: {},
       pages: [
         {
           title: 'MEGRENDELŐ (JOGI HÁTTÉR ESETÉN) ADATAI',
-          type: 'client'
-        }
-      ]
+          type: 'client',
+        },
+      ],
     };
   },
   methods: {
@@ -112,6 +112,14 @@ export default {
       };
       localStorage.setItem('formDataPage9', JSON.stringify(formData));
       console.log('Adatok mentve a localStorage-ba (Page9):', formData);
+    },
+    loadDataFromLocalStorage() {
+      const savedData = localStorage.getItem('formDataPage9');
+      if (savedData) {
+        const data = JSON.parse(savedData);
+        this.clientDetails = data.clientDetails || this.clientDetails;
+        console.log('Adatok betöltve a localStorage-ból (Page9):', data);
+      }
     },
     validatePage() {
       this.errors = {};
@@ -162,8 +170,12 @@ export default {
     validateEmail(email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       return emailRegex.test(email);
-    }
-  }
+    },
+  },
+  mounted() {
+    // Az oldal betöltésekor automatikusan betölti az adatokat a localStorage-ból
+    this.loadDataFromLocalStorage();
+  },
 };
 </script>
 

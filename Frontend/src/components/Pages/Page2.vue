@@ -83,15 +83,6 @@ export default {
     };
   },
   methods: {
-    navigate(page) {
-      if (this.validatePage()) {
-        // Mentés a localStorage-ba
-        localStorage.setItem('formData', JSON.stringify(this.inputValues));
-        if (page >= 1 && page <= this.pages.length) {
-          this.activePage = page;
-        }
-      }
-    },
     saveDataToLocalStorage() {
       const formData = {
         eventType: this.eventType,
@@ -103,6 +94,18 @@ export default {
       localStorage.setItem('formDataPage2', JSON.stringify(formData));
       console.log('Adatok mentve a localStorage-ba (Page2):', formData);
     },
+    loadDataFromLocalStorage() {
+      const savedData = localStorage.getItem('formDataPage2');
+      if (savedData) {
+        const data = JSON.parse(savedData);
+        this.eventType = data.eventType || '';
+        this.eventClassification = data.eventClassification || '';
+        this.expectedParticipants = data.expectedParticipants || '';
+        this.pressPublicity = data.pressPublicity || '';
+        this.inputValues = data.inputValues || {};
+        console.log('Adatok betöltve a localStorage-ból (Page2):', data);
+      }
+    },
     validatePage() {
       this.errors = {};
       let isValid = true;
@@ -113,8 +116,25 @@ export default {
         }
       });
       return isValid;
-    }
-  }
+    },
+    navigate(page) {
+      if (this.validatePage()) {
+        // Mentés a localStorage-ba
+        this.saveDataToLocalStorage();
+
+        if (page >= 1 && page <= this.pages.length) {
+          this.activePage = page;
+
+          // Betöltés a localStorage-ból
+          this.loadDataFromLocalStorage();
+        }
+      }
+    },
+  },
+  mounted() {
+    // Az aktuális oldal adatainak betöltése a localStorage-ból
+    this.loadDataFromLocalStorage();
+  },
 };
 </script>
   

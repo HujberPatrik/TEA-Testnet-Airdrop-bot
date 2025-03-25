@@ -7,11 +7,11 @@
         <i class="bi bi-info-circle" title="A * részek kötelezőek"></i>
       </h2>
 
-      <!-- Igen/Nem választó mezők közvetlenül -->
+      <!-- Igen/Nem választó mezők -->
       <div class="row">
         <div class="col-md-6" v-for="field in yesNoFields" :key="field.id">
           <div class="form-group mb-4">
-            <label :title="field.id === 'cleaningBefore' ? 'Szükséges lehet, amennyiben építési munkálatok vannak a rendezvényt megelőzően.' : ''">{{ field.label }} *</label>
+            <label>{{ field.label }} *</label>
             <div class="radio-group">
               <input
                 type="radio"
@@ -31,6 +31,7 @@
               />
               <label :for="field.id + '_nem'">Nem</label>
             </div>
+
             <!-- Építési és bontási munkálatok -->
             <div v-if="field.id === 'construction' && field.value === 'igen'" class="form-group">
               <label for="constructionStartDate">Rendezvényterület igénybevételének dátuma *</label>
@@ -80,6 +81,7 @@
               <span v-if="errors.constructionEndTime" class="error">{{ errors.constructionEndTime }}</span>
               <span v-if="errors.subcontractors" class="error">{{ errors.subcontractors }}</span>
             </div>
+
             <!-- Áramigény -->
             <div v-if="field.id === 'powerSupply' && field.value === 'igen'" class="form-group">
               <label for="powerSupplyDetails">Áramigény *</label>
@@ -93,8 +95,6 @@
               />
               <span v-if="errors.powerSupplyDetails" class="error">{{ errors.powerSupplyDetails }}</span>
             </div>
-            <!-- További mezők... -->
-            <span v-if="errors[field.id]" class="error">{{ errors[field.id] }}</span>
           </div>
         </div>
       </div>
@@ -112,12 +112,12 @@ export default {
         { id: "cleaningDuring", label: "Igényel takarítási ügyeletet a rendezvény alatt?", value: "" },
         { id: "powerSupply", label: "Szükséges rendezvényszekrényből áram vételezése?", value: "" },
       ],
-      constructionStartDate: "", // Rendezvényterület igénybevételének dátuma
-      constructionStartTime: "", // Rendezvényterület igénybevételének időpontja
-      constructionEndDate: "", // Rendezvényterület visszaadásának dátuma
-      constructionEndTime: "", // Rendezvényterület visszaadásának időpontja
-      subcontractors: "", // Rendezvényen megjelenő alvállalkozók
-      powerSupplyDetails: "", // Áramigény részletei
+      constructionStartDate: "",
+      constructionStartTime: "",
+      constructionEndDate: "",
+      constructionEndTime: "",
+      subcontractors: "",
+      powerSupplyDetails: "",
       errors: {},
     };
   },
@@ -132,14 +132,28 @@ export default {
         subcontractors: this.subcontractors,
         powerSupplyDetails: this.powerSupplyDetails,
       };
-      localStorage.setItem('formDataPage6', JSON.stringify(formData));
-      console.log('Adatok mentve a localStorage-ba (Page6):', formData);
+      localStorage.setItem("formDataPage6", JSON.stringify(formData));
+      console.log("Adatok mentve a localStorage-ba (Page6):", formData);
+    },
+    loadDataFromLocalStorage() {
+      const savedData = localStorage.getItem("formDataPage6");
+      if (savedData) {
+        const data = JSON.parse(savedData);
+        this.yesNoFields = data.yesNoFields || this.yesNoFields;
+        this.constructionStartDate = data.constructionStartDate || "";
+        this.constructionStartTime = data.constructionStartTime || "";
+        this.constructionEndDate = data.constructionEndDate || "";
+        this.constructionEndTime = data.constructionEndTime || "";
+        this.subcontractors = data.subcontractors || "";
+        this.powerSupplyDetails = data.powerSupplyDetails || "";
+        console.log("Adatok betöltve a localStorage-ból (Page6):", data);
+      }
     },
     validateForm() {
       this.errors = {};
 
       // Építési és bontási munkálatok validáció
-      const constructionField = this.yesNoFields.find(field => field.id === "construction");
+      const constructionField = this.yesNoFields.find((field) => field.id === "construction");
       if (constructionField && constructionField.value === "igen") {
         if (!this.constructionStartDate) {
           this.errors.constructionStartDate = "Kötelező megadni a rendezvényterület igénybevételének dátumát.";
@@ -159,15 +173,17 @@ export default {
       }
 
       // Áramigény validáció
-      const powerSupplyField = this.yesNoFields.find(field => field.id === "powerSupply");
+      const powerSupplyField = this.yesNoFields.find((field) => field.id === "powerSupply");
       if (powerSupplyField && powerSupplyField.value === "igen" && !this.powerSupplyDetails) {
         this.errors.powerSupplyDetails = "Kötelező megadni az áramigény részleteit.";
       }
 
-      // További validációk...
-
       return Object.keys(this.errors).length === 0;
     },
+  },
+  mounted() {
+    // Az oldal betöltésekor automatikusan betölti az adatokat a localStorage-ból
+    this.loadDataFromLocalStorage();
   },
 };
 </script>

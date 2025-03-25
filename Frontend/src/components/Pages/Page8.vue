@@ -184,6 +184,15 @@ export default {
       localStorage.setItem('formDataPage8', JSON.stringify(formData));
       console.log('Adatok mentve a localStorage-ba (Page8):', formData);
     },
+    loadDataFromLocalStorage() {
+      const savedData = localStorage.getItem('formDataPage8');
+      if (savedData) {
+        const data = JSON.parse(savedData);
+        this.organizerDetails = data.organizerDetails || this.organizerDetails;
+        this.additionalOrganizerDetails = data.additionalOrganizerDetails || this.additionalOrganizerDetails;
+        console.log('Adatok betöltve a localStorage-ból (Page8):', data);
+      }
+    },
     validatePage() {
       this.errors = {};
       let isValid = true;
@@ -252,6 +261,10 @@ export default {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       return emailRegex.test(email);
     },
+  },
+  mounted() {
+    // Az oldal betöltésekor automatikusan betölti az adatokat a localStorage-ból
+    this.loadDataFromLocalStorage();
   },
 };
 </script>

@@ -7,7 +7,7 @@
         <i class="bi bi-info-circle" title="A * részek kötelezőek"></i>
       </h2>
 
-      <!-- Igen/Nem választó mezők közvetlenül -->
+      <!-- Igen/Nem választó mezők -->
       <div class="row">
         <div class="col-md-6" v-for="field in yesNoFields" :key="field.id">
           <div class="form-group mb-4">
@@ -31,7 +31,8 @@
               />
               <label :for="field.id + '_nem'">Nem</label>
             </div>
-            <!-- Szállásigény létszám mezője, ha az "Igen" opció van kiválasztva -->
+
+            <!-- Szállásigény létszám mezője -->
             <div v-if="field.id === 'accommodation' && field.value === 'igen'" class="form-group mt-3">
               <label for="accommodationCount">Szállásigény várható létszáma *</label>
               <input
@@ -44,7 +45,8 @@
               />
               <span v-if="errors.accommodationCount" class="error">{{ errors.accommodationCount }}</span>
             </div>
-            <!-- Parkolóhely igény részletei, ha az "Igen" opció van kiválasztva -->
+
+            <!-- Parkolóhely igény részletei -->
             <div v-if="field.id === 'parking' && field.value === 'igen'" class="form-group mt-3">
               <label for="parkingDetails">Várható gépkocsiforgalom és parkolóhely igény *</label>
               <textarea
@@ -56,7 +58,8 @@
               ></textarea>
               <span v-if="errors.parkingDetails" class="error">{{ errors.parkingDetails }}</span>
             </div>
-            <!-- Hulladék elszállításának módja, ha az "Igen" opció van kiválasztva -->
+
+            <!-- Hulladék elszállításának módja -->
             <div v-if="field.id === 'waste' && field.value === 'igen'" class="form-group mt-3">
               <label for="wasteDisposalMethod">Hulladék elszállításának módja *</label>
               <select
@@ -70,6 +73,7 @@
                 <option value="egyetem">Egyetem által biztosítva</option>
               </select>
               <span v-if="errors.wasteDisposalMethod" class="error">{{ errors.wasteDisposalMethod }}</span>
+
               <!-- Ha a "Saját úton" opció van kiválasztva -->
               <div v-if="wasteDisposalMethod === 'sajat'" class="form-group mt-3">
                 <label for="wasteDisposalResponsible">Ki végzi a hulladék elszállítását? *</label>
@@ -102,10 +106,10 @@ export default {
         { id: "waste", label: "Keletkezik hulladék?", value: "" },
         { id: "internet", label: "Szükséges internetkapcsolat (WiFi) a rendezvény idejére?", value: "" },
       ],
-      accommodationCount: "", // Szállásigény létszáma
-      parkingDetails: "", // Parkolóhely részletei
-      wasteDisposalMethod: "", // Hulladék elszállításának módja
-      wasteDisposalResponsible: "", // Ki végzi a hulladék elszállítását
+      accommodationCount: "",
+      parkingDetails: "",
+      wasteDisposalMethod: "",
+      wasteDisposalResponsible: "",
       errors: {},
     };
   },
@@ -118,26 +122,38 @@ export default {
         wasteDisposalMethod: this.wasteDisposalMethod,
         wasteDisposalResponsible: this.wasteDisposalResponsible,
       };
-      localStorage.setItem('formDataPage4', JSON.stringify(formData));
-      console.log('Adatok mentve a localStorage-ba (Page4):', formData);
+      localStorage.setItem("formDataPage4", JSON.stringify(formData));
+      console.log("Adatok mentve a localStorage-ba (Page4):", formData);
+    },
+    loadDataFromLocalStorage() {
+      const savedData = localStorage.getItem("formDataPage4");
+      if (savedData) {
+        const data = JSON.parse(savedData);
+        this.yesNoFields = data.yesNoFields || this.yesNoFields;
+        this.accommodationCount = data.accommodationCount || "";
+        this.parkingDetails = data.parkingDetails || "";
+        this.wasteDisposalMethod = data.wasteDisposalMethod || "";
+        this.wasteDisposalResponsible = data.wasteDisposalResponsible || "";
+        console.log("Adatok betöltve a localStorage-ból (Page4):", data);
+      }
     },
     validateForm() {
       this.errors = {};
 
       // Szállásigény validáció
-      const accommodationField = this.yesNoFields.find(field => field.id === "accommodation");
+      const accommodationField = this.yesNoFields.find((field) => field.id === "accommodation");
       if (accommodationField && accommodationField.value === "igen" && !this.accommodationCount) {
         this.errors.accommodationCount = "Kötelező megadni a szállásigény várható létszámát.";
       }
 
       // Parkolóhely validáció
-      const parkingField = this.yesNoFields.find(field => field.id === "parking");
+      const parkingField = this.yesNoFields.find((field) => field.id === "parking");
       if (parkingField && parkingField.value === "igen" && !this.parkingDetails) {
         this.errors.parkingDetails = "Kötelező megadni a várható gépkocsiforgalom és parkolóhely igény részleteit.";
       }
 
       // Hulladék validáció
-      const wasteField = this.yesNoFields.find(field => field.id === "waste");
+      const wasteField = this.yesNoFields.find((field) => field.id === "waste");
       if (wasteField && wasteField.value === "igen") {
         if (!this.wasteDisposalMethod) {
           this.errors.wasteDisposalMethod = "Kötelező megadni a hulladék elszállításának módját.";
@@ -147,10 +163,12 @@ export default {
         }
       }
 
-      // További validációk...
-
       return Object.keys(this.errors).length === 0;
     },
+  },
+  mounted() {
+    // Az oldal betöltésekor automatikusan betölti az adatokat a localStorage-ból
+    this.loadDataFromLocalStorage();
   },
 };
 </script>
