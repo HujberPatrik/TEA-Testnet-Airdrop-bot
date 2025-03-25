@@ -89,18 +89,34 @@
           address: '',
           taxNumber: '',
           phoneNumber: '',
-          email: ''
+          email: '',
+          dataDeclaration: false,
+          regulationAcceptance: false,
         },
+        fileName: '',
+        fileContent: null,
         errors: {},
         pages: [
           {
             title: 'FÁJLFELTÖLTÉS ÉS FELHASZNÁLÓI SZERZŐDÉS',
-            type: 'client'
-          }
-        ]
+            type: 'client',
+          },
+        ],
       };
     },
     methods: {
+      saveDataToLocalStorage() {
+        const formData = {
+          clientDetails: this.clientDetails,
+        };
+        localStorage.setItem('formDataPage10', JSON.stringify(formData));
+        console.log('Adatok mentve a localStorage-ba (Page10):', formData);
+
+        // Fájl mentése, ha van feltöltött fájl
+        if (this.fileContent) {
+          this.uploadFile();
+        }
+      },
       validatePage() {
         this.errors = {};
         let isValid = true;
@@ -135,9 +151,59 @@
           isValid = false;
         }
   
+        // Nyilatkozatok validálása
+        if (!this.clientDetails.dataDeclaration) {
+          this.errors.dataDeclaration = 'A nyilatkozat elfogadása kötelező.';
+          isValid = false;
+        }
+        if (!this.clientDetails.regulationAcceptance) {
+          this.errors.regulationAcceptance = 'A szabályzat elfogadása kötelező.';
+          isValid = false;
+        }
+  
         return isValid;
-      }
-    }
+      },
+      handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (file) {
+          if (file.size > 6 * 1024 * 1024) {
+            alert('A fájl mérete nem haladhatja meg a 6 MB-ot.');
+            return;
+          }
+          this.fileName = file.name;
+  
+          // Olvassuk be a fájl tartalmát
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            this.fileContent = e.target.result;
+          };
+          reader.readAsDataURL(file);
+        }
+      },
+      uploadFile() {
+        // Küldjük el a fájlt a szervernek
+        fetch('/uploadedfiles', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            fileName: this.fileName,
+            fileContent: this.fileContent,
+          }),
+        })
+          .then((response) => {
+            if (response.ok) {
+              console.log('Fájl sikeresen feltöltve:', this.fileName);
+            } else {
+              console.error('Hiba történt a fájl feltöltése során.');
+            }
+          })
+          .catch((error) => {
+            console.error('Hálózati hiba:', error);
+          });
+      },
+    },
   };
   </script>
   

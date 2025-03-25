@@ -80,6 +80,16 @@ export default {
     };
   },
   methods: {
+    saveDataToLocalStorage() {
+      const formData = {
+        yesNoFields: this.yesNoFields,
+        fireHazardDetails: this.fireHazardDetails,
+        chemicalsDetails: this.chemicalsDetails,
+        decorationDetails: this.decorationDetails,
+      };
+      localStorage.setItem('formDataPage7', JSON.stringify(formData));
+      console.log('Adatok mentve a localStorage-ba (Page7):', formData);
+    },
     validateForm() {
       this.errors = {};
 
@@ -95,12 +105,12 @@ export default {
         this.errors.chemicalsDetails = "Kötelező megadni a vegyi anyag felhasználásával kapcsolatos tevékenység leírását.";
       }
 
-// Dekoráció validáció
-const decorationField = this.yesNoFields.find(field => field.id === "decoration");
-if (decorationField && decorationField.value === "igen" && !this.decorationDetails) {
-this.errors.decorationDetails = "Kötelező megadni a dekoráció részleteit.";
+      // Dekoráció validáció
+      const decorationField = this.yesNoFields.find(field => field.id === "decoration");
+      if (decorationField && decorationField.value === "igen" && !this.decorationDetails) {
+        this.errors.decorationDetails = "Kötelező megadni a dekoráció részleteit.";
       }
-  
+
       // További validációk...
 
       return Object.keys(this.errors).length === 0;

@@ -85,10 +85,23 @@ export default {
   methods: {
     navigate(page) {
       if (this.validatePage()) {
+        // Mentés a localStorage-ba
+        localStorage.setItem('formData', JSON.stringify(this.inputValues));
         if (page >= 1 && page <= this.pages.length) {
           this.activePage = page;
         }
       }
+    },
+    saveDataToLocalStorage() {
+      const formData = {
+        eventType: this.eventType,
+        eventClassification: this.eventClassification,
+        expectedParticipants: this.expectedParticipants,
+        pressPublicity: this.pressPublicity,
+        inputValues: this.inputValues,
+      };
+      localStorage.setItem('formDataPage2', JSON.stringify(formData));
+      console.log('Adatok mentve a localStorage-ba (Page2):', formData);
     },
     validatePage() {
       this.errors = {};

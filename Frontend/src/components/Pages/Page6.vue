@@ -122,6 +122,19 @@ export default {
     };
   },
   methods: {
+    saveDataToLocalStorage() {
+      const formData = {
+        yesNoFields: this.yesNoFields,
+        constructionStartDate: this.constructionStartDate,
+        constructionStartTime: this.constructionStartTime,
+        constructionEndDate: this.constructionEndDate,
+        constructionEndTime: this.constructionEndTime,
+        subcontractors: this.subcontractors,
+        powerSupplyDetails: this.powerSupplyDetails,
+      };
+      localStorage.setItem('formDataPage6', JSON.stringify(formData));
+      console.log('Adatok mentve a localStorage-ba (Page6):', formData);
+    },
     validateForm() {
       this.errors = {};
 

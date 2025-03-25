@@ -157,25 +157,33 @@ export default {
         phoneNumber: '',
         email: '',
         address: '',
-        hasAdditionalOrganizer: ''
+        hasAdditionalOrganizer: '',
       },
       additionalOrganizerDetails: {
         fullName: '',
         neptunCode: '',
         phoneNumber: '',
         email: '',
-        address: ''
+        address: '',
       },
       errors: {},
       pages: [
         {
           title: 'A RENDEZVÉNYÉRT FELELŐS SZEMÉLY (SZERVEZŐ) ADATAI',
-          type: 'organizer'
-        }
-      ]
+          type: 'organizer',
+        },
+      ],
     };
   },
   methods: {
+    saveDataToLocalStorage() {
+      const formData = {
+        organizerDetails: this.organizerDetails,
+        additionalOrganizerDetails: this.additionalOrganizerDetails,
+      };
+      localStorage.setItem('formDataPage8', JSON.stringify(formData));
+      console.log('Adatok mentve a localStorage-ba (Page8):', formData);
+    },
     validatePage() {
       this.errors = {};
       let isValid = true;
@@ -243,8 +251,8 @@ export default {
     validateEmail(email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       return emailRegex.test(email);
-    }
-  }
+    },
+  },
 };
 </script>
 

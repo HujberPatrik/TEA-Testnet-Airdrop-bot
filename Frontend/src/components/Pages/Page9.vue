@@ -106,6 +106,13 @@ export default {
     };
   },
   methods: {
+    saveDataToLocalStorage() {
+      const formData = {
+        clientDetails: this.clientDetails,
+      };
+      localStorage.setItem('formDataPage9', JSON.stringify(formData));
+      console.log('Adatok mentve a localStorage-ba (Page9):', formData);
+    },
     validatePage() {
       this.errors = {};
       let isValid = true;

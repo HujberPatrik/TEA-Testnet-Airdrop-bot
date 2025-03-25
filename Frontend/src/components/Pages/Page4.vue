@@ -110,6 +110,17 @@ export default {
     };
   },
   methods: {
+    saveDataToLocalStorage() {
+      const formData = {
+        yesNoFields: this.yesNoFields,
+        accommodationCount: this.accommodationCount,
+        parkingDetails: this.parkingDetails,
+        wasteDisposalMethod: this.wasteDisposalMethod,
+        wasteDisposalResponsible: this.wasteDisposalResponsible,
+      };
+      localStorage.setItem('formDataPage4', JSON.stringify(formData));
+      console.log('Adatok mentve a localStorage-ba (Page4):', formData);
+    },
     validateForm() {
       this.errors = {};
 

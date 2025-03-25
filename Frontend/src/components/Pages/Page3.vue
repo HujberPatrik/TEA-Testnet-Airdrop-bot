@@ -87,6 +87,8 @@
           />
         </div>
       </div>
+
+      <!-- Beküldés gomb eltávolítva -->
     </div>
   </div>
 </template>
@@ -123,10 +125,39 @@ export default {
     toggleAccordion(index) {
       this.activeAccordion = this.activeAccordion === index ? null : index;
     },
+    saveDataToLocalStorage() {
+      const formData = {
+        eventNature: this.eventNature,
+        eventProgram: this.eventProgram,
+        venueSetup: this.venueSetup,
+        electricianDuty: this.electricianDuty,
+        expectedActivity: this.expectedActivity,
+        otherActivity: this.otherActivity,
+      };
+      localStorage.setItem('formData', JSON.stringify(formData));
+      console.log('Adatok mentve a localStorage-ba:', formData);
+    },
     validateForm() {
       this.errors = {};
-
+      if (!this.eventNature) {
+        this.errors.eventNature = 'A rendezvény jellege kötelező!';
+      }
+      if (!this.eventProgram) {
+        this.errors.eventProgram = 'A részletes programterv kötelező!';
+      }
+      if (!this.electricianDuty) {
+        this.errors.electricianDuty = 'A villanyszerelői ügyelet kiválasztása kötelező!';
+      }
+      if (!this.expectedActivity) {
+        this.errors.expectedActivity = 'A várható tevékenység kiválasztása kötelező!';
+      }
       return Object.keys(this.errors).length === 0;
+    },
+    submitForm() {
+      if (this.validateForm()) {
+        this.saveDataToLocalStorage();
+        alert('Adatok sikeresen mentve!');
+      }
     },
   },
 };

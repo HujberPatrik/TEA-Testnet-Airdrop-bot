@@ -3,7 +3,9 @@
     <Navbar /> <!-- Navbar komponens -->
 
     <!-- komponens váltás -->
-    <component :is="currentPage" />
+    <component :is="currentPage" :ref="'page' + activePage" />
+
+    
 
     <!-- Navigáció és kitöltési csík -->
     <div class="navigation-container bg-light fixed-bottom p-3">
@@ -72,6 +74,7 @@ export default {
       currentPage: 'Pages', 
       activePage: 1,
       totalPages: 10, 
+      formData: null
     };
   },
   computed: {
@@ -86,9 +89,19 @@ export default {
   methods: {
     // Navigáció
     navigate(page) {
+      // Mentés a localStorage-ba az aktuális oldal adataival
+      this.saveCurrentPageData();
+
       if (page >= 1 && page <= this.totalPages) {
         this.activePage = page;
         this.currentPage = this.getPageName(page);
+      }
+    },
+    saveCurrentPageData() {
+      // Ellenőrzés, hogy az aktuális oldalhoz tartozik-e adat
+      const currentPageRef = this.$refs[`page${this.activePage}`];
+      if (currentPageRef && currentPageRef.saveDataToLocalStorage) {
+        currentPageRef.saveDataToLocalStorage();
       }
     },
     // Oldal nevének lekérése az index alapján
@@ -102,6 +115,13 @@ export default {
       // Itt lehet API hívást vagy más műveletet végrehajtani
     },
   },
+  mounted() {
+    const savedData = localStorage.getItem('formData');
+    console.log('LocalStorage-ból betöltött adatok:', savedData); // Ellenőrzés
+    if (savedData) {
+      this.formData = JSON.parse(savedData);
+    }
+  }
 };
 </script>
 

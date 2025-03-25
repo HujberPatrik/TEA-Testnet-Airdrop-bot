@@ -99,7 +99,7 @@ export default {
     return {
       yesNoFields: [
         { id: "photography", label: "Fotó és/vagy videófelvétel készül-e a rendezvényen?", value: "" },
-        { id: "catering", label: "Lesz a rendezvény területén catering?\n", value: "" },
+        { id: "catering", label: "Lesz a rendezvény területén catering?", value: "" },
         { id: "technicalSupport", label: "Szükséges-e oktatástechnikai támogatás?", value: "" },
         { id: "disabledAccess", label: "Korlátozott mozgású személyek részt vesznek?", value: "" },
       ],
@@ -111,6 +111,17 @@ export default {
     };
   },
   methods: {
+    saveDataToLocalStorage() {
+      const formData = {
+        yesNoFields: this.yesNoFields,
+        photographyDetails: this.photographyDetails,
+        cateringTypes: this.cateringTypes,
+        technicalEquipmentNeeds: this.technicalEquipmentNeeds,
+        disabledAccessDetails: this.disabledAccessDetails,
+      };
+      localStorage.setItem('formDataPage5', JSON.stringify(formData));
+      console.log('Adatok mentve a localStorage-ba (Page5):', formData);
+    },
     validateForm() {
       this.errors = {};
 

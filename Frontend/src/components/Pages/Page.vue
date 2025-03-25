@@ -72,12 +72,12 @@ v-if="input.type === 'text'"
       };
     },
     methods: {
-      navigate(page) {
-        if (this.validatePage()) {
-          if (page >= 1 && page <= this.pages.length) {
-            this.activePage = page;
-          }
-        }
+      saveDataToLocalStorage() {
+        const formData = {
+          inputValues: this.inputValues,
+        };
+        localStorage.setItem('formDataPage1', JSON.stringify(formData));
+        console.log('Adatok mentve a localStorage-ba (Page1):', formData);
       },
       validatePage() {
         this.errors = {};
@@ -89,6 +89,16 @@ v-if="input.type === 'text'"
           }
         });
         return isValid;
+      },
+      navigate(page) {
+        if (this.validatePage()) {
+          // Mentés a localStorage-ba
+          this.saveDataToLocalStorage();
+
+          if (page >= 1 && page <= this.pages.length) {
+            this.activePage = page;
+          }
+        }
       }
     }
   };
