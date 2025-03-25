@@ -3,9 +3,11 @@
     <Navbar /> <!-- Navbar komponens -->
 
     <!-- komponens váltás -->
-    <component :is="currentPage" :ref="'page' + activePage" />
-
-    
+    <component
+      :is="currentPage"
+      :ref="'page' + activePage"
+      @email-verified="updateEmailVerificationStatus"
+    />
 
     <!-- Navigáció és kitöltési csík -->
     <div class="navigation-container bg-light fixed-bottom p-3">
@@ -14,7 +16,7 @@
         @click="navigate(activePage - 1)"
         class="nav-button btn btn-primary"
       >
-        <i class="bi bi-arrow-left"></i> 
+        <i class="bi bi-arrow-left"></i>
       </button>
 
       <!-- Kitöltési csík -->
@@ -34,6 +36,7 @@
       <button
         v-else
         @click="submit"
+        :disabled="!isEmailVerified"
         class="submit-button btn btn-primary"
       >
         Küldés
@@ -54,6 +57,7 @@ import Pages7 from '../components/Pages/Page7.vue';
 import Pages8 from '../components/Pages/Page8.vue';
 import Pages9 from '../components/Pages/Page9.vue';
 import Pages10 from '../components/Pages/Page10.vue';
+import Pages11 from '../components/Pages/Page11.vue';
 
 export default {
   components: {
@@ -68,13 +72,15 @@ export default {
     Pages8,
     Pages9,
     Pages10,
+    Pages11,
   },
   data() {
     return {
-      currentPage: 'Pages', 
-      activePage: 1,
-      totalPages: 10, 
-      formData: null
+      currentPage: 'Pages', // Az első oldal alapértelmezett neve
+      activePage: 1, // Az első oldal az aktív
+      totalPages: 11, // Összes oldal száma
+      formData: null,
+      isEmailVerified: false, // E-mail hitelesítés állapota
     };
   },
   computed: {
@@ -89,30 +95,49 @@ export default {
   methods: {
     // Navigáció
     navigate(page) {
-      // Mentés a localStorage-ba az aktuális oldal adataival
       this.saveCurrentPageData();
 
       if (page >= 1 && page <= this.totalPages) {
+        // Ha visszalépés történik, állítsuk vissza az isEmailVerified értékét
+        if (page !== this.totalPages) {
+          this.isEmailVerified = false;
+        }
+
         this.activePage = page;
         this.currentPage = this.getPageName(page);
       }
     },
     saveCurrentPageData() {
-      // Ellenőrzés, hogy az aktuális oldalhoz tartozik-e adat
       const currentPageRef = this.$refs[`page${this.activePage}`];
       if (currentPageRef && currentPageRef.saveDataToLocalStorage) {
         currentPageRef.saveDataToLocalStorage();
       }
     },
-    // Oldal nevének lekérése az index alapján
     getPageName(index) {
-      const pages = ['Pages', 'Pages2', 'Pages3', 'Pages4', 'Pages5', 'Pages6', 'Pages7', 'Pages8', 'Pages9', 'Pages10'];
+      const pages = [
+        'Pages',
+        'Pages2',
+        'Pages3',
+        'Pages4',
+        'Pages5',
+        'Pages6',
+        'Pages7',
+        'Pages8',
+        'Pages9',
+        'Pages10',
+        'Pages11',
+      ];
       return pages[index - 1];
     },
-    // Küldés gomb eseménykezelője
     submit() {
-      alert('Adatok elküldve!'); 
-      // Itt lehet API hívást vagy más műveletet végrehajtani
+      if (this.isEmailVerified) {
+        alert('Adatok elküldve!');
+      } else {
+        alert('Az e-mail cím hitelesítése szükséges a küldéshez!');
+      }
+    },
+    updateEmailVerificationStatus(status) {
+      this.isEmailVerified = status;
     },
   },
   mounted() {
@@ -121,7 +146,10 @@ export default {
     if (savedData) {
       this.formData = JSON.parse(savedData);
     }
-  }
+
+    // Oldal újratöltésekor állítsuk vissza az isEmailVerified értékét
+    this.isEmailVerified = false;
+  },
 };
 </script>
 
@@ -184,6 +212,12 @@ html {
   border-color: #50adc9; /* Gombok szegélyének színe */
 }
 
+.submit-button:disabled {
+  background-color: #ccc; /* Letiltott gomb színe */
+  border-color: #ccc;
+  cursor: not-allowed;
+}
+
 /* Média lekérdezések kisebb képernyőkhöz */
 @media (max-width: 768px) {
   .navigation-container {
@@ -221,8 +255,6 @@ html {
 .dark-mode .custom-progress::-webkit-progress-bar {
   background-color: #333;
 }
-
-
 
 .dark-mode .bg-light {
   background-color: #242943 !important; /* Override bg-light in dark mode */

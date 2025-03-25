@@ -44,45 +44,8 @@
             <p class="max-size-text">Max. méret 6Mb</p> <!-- Max. méret szöveg -->
           </div>
         </div>
-          <!-- E-mail és verifikációs kód -->
-          <div class="row">
-            <div class="col-md-12">
-              <input
-                type="email"
-                placeholder="E-mail cím *"
-                class="form-control mb-3"
-                v-model="clientDetails.email"
-                required
-              />
-              <button
-                @click="sendVerificationCode"
-                class="btn btn-secondary mb-3"
-                :disabled="isSending"
-              >
-                {{ isSending ? "Küldés..." : "Verifikációs kód küldése" }}
-              </button>
-              <span v-if="errors.email" class="error">{{ errors.email }}</span>
-            </div>
-          </div>
-          <div class="row" v-if="verificationCodeSent">
-            <div class="col-md-12">
-              <input
-                type="text"
-                placeholder="Verifikációs kód"
-                class="form-control mb-3"
-                v-model="enteredVerificationCode"
-                required
-              />
-              <button
-                @click="verifyCode"
-                class="btn btn-success mb-3"
-              >
-                Kód ellenőrzése
-              </button>
-              <span v-if="errors.verificationCode" class="error">{{ errors.verificationCode }}</span>
-            </div>
-          </div>
-        
+        <button class="btn btn-primary" @click="uploadFile">Fájl feltöltése</button>
+
         <!-- Nyilatkozatok -->
         <div class="form-check">
           <input
@@ -140,10 +103,6 @@ export default {
       fileName: "",
       fileContent: null,
       errors: {},
-      isSending: false, // Gomb állapotának kezelése
-      verificationCode: "", // Generált verifikációs kód
-      enteredVerificationCode: "", // Felhasználó által megadott kód
-      verificationCodeSent: false, // Jelzi, hogy a kód elküldésre került-e
       pages: [
         {
           title: "FÁJLFELTÖLTÉS ÉS FELHASZNÁLÓI SZERZŐDÉS",
@@ -192,105 +151,65 @@ export default {
         });
     },
     validatePage() {
-        this.errors = {};
-        let isValid = true;
-  
-        // Név/Cégnév validálása
-        if (!this.clientDetails.name) {
-          this.errors.name = "A név/cégnév kötelező.";
-          isValid = false;
-        }
-  
-        // Cím validálása
-        if (!this.clientDetails.address) {
-          this.errors.address = "A cím kötelező.";
-          isValid = false;
-        }
-  
-        // Adószám validálása
-        if (!this.clientDetails.taxNumber) {
-          this.errors.taxNumber = "Az adószám kötelező.";
-          isValid = false;
-        }
-  
-        // Telefonszám validálása
-        if (!this.clientDetails.phoneNumber) {
-          this.errors.phoneNumber = "A telefonszám kötelező.";
-          isValid = false;
-        }
-  
-        // E-mail cím validálása
-        if (!this.clientDetails.email) {
-          this.errors.email = "Az e-mail cím kötelező.";
-          isValid = false;
-        } else if (!this.validateEmail(this.clientDetails.email)) {
-          this.errors.email = "Érvénytelen e-mail cím formátum.";
-          isValid = false;
-        }
-  
-        return isValid;
-      },
-      validateEmail(email) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return emailRegex.test(email);
-      },
-      generateVerificationCode() {
-        // 6 jegyű véletlenszerű kód generálása
-        this.verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-      },
-      async sendVerificationCode() {
-        if (!this.clientDetails.email) {
-          this.errors.email = "Az e-mail cím kötelező.";
-          return;
-        }
-        if (!this.validateEmail(this.clientDetails.email)) {
-          this.errors.email = "Érvénytelen e-mail cím formátum.";
-          return;
-        }
-  
-        this.isSending = true; // Gomb letiltása küldés közben
-        this.generateVerificationCode(); // Kód generálása
-  
-        try {
-          const response = await axios.post("http://localhost:3000/send-verification-code", {
-            email: this.clientDetails.email,
-            verificationCode: this.verificationCode,
-          }, {
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          });
-  
-          console.log('Teljes válasz:', response); // Teljes válasz naplózása
-          alert(response.data); // "Email sikeresen elküldve!"
-          this.verificationCodeSent = true;
-        } catch (error) {
-          console.error("Hiba részletei:", error.response ? error.response.data : error.message);
-          console.error("Teljes hiba objektum:", error);
-  
-          if (error.response) {
-            // A szerver válaszolt, de hibakód érkezett
-            alert(`Szerver hiba: ${error.response.status} - ${error.response.data}`);
-          } else if (error.request) {
-            // A kérés elküldésre került, de nem érkezett válasz
-            alert("Nem érkezett válasz a szervertől. Ellenőrizd a szerver futását.");
-          } else {
-            // Valami más hiba történt a kérés előkészítése közben
-            alert("Hálózati vagy más hiba történt.");
-          }
-        } finally {
-          this.isSending = false; // Gomb újra engedélyezése
-        }
-      },
-      verifyCode() {
-        if (this.enteredVerificationCode === this.verificationCode) {
-          alert("A kód helyes!");
-        } else {
-          this.errors.verificationCode = "A megadott kód helytelen.";
-        }
-      },
+      this.errors = {};
+      let isValid = true;
+
+      // Név validálása
+      if (!this.clientDetails.name) {
+        this.errors.name = "A név/cégnév kötelező.";
+        isValid = false;
+      }
+
+      // Cím validálása
+      if (!this.clientDetails.address) {
+        this.errors.address = "A cím kötelező.";
+        isValid = false;
+      }
+
+      // Adószám validálása
+      if (!this.clientDetails.taxNumber) {
+        this.errors.taxNumber = "Az adószám kötelező.";
+        isValid = false;
+      }
+
+      // Telefonszám validálása
+      if (!this.clientDetails.phoneNumber) {
+        this.errors.phoneNumber = "A telefonszám kötelező.";
+        isValid = false;
+      }
+
+      // E-mail cím validálása
+      if (!this.clientDetails.email) {
+        this.errors.email = "Az e-mail cím kötelező.";
+        isValid = false;
+      } else if (!this.validateEmail(this.clientDetails.email)) {
+        this.errors.email = "Érvénytelen e-mail cím formátum.";
+        isValid = false;
+      }
+
+      return isValid;
+    },
+    validateEmail(email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return emailRegex.test(email);
+    },
   },
 };
 </script>
 
-<style src="/src/assets/css/style_pages.css"></style>
+<style scoped>
+.file-info {
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.max-size-text {
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.error {
+  color: red;
+  font-size: 0.875rem;
+}
+</style>
