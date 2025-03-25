@@ -28,8 +28,37 @@ app.post("/send-verification-code", (req, res) => {
   const mailOptions = {
     from: "souris20013@gmail.com",
     to: email,
-    subject: "Email Verification Code",
-    text: `Your verification code is: ${verificationCode}`,
+    subject: "Széchenyi Egyetem - Email Verifikáció",
+    html: `
+      <div style="font-family: 'Montserrat', sans-serif; font-weight: 300; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+        <header style="text-align: center; padding: 20px 0; background-color: #1c2442; color: #fff; border-radius: 8px 8px 0 0;">
+          <img src="cid:logo" alt="Széchenyi Egyetem" style="max-width: 250px; margin-bottom: 10px;">
+        </header>
+        <main style="padding: 20px;">
+          <p style="font-size: 16px; color: #333;">Kedves Felhasználó!</p>
+          <p style="font-size: 16px; color: #333;">Köszönjük, hogy regisztráltál a Széchenyi István Egyetem rendszerébe. Az email címed hitelesítéséhez kérjük, használd az alábbi verifikációs kódot:</p>
+          <div style="text-align: center; margin: 20px 0;">
+            <span style="font-size: 24px; font-weight: bold; color: #1c2442;">${verificationCode}</span>
+          </div>
+          <p style="font-size: 16px; color: #333;">Ha nem te kezdeményezted ezt a műveletet, kérjük, hagyd figyelmen kívül ezt az emailt.</p>
+          <p style="font-size: 16px; color: #333;">Üdvözlettel,</p>
+          <p style="font-size: 16px; color: #333; font-weight: bold;">Széchenyi István Egyetem Csapata</p>
+        </main>
+        <footer style="text-align: center; padding: 10px 0; background-color: #f4f4f4; color: #666; font-size: 12px; border-radius: 0 0 8px 8px;">
+          <p style="margin: 0;">Széchenyi István Egyetem</p>
+          <p style="margin: 0;">9026 Győr, Egyetem tér 1.</p>
+          <p style="margin: 0;">Telefon: +36 96 503 400</p>
+          <p style="margin: 0;">Email: info@sze.hu</p>
+        </footer>
+      </div>
+    `,
+    attachments: [
+      {
+        filename: "logo.png",
+        path: __dirname + "/assets/logo.png", // Helyi fájl elérési útvonala
+        cid: "logo", // Content-ID azonosító
+      },
+    ],
   };
 
   transporter.sendMail(mailOptions, (error, info) => {
