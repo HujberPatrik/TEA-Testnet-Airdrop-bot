@@ -12,6 +12,9 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization']
   }));
 
+// Ideiglenes tároló a verifikációs kódokhoz
+const verificationCodes = {};
+
 // Nodemailer konfiguráció
 const transporter = nodemailer.createTransport({
   service: "gmail", // Használj megfelelő email szolgáltatót
@@ -21,9 +24,19 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Email küldés API
-app.post("/send-verification-code", (req, res) => {
-  const { email, verificationCode } = req.body;
+// Verifikációs kód küldése
+app.post('/send-verification-code', (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ success: false, message: 'E-mail cím szükséges.' });
+  }
+
+  // Generálj egy 6 számjegyű kódot
+  const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+  verificationCodes[email] = verificationCode;
+
+  console.log(`Verifikációs kód (${verificationCode}) elküldve az e-mail címre: ${email}`);
 
   const mailOptions = {
     from: "souris20013@gmail.com",
@@ -73,6 +86,23 @@ app.post("/send-verification-code", (req, res) => {
 
 app.get("/", (req, res) => {
   res.send("Server is running!");
+});
+
+// Verifikációs kód ellenőrzése
+app.post('/verify-code', (req, res) => {
+  const { email, code } = req.body;
+
+  if (!email || !code) {
+    return res.status(400).json({ success: false, message: 'E-mail és kód szükséges.' });
+  }
+
+  // Ellenőrizd, hogy a kód helyes-e
+  if (verificationCodes[email] === code) {
+    delete verificationCodes[email]; // Töröld a kódot, miután ellenőrizted
+    return res.status(200).json({ success: true, message: 'A kód helyes.' });
+  }
+
+  return res.status(400).json({ success: false, message: 'A kód helytelen.' });
 });
 
 // Backend indítása
