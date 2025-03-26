@@ -58,6 +58,7 @@ import Pages8 from '../components/Pages/Page8.vue';
 import Pages9 from '../components/Pages/Page9.vue';
 import Pages10 from '../components/Pages/Page10.vue';
 import Pages11 from '../components/Pages/Page11.vue';
+import Page12 from '../components/Pages/Page12.vue'; // Új oldal importálása
 
 export default {
   components: {
@@ -73,19 +74,25 @@ export default {
     Pages9,
     Pages10,
     Pages11,
+    Page12, // Új oldal hozzáadása
   },
   data() {
     return {
       currentPage: 'Pages', // Az első oldal alapértelmezett neve
       activePage: 1, // Az első oldal az aktív
-      totalPages: 11, // Összes oldal száma
+      totalPages: 11, // Összes oldal száma (Page12 nem számít bele)
       formData: null,
       isEmailVerified: false, // E-mail hitelesítés állapota
+      isVerified: false, // Állapot a Küldés gombhoz
     };
   },
   computed: {
     // Kitöltési százalék számítása
     progress() {
+      if (this.activePage > this.totalPages) {
+        // Ha a Page12 van aktívan, a progress értéke maradjon 100%
+        return 100;
+      }
       if (this.totalPages === 1) {
         return 100;
       }
@@ -145,14 +152,29 @@ export default {
           const key = localStorage.key(i);
           allData[key] = localStorage.getItem(key);
         }
-        localStorage.setItem('allData', JSON.stringify(allData)); // Az összes adatot mentjük egy kulcs alá
-        this.$router.push('/test'); // Átirányítás a test oldalra
+
+        try {
+          // Compress the data before saving
+          const compressedData = btoa(unescape(encodeURIComponent(JSON.stringify(allData))));
+          localStorage.setItem('allData', compressedData); // Save compressed data
+        } catch (error) {
+          console.error('Failed to save data to localStorage:', error);
+          alert('Az adatok mentése sikertelen. Túl sok adatot próbál menteni.');
+          return;
+        }
+
+        // Page12 megjelenítése
+        this.currentPage = 'Page12';
+        this.activePage = this.totalPages + 1; // Az aktív oldal értékét növeljük
       } else {
         alert('Az e-mail cím hitelesítése szükséges a küldéshez!');
       }
     },
     updateEmailVerificationStatus(status) {
       this.isEmailVerified = status;
+    },
+    onVerificationSuccess() {
+      this.isVerified = true; // Állapot frissítése, ha a hitelesítés sikeres
     },
   },
   mounted() {
