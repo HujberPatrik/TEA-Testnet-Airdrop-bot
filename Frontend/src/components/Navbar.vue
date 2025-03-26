@@ -54,6 +54,16 @@
         >
           <i class="fa fa-user" style="color: #ffffff"></i>
         </a>
+
+        <!-- LocalStorage Clear Button -->
+        <button
+          class="btn rounded-circle"
+          @click="clearLocalStorage"
+          style="background-color: #50adc9; padding: 12px; width: 42px; height: 42px; display: inline-flex; align-items: center; justify-content: center; border: none"
+          aria-label="Clear Local Storage"
+        >
+          <i class="fa fa-trash" style="color: #ffffff"></i>
+        </button>
       </div>
     </div>
   </nav>
@@ -70,6 +80,11 @@ export default {
     toggleDarkMode() {
       this.darkMode = !this.darkMode;
       document.body.classList.toggle("dark-mode", this.darkMode);
+    },
+    clearLocalStorage() {
+      localStorage.clear();
+      console.log("LocalStorage kiürítve.");
+      alert("A LocalStorage sikeresen kiürítve!");
     },
   },
 };

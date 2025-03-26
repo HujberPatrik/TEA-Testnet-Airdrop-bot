@@ -28,7 +28,7 @@
       <!-- Jobbra gomb vagy Küldés gomb (utolsó oldalon) -->
       <button
         v-if="activePage !== totalPages"
-        @click="navigate(activePage + 1)"
+        @click="validateAndNavigate"
         class="nav-button btn btn-primary"
       >
         <i class="bi bi-arrow-right"></i>
@@ -98,13 +98,22 @@ export default {
       this.saveCurrentPageData();
 
       if (page >= 1 && page <= this.totalPages) {
-        // Ha visszalépés történik, állítsuk vissza az isEmailVerified értékét
         if (page !== this.totalPages) {
           this.isEmailVerified = false;
         }
 
         this.activePage = page;
         this.currentPage = this.getPageName(page);
+      }
+    },
+    validateAndNavigate() {
+      const currentPageRef = this.$refs[`page${this.activePage}`];
+      if (currentPageRef && currentPageRef.validatePage) {
+        if (currentPageRef.validatePage()) {
+          this.navigate(this.activePage + 1);
+        } else {
+          console.log('Minden kötelező mezőt ki kell tölteni!');
+        }
       }
     },
     saveCurrentPageData() {
@@ -131,7 +140,13 @@ export default {
     },
     submit() {
       if (this.isEmailVerified) {
-        alert('Adatok elküldve!');
+        const allData = {};
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          allData[key] = localStorage.getItem(key);
+        }
+        localStorage.setItem('allData', JSON.stringify(allData)); // Az összes adatot mentjük egy kulcs alá
+        this.$router.push('/test'); // Átirányítás a test oldalra
       } else {
         alert('Az e-mail cím hitelesítése szükséges a küldéshez!');
       }

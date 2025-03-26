@@ -103,6 +103,19 @@ export default {
       otherActivity: "",
       activities: ["por", "füst", "páraképződés", "egyik sem várható", "egyéb"],
       errors: {},
+      // Példa adatszerkezet a validatePage metódushoz
+      pages: [
+        {
+          inputs: [
+            { placeholder: "eventNature" },
+            { placeholder: "eventProgram" },
+            { placeholder: "electricianDuty" },
+            { placeholder: "expectedActivity" },
+          ],
+        },
+      ],
+      activePage: 1,
+      inputValues: {}, // Az input mezők értékeinek tárolására
     };
   },
   methods: {
@@ -131,26 +144,28 @@ export default {
         console.log('Adatok betöltve a localStorage-ból (Page3):', data);
       }
     },
-    validateForm() {
+    
+    validatePage() {
       this.errors = {};
-      if (!this.eventNature) {
-        this.errors.eventNature = 'A rendezvény jellege kötelező!';
-      }
-      if (!this.eventProgram) {
-        this.errors.eventProgram = 'A részletes programterv kötelező!';
-      }
-      if (!this.electricianDuty) {
-        this.errors.electricianDuty = 'A villanyszerelői ügyelet kiválasztása kötelező!';
-      }
-      if (!this.expectedActivity) {
-        this.errors.expectedActivity = 'A várható tevékenység kiválasztása kötelező!';
-      }
-      return Object.keys(this.errors).length === 0;
+      let isValid = true;
+
+      // Kötelező mezők ellenőrzése az inputValues alapján
+      this.pages[this.activePage - 1].inputs.forEach((input) => {
+        const value = this[input.placeholder];
+        if (!value) {
+          this.errors[input.placeholder] = 'A mező kitöltése kötelező!';
+          isValid = false;
+        }
+      });
+
+      return isValid;
     },
     submitForm() {
       if (this.validateForm()) {
         this.saveDataToLocalStorage();
         alert('Adatok sikeresen mentve!');
+      } else {
+        alert('Kérjük, töltse ki az összes kötelező mezőt!');
       }
     },
   },

@@ -19,6 +19,7 @@
                 :name="field.id"
                 value="igen"
                 v-model="field.value"
+                @change="logFieldValue(field)"
               />
               <label :for="field.id + '_igen'">Igen</label>
               <input
@@ -28,6 +29,7 @@
                 value="nem"
                 v-model="field.value"
                 class="ms-3"
+                @change="logFieldValue(field)"
               />
               <label :for="field.id + '_nem'">Nem</label>
             </div>
@@ -71,6 +73,23 @@
               <span v-if="errors.decorationDetails" class="error">{{ errors.decorationDetails }}</span>
             </div>
 
+            <!-- Portaszolgálat igénylése részletek -->
+            <div
+              v-if="field.id === 'securityService' && field.value === 'igen'"
+              class="form-group"
+              style="display: block; visibility: visible; opacity: 1;"
+            >
+              <label for="securityServiceDetails">Portaszolgálat részletei *</label>
+              <textarea
+                id="securityServiceDetails"
+                v-model="securityServiceDetails"
+                placeholder="Írja le a portaszolgálat igénylésével kapcsolatos részleteket"
+                class="form-control"
+                required
+              ></textarea>
+              <span v-if="errors.securityServiceDetails" class="error">{{ errors.securityServiceDetails }}</span>
+            </div>
+
             <span v-if="errors[field.id]" class="error">{{ errors[field.id] }}</span>
           </div>
         </div>
@@ -87,10 +106,12 @@ export default {
         { id: "fireHazard", label: "Tűzveszélyes tevékenység várható-e?", value: "" },
         { id: "chemicals", label: "Vegyi anyag felhasználása várható-e?", value: "" },
         { id: "decoration", label: "Várható-e dekoráció a helyiség légterében?", value: "" },
+        { id: "securityService", label: "Portaszolgálat igénylése a rendezvény idejére?", value: "" } // Új mező
       ],
       fireHazardDetails: "", // Tűzveszélyes tevékenység leírása
       chemicalsDetails: "", // Vegyi anyag felhasználásával kapcsolatos tevékenység leírása
       decorationDetails: "", // Dekoráció részletei
+      securityServiceDetails: "", // Portaszolgálat részletei
       errors: {},
     };
   },
@@ -101,6 +122,7 @@ export default {
         fireHazardDetails: this.fireHazardDetails,
         chemicalsDetails: this.chemicalsDetails,
         decorationDetails: this.decorationDetails,
+        securityServiceDetails: this.securityServiceDetails, // Új mező
       };
       localStorage.setItem("formDataPage7", JSON.stringify(formData));
       console.log("Adatok mentve a localStorage-ba (Page7):", formData);
@@ -109,35 +131,59 @@ export default {
       const savedData = localStorage.getItem("formDataPage7");
       if (savedData) {
         const data = JSON.parse(savedData);
+        console.log("Betöltött adatok:", data); // Ellenőrzés
         this.yesNoFields = data.yesNoFields || this.yesNoFields;
         this.fireHazardDetails = data.fireHazardDetails || "";
         this.chemicalsDetails = data.chemicalsDetails || "";
         this.decorationDetails = data.decorationDetails || "";
+        this.securityServiceDetails = data.securityServiceDetails || ""; // Új mező
         console.log("Adatok betöltve a localStorage-ból (Page7):", data);
       }
     },
-    validateForm() {
+    validatePage() {
       this.errors = {};
+      let isValid = true;
 
-      // Tűzveszélyes tevékenység validáció
+      // Kötelező mezők ellenőrzése a yesNoFields alapján
+      this.yesNoFields.forEach((field) => {
+        if (!field.value) {
+          this.errors[field.id] = "A mező kitöltése kötelező!";
+          isValid = false;
+        }
+      });
+
+      // Tűzveszélyes tevékenység mező ellenőrzése
       const fireHazardField = this.yesNoFields.find((field) => field.id === "fireHazard");
       if (fireHazardField && fireHazardField.value === "igen" && !this.fireHazardDetails) {
-        this.errors.fireHazardDetails = "Kötelező megadni a tűzveszélyes tevékenység leírását.";
+        this.errors.fireHazardDetails = "A mező kitöltése kötelező!";
+        isValid = false;
       }
 
-      // Vegyi anyag felhasználása validáció
+      // Vegyi anyag felhasználása mező ellenőrzése
       const chemicalsField = this.yesNoFields.find((field) => field.id === "chemicals");
       if (chemicalsField && chemicalsField.value === "igen" && !this.chemicalsDetails) {
-        this.errors.chemicalsDetails = "Kötelező megadni a vegyi anyag felhasználásával kapcsolatos tevékenység leírását.";
+        this.errors.chemicalsDetails = "A mező kitöltése kötelező!";
+        isValid = false;
       }
 
-      // Dekoráció validáció
+      // Dekoráció részletei mező ellenőrzése
       const decorationField = this.yesNoFields.find((field) => field.id === "decoration");
       if (decorationField && decorationField.value === "igen" && !this.decorationDetails) {
-        this.errors.decorationDetails = "Kötelező megadni a dekoráció részleteit.";
+        this.errors.decorationDetails = "A mező kitöltése kötelező!";
+        isValid = false;
       }
 
-      return Object.keys(this.errors).length === 0;
+      // Portaszolgálat részletei mező ellenőrzése
+      const securityServiceField = this.yesNoFields.find((field) => field.id === "securityService");
+      if (securityServiceField && securityServiceField.value === "igen" && !this.securityServiceDetails) {
+        this.errors.securityServiceDetails = "A mező kitöltése kötelező!";
+        isValid = false;
+      }
+
+      return isValid;
+    },
+    logFieldValue(field) {
+      console.log(`Field ID: ${field.id}, Value: ${field.value}`);
     },
   },
   mounted() {
@@ -145,32 +191,7 @@ export default {
     this.loadDataFromLocalStorage();
   },
 };
+
 </script>
 
 <style src="/src/assets/css/style_pages.css"></style>
-<style scoped>
-.uniform-input {
-  width: 100%;
-  padding: 12px;
-  margin-bottom: 20px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  font-size: 1rem;
-}
-
-.uniform-input::placeholder {
-  color: #888;
-  opacity: 0.5;
-}
-
-.form-group {
-  margin-bottom: 30px; /* Larger margin between form groups */
-}
-
-.error {
-  color: red;
-  font-size: 0.875rem;
-}
-</style>
-
-

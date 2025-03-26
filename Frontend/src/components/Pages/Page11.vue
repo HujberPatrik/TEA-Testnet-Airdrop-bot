@@ -2,7 +2,7 @@
   <div class="container custom-container">
     <div class="page">
       <h2>
-        <span>HITELESÍTÉS (SZÜKSÉGES AZ ŰRLAP KITÖLTÉSÉHEZ)</span>
+        <span>HITELESÍTÉS</span>
         <i class="bi bi-info-circle" title="A * részek kötelezőek"></i>
       </h2>
 
@@ -28,14 +28,18 @@
         </div>
 
         <!-- Verifikációs kód küldése gomb -->
-        <button
-          v-if="!isEmailVerified && !showVerificationCodeInput"
-          class="btn verification-btn"
-          @click="sendVerificationCode"
-          style="background-color: #007bff; color: white; border: none;"
-        >
-          Verifikációs kód küldése
-        </button>
+        <div class="row justify-content-center mb-3">
+          <div class="col-auto">
+            <button
+              v-if="!isEmailVerified && !showVerificationCodeInput"
+              class="btn btn-sm verification-btn d-inline-block"
+              @click="sendVerificationCode"
+              style="background-color: #007bff; color: white; border: none;"
+            >
+              Verifikációs kód küldése
+            </button>
+          </div>
+        </div>
 
         <!-- Verifikációs kód mező és ellenőrzés gomb -->
         <div v-if="showVerificationCodeInput || isEmailVerified" class="verification-code-section">
@@ -52,24 +56,28 @@
               <span v-if="errors.verificationCode" class="error">{{ errors.verificationCode }}</span>
             </div>
           </div>
-          <button
-            class="btn verification-btn"
-            :class="{ 'btn-success': isEmailVerified, 'btn-primary': !isEmailVerified }"
-            @click="verifyCode"
-            :disabled="isEmailVerified"
-            :style="isEmailVerified 
-              ? 'background-color: #28a745; color: white; border: none;' 
-              : 'background-color: #007bff; color: white; border: none;'"
-          >
-            {{ isEmailVerified ? 'Hitelesítve' : 'Kód ellenőrzése' }}
-          </button>
+          <div class="row justify-content-center mb-3">
+            <div class="col-auto">
+              <button
+                class="btn btn-sm verification-btn d-inline-block"
+                :class="{ 'btn-success': isEmailVerified, 'btn-primary': !isEmailVerified }"
+                @click="verifyCode"
+                :disabled="isEmailVerified"
+                :style="isEmailVerified 
+                  ? 'background-color: #28a745; color: white; border: none;' 
+                  : 'background-color: #007bff; color: white; border: none;'"
+              >
+                {{ isEmailVerified ? 'Hitelesítve' : 'Kód ellenőrzése' }}
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- Hitelesítési adatok törlése gomb -->
-        <div class="row mt-3">
-          <div class="col-md-12">
+        <div class="row justify-content-center mt-3">
+          <div class="col-auto">
             <button
-              class="btn btn-danger w-100"
+              class="btn btn-sm btn-danger d-inline-block"
               @click="clearVerificationData"
               style="background-color: #dc3545; color: white; border: none;"
             >
@@ -200,78 +208,4 @@ export default {
 };
 </script>
 
-<style scoped>
-:root {
-  --btn-primary-bg: #007bff;
-  --btn-primary-hover-bg: #0056b3;
-  --btn-success-bg: #28a745;
-  --btn-success-hover-bg: #218838;
-  --btn-danger-bg: #dc3545;
-  --btn-danger-hover-bg: #c82333;
-}
-
-.custom-container {
-  max-width: 800px; /* Maximális szélesség */
-  margin: 0 auto; /* Középre igazítás */
-  padding: 20px; /* Oldalsó margók */
-}
-
-.uniform-input {
-  width: 100%;
-  padding: 12px;
-  margin-bottom: 20px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  font-size: 1rem;
-}
-
-.uniform-input::placeholder {
-  color: #888;
-  opacity: 0.5;
-}
-
-.error {
-  color: red;
-  font-size: 0.875rem;
-}
-
-.info-text {
-  margin-bottom: 15px;
-  font-size: 0.9rem;
-  color: #555;
-}
-
-.verification-btn {
-  margin-bottom: 20px;
-  width: 100%;
-  padding: 12px;
-  font-size: 1rem;
-  border-radius: 5px;
-  cursor: pointer;
-  background-color: var(--btn-primary-bg);
-  border: none;
-  color: white;
-}
-
-.verification-btn:hover {
-  background-color: var(--btn-primary-hover-bg);
-}
-
-.verification-btn.btn-success {
-  background-color: var(--btn-success-bg);
-}
-
-.verification-btn.btn-success:hover {
-  background-color: var(--btn-success-hover-bg);
-}
-
-.btn-danger {
-  background-color: var(--btn-danger-bg);
-  border: none;
-  color: white;
-}
-
-.btn-danger:hover {
-  background-color: var(--btn-danger-hover-bg);
-}
-</style>
+<style src="/src/assets/css/style_pages.css"></style>

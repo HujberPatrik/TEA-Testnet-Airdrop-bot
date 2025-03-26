@@ -247,7 +247,7 @@ body.dark-mode .page label {
 
 .error {
   color: red;
-  font-size: 0.875rem;
+  font-size: 0.9em;
 }
 
 .program-and-layout {
@@ -423,11 +423,22 @@ body.dark-mode .page label {
   opacity: 0.5;
 }
 
+.is-invalid {
+  border: 2px solid red;
+}
+
 /* Média lekérdezések kisebb képernyőkhöz */
 @media (max-width: 800px) {
   .bi-info-circle {
     display: none; /* Infó gomb elrejtése */
   }
+}
+
+.validation-error {
+  color: red;
+  font-size: 0.9rem;
+  margin-top: 0px; /* Csökkentett margó */
+  display: block;
 }
 
 

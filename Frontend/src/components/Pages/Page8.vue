@@ -197,69 +197,65 @@ export default {
       this.errors = {};
       let isValid = true;
 
-      // Fő szervező adatainak validálása
+      // Reguláris kifejezések
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // Egyszerű e-mail ellenőrzés
+      const phoneRegex = /^\+36\s?\d{1,2}\s?\d{3}\s?\d{4}$/; // Magyar telefonszám formátum: +36 20 123 4567 vagy +36201234567
+
+      // Fő szervező adatainak ellenőrzése
       if (!this.organizerDetails.fullName) {
-        this.errors.fullName = 'A teljes név kötelező.';
+        this.errors.fullName = "A mező kitöltése kötelező!";
         isValid = false;
       }
       if (!this.organizerDetails.phoneNumber) {
-        this.errors.phoneNumber = 'A telefonszám kötelező.';
+        this.errors.phoneNumber = "A mező kitöltése kötelező!";
         isValid = false;
-      } else if (!this.validatePhoneNumber(this.organizerDetails.phoneNumber)) {
-        this.errors.phoneNumber = 'Érvénytelen telefonszám formátum.';
+      } else if (!phoneRegex.test(this.organizerDetails.phoneNumber)) {
+        this.errors.phoneNumber = "A telefonszám formátuma nem megfelelő! (pl. +36 20 123 4567)";
         isValid = false;
       }
       if (!this.organizerDetails.email) {
-        this.errors.email = 'Az e-mail cím kötelező.';
+        this.errors.email = "A mező kitöltése kötelező!";
         isValid = false;
-      } else if (!this.validateEmail(this.organizerDetails.email)) {
-        this.errors.email = 'Érvénytelen e-mail cím formátum.';
+      } else if (!emailRegex.test(this.organizerDetails.email)) {
+        this.errors.email = "Az e-mail cím formátuma nem megfelelő!";
         isValid = false;
       }
       if (!this.organizerDetails.address) {
-        this.errors.address = 'A lakcím kötelező.';
+        this.errors.address = "A mező kitöltése kötelező!";
         isValid = false;
       }
       if (!this.organizerDetails.hasAdditionalOrganizer) {
-        this.errors.hasAdditionalOrganizer = 'Válassza ki, van-e további szervező.';
+        this.errors.hasAdditionalOrganizer = "A mező kitöltése kötelező!";
         isValid = false;
       }
 
-      // További szervező adatainak validálása (ha "Igen" a válasz)
-      if (this.organizerDetails.hasAdditionalOrganizer === 'igen') {
+      // További szervező adatainak ellenőrzése (ha van)
+      if (this.organizerDetails.hasAdditionalOrganizer === "igen") {
         if (!this.additionalOrganizerDetails.fullName) {
-          this.errors.additionalFullName = 'A teljes név kötelező.';
+          this.errors.additionalFullName = "A mező kitöltése kötelező!";
           isValid = false;
         }
         if (!this.additionalOrganizerDetails.phoneNumber) {
-          this.errors.additionalPhoneNumber = 'A telefonszám kötelező.';
+          this.errors.additionalPhoneNumber = "A mező kitöltése kötelező!";
           isValid = false;
-        } else if (!this.validatePhoneNumber(this.additionalOrganizerDetails.phoneNumber)) {
-          this.errors.additionalPhoneNumber = 'Érvénytelen telefonszám formátum.';
+        } else if (!phoneRegex.test(this.additionalOrganizerDetails.phoneNumber)) {
+          this.errors.additionalPhoneNumber = "A telefonszám formátuma nem megfelelő! (pl. +36 20 123 4567)";
           isValid = false;
         }
         if (!this.additionalOrganizerDetails.email) {
-          this.errors.additionalEmail = 'Az e-mail cím kötelező.';
+          this.errors.additionalEmail = "A mező kitöltése kötelező!";
           isValid = false;
-        } else if (!this.validateEmail(this.additionalOrganizerDetails.email)) {
-          this.errors.additionalEmail = 'Érvénytelen e-mail cím formátum.';
+        } else if (!emailRegex.test(this.additionalOrganizerDetails.email)) {
+          this.errors.additionalEmail = "Az e-mail cím formátuma nem megfelelő!";
           isValid = false;
         }
         if (!this.additionalOrganizerDetails.address) {
-          this.errors.additionalAddress = 'A lakcím kötelező.';
+          this.errors.additionalAddress = "A mező kitöltése kötelező!";
           isValid = false;
         }
       }
 
       return isValid;
-    },
-    validatePhoneNumber(phoneNumber) {
-      const phoneRegex = /^\+36 \d{2} \d{3} \d{4}$/;
-      return phoneRegex.test(phoneNumber);
-    },
-    validateEmail(email) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      return emailRegex.test(email);
     },
   },
   mounted() {

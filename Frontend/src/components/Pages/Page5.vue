@@ -31,6 +31,7 @@
               />
               <label :for="field.id + '_nem'">Nem</label>
             </div>
+            <span v-if="errors[field.id]" class="error">{{ errors[field.id] }}</span>
 
             <!-- Fotó és/vagy videófelvétel részletei -->
             <div v-if="field.id === 'photography' && field.value === 'igen'" class="form-group">
@@ -39,10 +40,12 @@
                 id="photographyDetails"
                 v-model="photographyDetails"
                 placeholder="Fényképezőgép, videokamera, GoPro, drón, stb."
-                class="form-control"
+                class="form-control uniform-input"
                 required
               ></textarea>
-              <span v-if="errors.photographyDetails" class="error">{{ errors.photographyDetails }}</span>
+              <span v-if="!photographyDetails && errors.photographyDetails" class="error">
+                {{ errors.photographyDetails }}
+              </span>
             </div>
 
             <!-- Catering típusa -->
@@ -60,7 +63,9 @@
                 <input type="checkbox" id="drinks" value="kávé, tea, üdítő" v-model="cateringTypes" />
                 <label for="drinks" class="checkbox-label">kávé, tea, üdítő</label>
               </div>
-              <span v-if="errors.cateringTypes" class="error">{{ errors.cateringTypes }}</span>
+              <span v-if="!cateringTypes.length && errors.cateringTypes" class="error">
+                {{ errors.cateringTypes }}
+              </span>
             </div>
 
             <!-- Oktatástechnikai eszközigény -->
@@ -74,7 +79,9 @@
                 class="form-control uniform-input"
                 required
               />
-              <span v-if="errors.technicalEquipmentNeeds" class="error">{{ errors.technicalEquipmentNeeds }}</span>
+              <span v-if="!technicalEquipmentNeeds && errors.technicalEquipmentNeeds" class="error">
+                {{ errors.technicalEquipmentNeeds }}
+              </span>
             </div>
 
             <!-- Korlátozott mozgású személyek részletei -->
@@ -87,7 +94,9 @@
                 class="form-control uniform-input"
                 required
               ></textarea>
-              <span v-if="errors.disabledAccessDetails" class="error">{{ errors.disabledAccessDetails }}</span>
+              <span v-if="!disabledAccessDetails && errors.disabledAccessDetails" class="error">
+                {{ errors.disabledAccessDetails }}
+              </span>
             </div>
           </div>
         </div>
@@ -137,34 +146,40 @@ export default {
         console.log("Adatok betöltve a localStorage-ból (Page5):", data);
       }
     },
-    validateForm() {
+    validatePage() {
       this.errors = {};
+      let isValid = true;
 
-      // Fotó és/vagy videófelvétel validáció
-      const photographyField = this.yesNoFields.find((field) => field.id === "photography");
-      if (photographyField && photographyField.value === "igen" && !this.photographyDetails) {
-        this.errors.photographyDetails = "Kötelező megadni a fotó és/vagy videófelvétel részleteit.";
+      // Kötelező mezők ellenőrzése a yesNoFields alapján
+      this.yesNoFields.forEach((field) => {
+        if (!field.value) {
+          this.errors[field.id] = `A mező kitöltése kötelező!`;
+          isValid = false;
+        }
+      });
+
+      // Egyedi mezők validációja
+      if (!this.photographyDetails && this.yesNoFields.find(f => f.id === 'photography' && f.value === 'igen')) {
+        this.errors.photographyDetails = "A mező kitöltése kötelező!";
+        isValid = false;
       }
 
-      // Catering validáció
-      const cateringField = this.yesNoFields.find((field) => field.id === "catering");
-      if (cateringField && cateringField.value === "igen" && this.cateringTypes.length === 0) {
-        this.errors.cateringTypes = "Kötelező megadni a catering típusát.";
+      if (!this.cateringTypes.length && this.yesNoFields.find(f => f.id === 'catering' && f.value === 'igen')) {
+        this.errors.cateringTypes = "Legalább egy opciót ki kell választani!";
+        isValid = false;
       }
 
-      // Oktatástechnikai támogatás validáció
-      const technicalSupportField = this.yesNoFields.find((field) => field.id === "technicalSupport");
-      if (technicalSupportField && technicalSupportField.value === "igen" && !this.technicalEquipmentNeeds) {
-        this.errors.technicalEquipmentNeeds = "Kötelező megadni az oktatástechnikai eszközigényt.";
+      if (!this.technicalEquipmentNeeds && this.yesNoFields.find(f => f.id === 'technicalSupport' && f.value === 'igen')) {
+        this.errors.technicalEquipmentNeeds = "A mező kitöltése kötelező!";
+        isValid = false;
       }
 
-      // Korlátozott mozgású személyek részvételének validáció
-      const disabledAccessField = this.yesNoFields.find((field) => field.id === "disabledAccess");
-      if (disabledAccessField && disabledAccessField.value === "igen" && !this.disabledAccessDetails) {
-        this.errors.disabledAccessDetails = "Kötelező megadni a korlátozott mozgású személyek részvételének részleteit.";
+      if (!this.disabledAccessDetails && this.yesNoFields.find(f => f.id === 'disabledAccess' && f.value === 'igen')) {
+        this.errors.disabledAccessDetails = "A mező kitöltése kötelező!";
+        isValid = false;
       }
 
-      return Object.keys(this.errors).length === 0;
+      return isValid;
     },
   },
   mounted() {
@@ -175,28 +190,14 @@ export default {
 </script>
 
 <style src="/src/assets/css/style_pages.css"></style>
+
 <style scoped>
-.uniform-input {
-  width: 100%;
-  padding: 12px;
-  margin-bottom: 20px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  font-size: 1rem;
+/* A "Catering típusa" style */
+label {
+  font-weight: bold;
 }
-
-.uniform-input::placeholder {
-  color: #888;
-  opacity: 0.5;
-}
-
-.form-group {
-  margin-bottom: 30px; /* Larger margin between form groups */
-}
-
-.error {
-  color: red;
-  font-size: 0.875rem;
+.checkbox-label {
+  margin-left: 1.5rem; 
+  display: inline-block; 
 }
 </style>
-

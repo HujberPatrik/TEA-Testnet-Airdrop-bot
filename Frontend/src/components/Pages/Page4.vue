@@ -137,33 +137,49 @@ export default {
         console.log("Adatok betöltve a localStorage-ból (Page4):", data);
       }
     },
-    validateForm() {
+    validatePage() {
       this.errors = {};
+      let isValid = true;
 
-      // Szállásigény validáció
+      // Kötelező mezők ellenőrzése a yesNoFields alapján
+      this.yesNoFields.forEach((field) => {
+        if (!field.value) {
+          this.errors[field.id] = `A mező kitöltése kötelező!`;
+          isValid = false;
+        }
+      });
+
+      // Egyedi mezők validációja
       const accommodationField = this.yesNoFields.find((field) => field.id === "accommodation");
-      if (accommodationField && accommodationField.value === "igen" && !this.accommodationCount) {
-        this.errors.accommodationCount = "Kötelező megadni a szállásigény várható létszámát.";
+      if (accommodationField && accommodationField.value === "igen") {
+        if (!this.accommodationCount) {
+          this.errors.accommodationCount = "A mező kitöltése kötelező!";
+          isValid = false;
+        } else if (!Number.isInteger(parseInt(this.accommodationCount)) || this.accommodationCount <= 0) {
+          this.errors.accommodationCount = "Adjon meg egy érvényes létszámot!";
+          isValid = false;
+        }
       }
 
-      // Parkolóhely validáció
       const parkingField = this.yesNoFields.find((field) => field.id === "parking");
       if (parkingField && parkingField.value === "igen" && !this.parkingDetails) {
-        this.errors.parkingDetails = "Kötelező megadni a várható gépkocsiforgalom és parkolóhely igény részleteit.";
+        this.errors.parkingDetails = "A mező kitöltése kötelező!";
+        isValid = false;
       }
 
-      // Hulladék validáció
       const wasteField = this.yesNoFields.find((field) => field.id === "waste");
       if (wasteField && wasteField.value === "igen") {
         if (!this.wasteDisposalMethod) {
-          this.errors.wasteDisposalMethod = "Kötelező megadni a hulladék elszállításának módját.";
+          this.errors.wasteDisposalMethod = "A mező kitöltése kötelező!.";
+          isValid = false;
         }
         if (this.wasteDisposalMethod === "sajat" && !this.wasteDisposalResponsible) {
-          this.errors.wasteDisposalResponsible = "Kötelező megadni, ki végzi a hulladék elszállítását.";
+          this.errors.wasteDisposalResponsible = "A mező kitöltése kötelező!";
+          isValid = false;
         }
       }
 
-      return Object.keys(this.errors).length === 0;
+      return isValid;
     },
   },
   mounted() {
@@ -174,27 +190,3 @@ export default {
 </script>
 
 <style src="/src/assets/css/style_pages.css"></style>
-<style scoped>
-.uniform-input {
-  width: 100%;
-  padding: 12px;
-  margin-bottom: 20px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  font-size: 1rem;
-}
-
-.uniform-input::placeholder {
-  color: #888;
-  opacity: 0.5;
-}
-
-.form-group {
-  margin-bottom: 30px; /* Larger margin between form groups */
-}
-
-.error {
-  color: red;
-  font-size: 0.875rem;
-}
-</style>

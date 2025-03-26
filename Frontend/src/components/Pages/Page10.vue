@@ -15,19 +15,6 @@
 
       <!-- Megrendelő (jogi háttér esetén) adatai -->
       <div v-if="page.type === 'client'" class="client-details">
-        <div class="row" v-for="(field, index) in clientFields" :key="index">
-          <div class="col-md-12">
-            <input
-              :type="field.type"
-              :placeholder="field.placeholder"
-              class="form-control mb-3"
-              v-model="clientDetails[field.model]"
-              :required="field.required"
-            />
-            <span v-if="errors[field.model]" class="error">{{ errors[field.model] }}</span>
-          </div>
-        </div>
-
         <!-- Fájl feltöltés -->
         <div class="row">
           <div class="col-md-12">
@@ -72,6 +59,7 @@
           <label for="regulationAcceptance" class="form-check-label">
             A Széchenyi István Egyetem hatályban lévő Rendezvényszabályzatát elfogadom.
           </label>
+          <span v-if="errors.regulationAcceptance" class="error">{{ errors.regulationAcceptance }}</span>
         </div>
 
         <div class="form-check">
@@ -92,11 +80,6 @@ export default {
     return {
       activePage: 1,
       clientDetails: {
-        name: "",
-        address: "",
-        taxNumber: "",
-        phoneNumber: "",
-        email: "",
         dataDeclaration: false,
         regulationAcceptance: false,
       },
@@ -112,6 +95,25 @@ export default {
     };
   },
   methods: {
+    saveDataToLocalStorage() {
+      const formData = {
+        clientDetails: this.clientDetails,
+        activePage: this.activePage,
+        fileName: this.fileName,
+      };
+      localStorage.setItem('formDataPage10', JSON.stringify(formData));
+      console.log('Adatok mentve a localStorage-ba (Page10):', formData);
+    },
+    loadDataFromLocalStorage() {
+      const savedData = localStorage.getItem('formDataPage10');
+      if (savedData) {
+        const data = JSON.parse(savedData);
+        this.clientDetails = data.clientDetails || this.clientDetails;
+        this.activePage = data.activePage || this.activePage;
+        this.fileName = data.fileName || this.fileName;
+        console.log('Adatok betöltve a localStorage-ból (Page10):', data);
+      }
+    },
     handleFileUpload(event) {
       const file = event.target.files[0];
       if (file) {
@@ -154,62 +156,24 @@ export default {
       this.errors = {};
       let isValid = true;
 
-      // Név validálása
-      if (!this.clientDetails.name) {
-        this.errors.name = "A név/cégnév kötelező.";
+      // Ellenőrizzük, hogy a checkboxok ki vannak-e pipálva
+      if (!this.clientDetails.dataDeclaration) {
+        this.errors.dataDeclaration = 'Ezt a mezőt kötelező elfogadni!';
         isValid = false;
       }
-
-      // Cím validálása
-      if (!this.clientDetails.address) {
-        this.errors.address = "A cím kötelező.";
-        isValid = false;
-      }
-
-      // Adószám validálása
-      if (!this.clientDetails.taxNumber) {
-        this.errors.taxNumber = "Az adószám kötelező.";
-        isValid = false;
-      }
-
-      // Telefonszám validálása
-      if (!this.clientDetails.phoneNumber) {
-        this.errors.phoneNumber = "A telefonszám kötelező.";
-        isValid = false;
-      }
-
-      // E-mail cím validálása
-      if (!this.clientDetails.email) {
-        this.errors.email = "Az e-mail cím kötelező.";
-        isValid = false;
-      } else if (!this.validateEmail(this.clientDetails.email)) {
-        this.errors.email = "Érvénytelen e-mail cím formátum.";
+      if (!this.clientDetails.regulationAcceptance) {
+        this.errors.regulationAcceptance = 'Ezt a mezőt kötelező elfogadni!';
         isValid = false;
       }
 
       return isValid;
     },
-    validateEmail(email) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      return emailRegex.test(email);
-    },
+  },
+  mounted() {
+    // Az oldal betöltésekor automatikusan betölti az adatokat a localStorage-ból
+    this.loadDataFromLocalStorage();
   },
 };
 </script>
 
-<style scoped>
-.file-info {
-  font-size: 0.9rem;
-  color: #555;
-}
-
-.max-size-text {
-  font-size: 0.8rem;
-  color: #888;
-}
-
-.error {
-  color: red;
-  font-size: 0.875rem;
-}
-</style>
+<style src="/src/assets/css/style_pages.css"></style>

@@ -3,6 +3,7 @@ import HomeView from "../views/HomeView.vue";
 import AdminPage from "../views/AdminPage.vue";
 import Login from "../views/Login.vue";
 import Event from "../views/event.vue";
+import Test from "../views/test.vue";
 
 
 const router = createRouter({
@@ -28,6 +29,11 @@ const router = createRouter({
       name: "event",
       component: Event,
     },
+    {
+      path: "/test",
+      name: "test",
+      component: Test,
+    }
   ],
 });
 

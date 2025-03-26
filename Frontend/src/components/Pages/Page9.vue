@@ -125,51 +125,55 @@ export default {
       this.errors = {};
       let isValid = true;
 
+      // Reguláris kifejezések
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // Egyszerű e-mail ellenőrzés
+      const phoneRegex = /^\+36\s?\d{1,2}\s?\d{3}\s?\d{4}$/; // Magyar telefonszám formátum: +36 20 123 4567 vagy +36201234567
+      const taxNumberRegex = /^\d{8}-\d{1}-\d{2}$|^\d{10}$/; // Magyar adószám: 12345678-1-12 vagy civil adóigazolvány: 1234567890
+      const addressRegex = /^\d{4,5} [A-Za-záéíóöőúüűÁÉÍÓÖŐÚÜŰ]+, ?.+$/; // Pl. 9026 Győr, Egyetem tér 1 vagy 92026 Győr,Egyetem tér 1
+
       // Név/Cégnév validálása
       if (!this.clientDetails.name) {
-        this.errors.name = 'A név/cégnév kötelező.';
+        this.errors.name = "A név/cégnév megadása kötelező!";
         isValid = false;
       }
 
       // Cím validálása
       if (!this.clientDetails.address) {
-        this.errors.address = 'A cím kötelező.';
+        this.errors.address = "A cím megadása kötelező!";
+        isValid = false;
+      } else if (!addressRegex.test(this.clientDetails.address)) {
+        this.errors.address = "Érvényes címet adjon meg (Pl. 9026 Győr, Egyetem tér 1.)!";
         isValid = false;
       }
 
       // Adószám validálása
       if (!this.clientDetails.taxNumber) {
-        this.errors.taxNumber = 'Az adószám kötelező.';
+        this.errors.taxNumber = "Az adószám megadása kötelező!";
+        isValid = false;
+      } else if (!taxNumberRegex.test(this.clientDetails.taxNumber)) {
+        this.errors.taxNumber = "Az adószám formátuma nem megfelelő! (pl. 12345678-1-12 vagy 1234567890)";
         isValid = false;
       }
 
       // Telefonszám validálása
       if (!this.clientDetails.phoneNumber) {
-        this.errors.phoneNumber = 'A telefonszám kötelező.';
+        this.errors.phoneNumber = "A telefonszám megadása kötelező!";
         isValid = false;
-      } else if (!this.validatePhoneNumber(this.clientDetails.phoneNumber)) {
-        this.errors.phoneNumber = 'Érvénytelen telefonszám formátum.';
+      } else if (!phoneRegex.test(this.clientDetails.phoneNumber)) {
+        this.errors.phoneNumber = "A telefonszám formátuma nem megfelelő! (pl. +36 20 123 4567)";
         isValid = false;
       }
 
       // E-mail cím validálása
       if (!this.clientDetails.email) {
-        this.errors.email = 'Az e-mail cím kötelező.';
+        this.errors.email = "Az e-mail cím megadása kötelező!";
         isValid = false;
-      } else if (!this.validateEmail(this.clientDetails.email)) {
-        this.errors.email = 'Érvénytelen e-mail cím formátum.';
+      } else if (!emailRegex.test(this.clientDetails.email)) {
+        this.errors.email = "Az e-mail cím formátuma nem megfelelő!";
         isValid = false;
       }
 
       return isValid;
-    },
-    validatePhoneNumber(phoneNumber) {
-      const phoneRegex = /^\+36 \d{2} \d{3} \d{4}$/;
-      return phoneRegex.test(phoneNumber);
-    },
-    validateEmail(email) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      return emailRegex.test(email);
     },
   },
   mounted() {

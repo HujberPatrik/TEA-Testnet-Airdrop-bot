@@ -9,6 +9,7 @@
 
       <!-- Igen/Nem választó mezők -->
       <div class="row">
+        <span v-if="errors.yesNoFields" class="error">{{ errors.yesNoFields }}</span>
         <div class="col-md-6" v-for="field in yesNoFields" :key="field.id">
           <div class="form-group mb-4">
             <label>{{ field.label }} *</label>
@@ -149,36 +150,51 @@ export default {
         console.log("Adatok betöltve a localStorage-ból (Page6):", data);
       }
     },
-    validateForm() {
+    validatePage() {
       this.errors = {};
+      let isValid = true;
 
-      // Építési és bontási munkálatok validáció
+      // Kötelező mezők ellenőrzése a yesNoFields alapján
+      this.yesNoFields.forEach((field) => {
+        if (!field.value) {
+          this.errors[field.id] = "A mező kitöltése kötelező!.";
+          isValid = false;
+        }
+      });
+
+      // Építési és bontási munkálatok mezők ellenőrzése
       const constructionField = this.yesNoFields.find((field) => field.id === "construction");
       if (constructionField && constructionField.value === "igen") {
         if (!this.constructionStartDate) {
-          this.errors.constructionStartDate = "Kötelező megadni a rendezvényterület igénybevételének dátumát.";
+          this.errors.constructionStartDate = "A mező kitöltése kötelező!.";
+          isValid = false;
         }
         if (!this.constructionStartTime) {
-          this.errors.constructionStartTime = "Kötelező megadni a rendezvényterület igénybevételének időpontját.";
+          this.errors.constructionStartTime = "A mező kitöltése kötelező!.";
+          isValid = false;
         }
         if (!this.constructionEndDate) {
-          this.errors.constructionEndDate = "Kötelező megadni a rendezvényterület visszaadásának dátumát.";
+          this.errors.constructionEndDate = "A mező kitöltése kötelező!.";
+          isValid = false;
         }
         if (!this.constructionEndTime) {
-          this.errors.constructionEndTime = "Kötelező megadni a rendezvényterület visszaadásának időpontját.";
+          this.errors.constructionEndTime = "A mező kitöltése kötelező!.";
+          isValid = false;
         }
         if (!this.subcontractors) {
-          this.errors.subcontractors = "Kötelező megadni a rendezvényen megjelenő alvállalkozókat.";
+          this.errors.subcontractors = "A mező kitöltése kötelező!.";
+          isValid = false;
         }
       }
 
-      // Áramigény validáció
+      // Áramigény mező ellenőrzése
       const powerSupplyField = this.yesNoFields.find((field) => field.id === "powerSupply");
       if (powerSupplyField && powerSupplyField.value === "igen" && !this.powerSupplyDetails) {
-        this.errors.powerSupplyDetails = "Kötelező megadni az áramigény részleteit.";
+        this.errors.powerSupplyDetails = "A mező kitöltése kötelező!.";
+        isValid = false;
       }
 
-      return Object.keys(this.errors).length === 0;
+      return isValid;
     },
   },
   mounted() {
@@ -189,27 +205,3 @@ export default {
 </script>
 
 <style src="/src/assets/css/style_pages.css"></style>
-<style scoped>
-.uniform-input {
-  width: 100%;
-  padding: 12px;
-  margin-bottom: 20px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  font-size: 1rem;
-}
-
-.uniform-input::placeholder {
-  color: #888;
-  opacity: 0.5;
-}
-
-.form-group {
-  margin-bottom: 30px; /* Larger margin between form groups */
-}
-
-.error {
-  color: red;
-  font-size: 0.875rem;
-}
-</style>
