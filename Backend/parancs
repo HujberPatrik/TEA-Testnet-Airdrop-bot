@@ -1,0 +1,8 @@
+module.exports = {
+  host: '127.0.0.1', // Ensure this matches your database host
+  port: 5432,        // Ensure this matches your database port
+  user: 'your_username', // Replace with your database username
+  password: 'your_password', // Replace with your database password
+  database: 'your_database_name', // Replace with your database name
+};
+
