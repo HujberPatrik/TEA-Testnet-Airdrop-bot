@@ -442,3 +442,34 @@ body.dark-mode .page label {
 }
 
 
+/* Új stílus a töltőkörhöz */
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 5px solid #f3f3f3;
+  border-top: 5px solid #50adc9;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.success-message {
+  margin-top: 50px;
+  font-size: 2rem;
+  font-weight: bold;
+  color: #50adc9;
+}
+
+.small-text {
+  font-size: 0.9rem;
+  color: #6c757d;
+}

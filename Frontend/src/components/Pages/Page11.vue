@@ -19,15 +19,16 @@
 
       <div v-else-if="!isEmailVerified" class="verification-section">
         <p class="info-text">
-          Az űrlap elküldéséhez szükséges az e-mail cím hitelesítése. Kérjük, adja meg az e-mail címét, majd erősítse meg a kapott kóddal.
+          Az űrlap elküldéséhez igazolja e-mail címét a kapott kóddal.
         </p>
 
         <div class="row">
           <div class="col-md-12">
+            <!-- E-mail mező -->
             <input
-              type="email"
+              type="text"
               placeholder="E-mail cím *"
-              class="form-control mb-1 uniform-input"
+              class="form-control mb-3 uniform-input"
               v-model="emailAddress"
               required
               :disabled="isEmailVerified"
@@ -54,6 +55,7 @@
         <div v-if="showVerificationCodeInput || isEmailVerified" class="verification-code-section">
           <div class="row">
             <div class="col-md-12">
+              <!-- Verifikációs kód mező -->
               <input
                 v-if="!isEmailVerified"
                 type="text"
@@ -69,9 +71,9 @@
             <div class="col-auto">
               <button
                 class="btn btn-sm verification-btn d-inline-block"
-                :class="{ 'btn-success': isEmailVerified, 'btn-primary': !isEmailVerified }"
                 @click="verifyCode"
                 :disabled="isEmailVerified"
+                style="background-color: #50adc9; color: white; border: none;"
               >
                 {{ isEmailVerified ? 'Hitelesítve' : 'Kód ellenőrzése' }}
               </button>
@@ -97,6 +99,7 @@ export default {
       sendAttempts: 0,
       isButtonDisabled: false,
       message: '',
+      codeExpirationTime: null,
     };
   },
   methods: {
@@ -123,9 +126,11 @@ export default {
 
         if (response.status === 200) {
           this.showVerificationCodeInput = true;
+          this.codeExpirationTime = Date.now() + 600000; // 10 perc múlva lejár
+
           let remainingTime = 10;
           const interval = setInterval(() => {
-            this.message = `Elküldtük a kódot a(z) ${this.emailAddress} címre! Új kód küldése ${remainingTime} mp múlva! Még ${3 - this.sendAttempts} új kódot kérhet!`;
+            this.message = `Elküldtük a kódot a(z) ${this.emailAddress} címre! Új kód küldése ${remainingTime} mp múlva! Még ${3 - this.sendAttempts} új kódot kérhet! \n A kód 10 perc múlva lejár!`;
             remainingTime--;
             if (remainingTime <= 0) {
               clearInterval(interval);
@@ -143,12 +148,20 @@ export default {
         this.isButtonDisabled = false;
       }
     },
+
     async verifyCode() {
       this.errors = {};
       if (!this.verificationCode) {
         this.errors.verificationCode = 'A verifikációs kód kötelező.';
         return;
       }
+
+      // Ellenőrizd, hogy a kód lejárt-e
+      if (Date.now() > this.codeExpirationTime) {
+        this.errors.verificationCode = 'A kód lejárt. Kérjen új kódot.';
+        return;
+      }
+
       try {
         const response = await axios.post('http://localhost:3000/verify-code', {
           email: this.emailAddress,
@@ -179,37 +192,5 @@ export default {
 };
 </script>
 
-<style>
-/* Új stílus a töltőkörhöz */
-.spinner {
-  width: 50px;
-  height: 50px;
-  border: 5px solid #f3f3f3;
-  border-top: 5px solid #50adc9;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto;
-}
 
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-.success-message {
-  margin-top: 50px;
-  font-size: 2rem;
-  font-weight: bold;
-  color: #50adc9;
-}
-
-.small-text {
-  font-size: 0.9rem;
-  color: #6c757d;
-}
-</style>
 <style src="/src/assets/css/style_pages.css"></style>

@@ -7,6 +7,7 @@
       :is="currentPage"
       :ref="'page' + activePage"
       @email-verified="updateEmailVerificationStatus"
+      @verification-success="onVerificationSuccess" 
     />
 
     <!-- Navigáció és kitöltési csík -->
@@ -36,7 +37,7 @@
       <button
         v-else
         @click="submit"
-        :disabled="!isEmailVerified"
+        :disabled="!isVerified" 
         class="submit-button btn btn-primary"
       >
         Küldés
@@ -146,29 +147,8 @@ export default {
       return pages[index - 1];
     },
     submit() {
-      if (this.isEmailVerified) {
-        const allData = {};
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          allData[key] = localStorage.getItem(key);
-        }
-
-        try {
-          // Compress the data before saving
-          const compressedData = btoa(unescape(encodeURIComponent(JSON.stringify(allData))));
-          localStorage.setItem('allData', compressedData); // Save compressed data
-        } catch (error) {
-          console.error('Failed to save data to localStorage:', error);
-          alert('Az adatok mentése sikertelen. Túl sok adatot próbál menteni.');
-          return;
-        }
-
-        // Page12 megjelenítése
-        this.currentPage = 'Page12';
-        this.activePage = this.totalPages + 1; // Az aktív oldal értékét növeljük
-      } else {
-        alert('Az e-mail cím hitelesítése szükséges a küldéshez!');
-      }
+      this.currentPage = 'Page12';
+      this.activePage = this.totalPages + 1;
     },
     updateEmailVerificationStatus(status) {
       this.isEmailVerified = status;
