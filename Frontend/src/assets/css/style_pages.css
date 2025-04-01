@@ -462,14 +462,45 @@ body.dark-mode .page label {
   }
 }
 
-.success-message {
-  margin-top: 50px;
-  font-size: 2rem;
-  font-weight: bold;
-  color: #50adc9;
-}
 
 .small-text {
   font-size: 0.9rem;
   color: #6c757d;
 }
+
+
+.success-message {
+  margin-top: 50px;
+  font-size: 2rem;
+  font-weight: bold;
+  color: #50adc9;
+  text-align: center; /* Középre igazítás */
+}
+
+.error-message {
+  margin-top: 50px;
+  font-size: 2rem;
+  font-weight: bold;
+  color: #ff0000;
+  text-align: center; /* Középre igazítás */
+}
+
+.icon-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.icon {
+  font-size: 3rem; /* Az ikon mérete */
+  color: #50adc9;
+}
+
+.iconerror {
+  font-size: 3rem; /* Az ikon mérete */
+  color: #ff0000;
+}
+
+
+

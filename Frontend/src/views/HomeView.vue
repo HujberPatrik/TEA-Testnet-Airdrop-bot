@@ -7,48 +7,54 @@
       :is="currentPage"
       :ref="'page' + activePage"
       @email-verified="updateEmailVerificationStatus"
-      @verification-success="onVerificationSuccess" 
+      @verification-success="onVerificationSuccess"
+      @go-to-page="navigate" 
     />
 
     <!-- Navigáció és kitöltési csík -->
-    <div class="navigation-container bg-light fixed-bottom p-3">
-      <button
-        v-if="activePage !== 1"
-        @click="navigate(activePage - 1)"
-        class="nav-button btn btn-primary"
-      >
-        <i class="bi bi-arrow-left"></i>
-      </button>
+<div
+  v-if="currentPage !== 'ControlPage'"
+  class="navigation-container bg-light fixed-bottom p-3"
+>
+  <button
+    v-if="activePage !== 1 && activePage !== 12"
+    @click="navigate(activePage - 1)"
+    class="nav-button btn btn-primary"
+  >
+    <i class="bi bi-arrow-left"></i>
+  </button>
 
-      <!-- Kitöltési csík -->
-      <div class="progress-container">
-        <progress :value="progress" max="100" class="custom-progress"></progress>
-        <span>{{ progress }}%</span>
-      </div>
+  <!-- Kitöltési csík -->
+  <div class="progress-container">
+    <progress :value="progress" max="100" class="custom-progress"></progress>
+    <span>{{ progress }}%</span>
+  </div>
 
-      <!-- Jobbra gomb vagy Küldés gomb (utolsó oldalon) -->
-      <button
-        v-if="activePage !== totalPages"
-        @click="validateAndNavigate"
-        class="nav-button btn btn-primary"
-      >
-        <i class="bi bi-arrow-right"></i>
-      </button>
-      <button
-        v-else
-        @click="submit"
-        :disabled="!isVerified" 
-        class="submit-button btn btn-primary"
-      >
-        Küldés
-      </button>
-    </div>
+  <!-- Jobbra gomb vagy Küldés gomb (utolsó oldalon) -->
+  <button
+    v-if="activePage !== totalPages && activePage !== 12"
+    @click="validateAndNavigate"
+    class="nav-button btn btn-primary"
+  >
+    <i class="bi bi-arrow-right"></i>
+  </button>
+  <button
+    v-else
+    @click="submit"
+    :disabled="!isVerified"
+    class="submit-button btn btn-primary"
+  >
+    Küldés
+  </button>
+</div>
+
   </div>
 </template>
 
 <script>
 import Navbar from '../components/Navbar.vue';
-import Pages from '../components/Pages/Page.vue';
+import ControlPage from '../components/Pages/ControlPage.vue'; // ControlPage importálása
+import Page1 from '../components/Pages/Page1.vue';
 import Pages2 from '../components/Pages/Page2.vue';
 import Pages3 from '../components/Pages/Page3.vue';
 import Pages4 from '../components/Pages/Page4.vue';
@@ -64,7 +70,8 @@ import Page12 from '../components/Pages/Page12.vue'; // Új oldal importálása
 export default {
   components: {
     Navbar,
-    Pages,
+    ControlPage, // ControlPage komponens
+    Page1,
     Pages2,
     Pages3,
     Pages4,
@@ -75,37 +82,36 @@ export default {
     Pages9,
     Pages10,
     Pages11,
-    Page12, // Új oldal hozzáadása
+    Page12,
   },
   data() {
     return {
-      currentPage: 'Pages', // Az első oldal alapértelmezett neve
-      activePage: 1, // Az első oldal az aktív
-      totalPages: 11, // Összes oldal száma (Page12 nem számít bele)
+      currentPage: 'ControlPage', // Az első oldal a ControlPage
+      activePage: 0, // Kezdetben nem szükséges oldal
+      totalPages: 11, // Összes oldal száma
       formData: null,
-      isEmailVerified: false, // E-mail hitelesítés állapota
-      isVerified: false, // Állapot a Küldés gombhoz
+      isEmailVerified: false,
+      isVerified: false,
     };
   },
   computed: {
-    // Kitöltési százalék számítása
-    progress() {
-      if (this.activePage > this.totalPages) {
-        // Ha a Page12 van aktívan, a progress értéke maradjon 100%
-        return 100;
-      }
-      if (this.totalPages === 1) {
-        return 100;
-      }
-      return Math.round(((this.activePage - 1) / (this.totalPages - 1)) * 100);
-    },
+  progress() {
+    if (this.activePage <= 1) {
+      return 0; // Starting progress
+    }
+    if (this.activePage > this.totalPages) {
+      return 100; // Completed progress
+    }
+    const actualTotalPages = this.totalPages - 1; // Subtract 1 to exclude ControlPage
+    return Math.round(((this.activePage - 1) / actualTotalPages) * 100); // ActivePage - 1 to adjust progress
   },
+},
+
   methods: {
-    // Navigáció
     navigate(page) {
       this.saveCurrentPageData();
 
-      if (page >= 1 && page <= this.totalPages) {
+      if (page >= 0 && page <= this.totalPages) {
         if (page !== this.totalPages) {
           this.isEmailVerified = false;
         }
@@ -132,7 +138,8 @@ export default {
     },
     getPageName(index) {
       const pages = [
-        'Pages',
+        'ControlPage', // Az első oldal a ControlPage
+        'Page1',
         'Pages2',
         'Pages3',
         'Pages4',
@@ -144,7 +151,7 @@ export default {
         'Pages10',
         'Pages11',
       ];
-      return pages[index - 1];
+      return pages[index];
     },
     submit() {
       this.currentPage = 'Page12';
@@ -154,17 +161,16 @@ export default {
       this.isEmailVerified = status;
     },
     onVerificationSuccess() {
-      this.isVerified = true; // Állapot frissítése, ha a hitelesítés sikeres
+      this.isVerified = true;
     },
   },
   mounted() {
     const savedData = localStorage.getItem('formData');
-    console.log('LocalStorage-ból betöltött adatok:', savedData); // Ellenőrzés
+    console.log('LocalStorage-ból betöltött adatok:', savedData); 
     if (savedData) {
       this.formData = JSON.parse(savedData);
     }
 
-    // Oldal újratöltésekor állítsuk vissza az isEmailVerified értékét
     this.isEmailVerified = false;
   },
 };
@@ -194,7 +200,7 @@ html {
   width: 100%;
   padding: 10px;
   box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1); 
-  flex-wrap: nowrap; /* Flexbox nowrap */
+  flex-wrap: nowrap;
 }
 
 /* Kitöltési csík */
@@ -203,11 +209,11 @@ html {
   align-items: center;
   gap: 10px;
   margin-top: 10px; 
-  flex-grow: 1; /* Flexbox grow */
+  flex-grow: 1;
 }
 
 .custom-progress {
-  width: 100%; /* Full width */
+  width: 100%;
   height: 10px;
   border-radius: 5px;
   pointer-events: none; 
@@ -225,12 +231,12 @@ html {
 
 /* Gombok színezése */
 .nav-button, .submit-button {
-  background-color: #50adc9; /* Gombok színe */
-  border-color: #50adc9; /* Gombok szegélyének színe */
+  background-color: #50adc9;
+  border-color: #50adc9;
 }
 
 .submit-button:disabled {
-  background-color: #ccc; /* Letiltott gomb színe */
+  background-color: #ccc;
   border-color: #ccc;
   cursor: not-allowed;
 }
@@ -238,25 +244,18 @@ html {
 /* Média lekérdezések kisebb képernyőkhöz */
 @media (max-width: 768px) {
   .navigation-container {
-    flex-direction: row; /* Always row */
+    flex-direction: row;
     align-items: center;
-    flex-wrap: nowrap; /* Prevent wrapping */
+    flex-wrap: nowrap;
   }
 
   .progress-container {
-    margin-top: 0; /* No margin top */
+    margin-top: 0;
   }
 
   .nav-button, .submit-button {
-    width: auto; /* Auto width */
-    margin-top: 0; /* No margin top */
-  }
-}
-
-/* Kitöltési csík elrejtése nagyon kicsi kijelzőnél */
-@media (max-width: 100px) {
-  .progress-container {
-    display: none;
+    width: auto;
+    margin-top: 0;
   }
 }
 
@@ -274,6 +273,6 @@ html {
 }
 
 .dark-mode .bg-light {
-  background-color: #242943 !important; /* Override bg-light in dark mode */
+  background-color: #242943 !important;
 }
 </style>

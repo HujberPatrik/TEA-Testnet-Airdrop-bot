@@ -31,8 +31,20 @@
             <p class="max-size-text">Max. méret 6Mb</p> <!-- Max. méret szöveg -->
           </div>
         </div>
-        <button class="btn btn-primary" @click="uploadFile">Fájl feltöltése</button>
 
+        <div class="row  mb-3">
+          <div class="col-auto position-relative">
+            <button
+              class="btn btn-sm verification-btn d-inline-block"
+              @click="uploadFile"
+              style="background-color: #50adc9; color: white; border: none;"
+            >
+            Fájl feltöltése
+            </button>
+          </div>
+        </div>
+
+        
         <!-- Nyilatkozatok -->
         <div class="form-check">
           <input
