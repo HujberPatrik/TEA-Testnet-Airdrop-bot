@@ -7,50 +7,59 @@
       class="page"
       :style="{ display: activePage === index + 1 ? 'block' : 'none' }"
     >
-      <h2>
-        <span>{{ page.title }}</span>
-      </h2>
+      <h2 class="page-title">{{ page.title }}</h2>
+      
+      <div class="description-container">
+        <p>{{ page.description }}</p>
+      </div>
 
       <div v-if="!showCaptcha" class="centered-button">
-        <button class="StartButton" @click="handleFillOut">Kitöltés</button>
+        <button class="start-button" @click="handleFillOut">Kitöltés</button>
       </div>
 
-      <div v-if="!showCaptcha">
-        Kérjük, a Rendezvénybejelentő űrlap kitöltése során minden adatot pontosan és helyesen adjon meg. A * jellel ellátott mezők kitöltése kötelező, mivel ezek az információk alapvetőek a rendezvény bejelentéséhez és feldolgozásához. A % jelzi, hogy hány oldal kitöltése van még hátra. A folyamat végén hitelesítés céljából meg kell adnia az email címét, amelyre egy biztonsági kódot fog kapni.
-      </div>
-      <div v-if="showCaptcha" class="captcha-container">
-        <div class="captcha-box">
+      <div v-if="showCaptcha" class="captcha-section">
+        <div class="section-title">
           <h3>Robot ellenőrzés</h3>
-          <div class="checkbox-container">
-            <label class="custom-checkbox">
-              <input type="checkbox" v-model="isRobotChecked" />
-              <span class="checkmark"></span>
-              <span class="checkbox-text">Nem vagyok robot</span>
-            </label>
-          </div>
-          <div v-if="loading" class="loading-circle-captcha"></div>
-          <div v-if="!loading" class="centered-button">
-            <button @click="goToNextPage" class="btn btn-primary" :disabled="!isRobotChecked || loading">Ellenőrzés</button>
+          <i class="bi bi-info-circle" title="A * részek kötelezőek"></i>
+        </div>
+        
+        <div class="captcha-container">
+          <p class="captcha-explanation">
+            Kérjük, igazolja, hogy nem robot a biztonsági ellenőrzés kitöltésével.
+            Ez segít megvédeni rendszerünket az automatizált programoktól.
+          </p>
+          <div id="g-recaptcha" class="g-recaptcha" :data-sitekey="siteKey"></div>
+          <div class="centered-button">
+            <button
+              @click="goToNextPage"
+              class="verification-button"
+              :disabled="!isCaptchaVerified || loading"
+            >
+              <span v-if="!loading">Ellenőrzés</span>
+              <span v-else class="loading-spinner"></span>
+            </button>
           </div>
         </div>
-
-
       </div>
     </div>
   </div>
 </template>
 
 <script>
+import axios from "axios";
+
 export default {
   data() {
     return {
       activePage: 1,
-      isRobotChecked: false,
-      showCaptcha: false,
-      loading: false, // Track loading state
+      showCaptcha: true,
+      isCaptchaVerified: false,
+      loading: false,
+      siteKey: "6LcOygYrAAAAAOgz6K5w0i4rE2J4Z7Gviftn73-r",
       pages: [
         {
-          title: 'RENDEZVÉNY BEJELENTÉSE',
+          title: "RENDEZVÉNY BEJELENTÉSE",
+          description: "Ezen az űrlapon keresztül jelentheti be hivatalosan rendezvényét a Széchenyi Egyetem rendszerében. A bejelentés folyamata egyszerű: töltse ki a szükséges adatokat, és küldje be az űrlapot. A sikeres bejelentés után visszaigazolást kap, és a rendszer automatikusan értesíti az illetékes szervezeti egységeket."
         },
       ],
     };
@@ -59,151 +68,212 @@ export default {
     handleFillOut() {
       this.showCaptcha = true;
     },
+    async onCaptchaVerified(token) {
+      try {
+        const response = await axios.post("http://localhost:3000/verify-captcha", { token });
+        if (response.data.success) {
+          console.log("CAPTCHA sikeresen ellenőrizve.");
+          this.isCaptchaVerified = true;
+        } else {
+          console.error("CAPTCHA ellenőrzés sikertelen:", response.data.message);
+        }
+      } catch (error) {
+        console.error("Hiba történt a CAPTCHA ellenőrzése során:", error);
+      }
+    },
     goToNextPage() {
       this.loading = true; // Start loading animation
       setTimeout(() => {
-        this.$emit('go-to-page', 1);
+        this.$emit("go-to-page", 1);
         this.loading = false; // Stop loading animation after 1.5 seconds
       }, 1500); // Delay of 1.5 seconds before going to the next page
     },
+  },
+  mounted() {
+    // Load Google reCAPTCHA script
+    const script = document.createElement("script");
+    script.src = "https://www.google.com/recaptcha/api.js";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      if (window.grecaptcha) {
+        window.grecaptcha.render("g-recaptcha", {
+          sitekey: this.siteKey,
+          callback: this.onCaptchaVerified,
+        });
+      } else {
+        console.error("Google reCAPTCHA script not loaded.");
+      }
+    };
+    document.head.appendChild(script);
+    
+    // Load Bootstrap Icons CSS
+    const linkElement = document.createElement("link");
+    linkElement.rel = "stylesheet";
+    linkElement.href = "https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.5/font/bootstrap-icons.min.css";
+    document.head.appendChild(linkElement);
   },
 };
 </script>
 
 <style scoped>
-.centered-button {
-  text-align: center;
-  margin-top: 20px;
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
 }
 
-.StartButton {
+.page {
+  background-color: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  padding: 30px;
+  margin: 20px 0;
+}
+
+.page-title {
+  color: #ffffff; /* Fehér szín */
+  text-align: center;
+  margin-bottom: 30px;
+  font-weight: 600;
+  font-size: 28px;
+  border-bottom: 2px solid #50adc9;
+  padding-bottom: 15px;
+}
+
+.description-container {
+  background-color: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 30px;
+  border-left: 4px solid #50adc9;
+}
+
+.description-container p {
+  color: #495057;
+  line-height: 1.6;
+  margin: 0;
+  font-size: 16px;
+}
+
+.centered-button {
+  text-align: center;
+  margin: 25px 0;
+}
+
+.start-button, .verification-button {
   background-color: #50adc9;
   color: white;
   border: none;
-  padding: 15px 30px;
+  padding: 12px 30px;
   cursor: pointer;
-  font-size: 18px;
+  font-size: 16px;
   border-radius: 5px;
-  margin-top: 50px;
-  margin-bottom: 50px;
+  transition: all 0.3s ease;
+  font-weight: 500;
 }
 
-.StartButton:hover {
+.start-button:hover, .verification-button:hover:not(:disabled) {
   background-color: #3d8ca1;
 }
 
-/* CAPTCHA Modern Styles */
-.captcha-container {
-  text-align: center;
-  margin-top: 50px;
-  margin-bottom: 50px;
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
+.verification-button:disabled {
+  background-color: #b0b0b0;
+  cursor: not-allowed;
 }
 
-.captcha-box {
-  display: inline-block;
-  padding: 20px;
-  border: 2px solid #ccc;
-  border-radius: 10px;
-  background-color: #f9f9f9;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-  margin-bottom: 20px;
-  width: 100%; /* Make it take full width on smaller screens */
-  max-width: 350px; /* Set a max width */
-  height: auto;
-  box-sizing: border-box;
+.captcha-section {
+  margin: 0 0 20px 0;
 }
 
-.checkbox-container {
+.section-title {
+  background-color: #50adc9;
+  color: white;
+  padding: 15px 20px;
+  border-radius: 5px 5px 0 0;
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
-  margin-top: 10px;
+  margin-bottom: 0;
 }
 
-.custom-checkbox {
-  display: flex;
-  align-items: center;
+.section-title h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 500;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Bootstrap icon styling */
+.bi-info-circle {
+  color: white;
+  font-size: 24px;
   cursor: pointer;
 }
 
-.custom-checkbox input {
-  position: absolute;
-  opacity: 0;
+.captcha-container {
+  background-color: #fff;
+  padding: 20px;
+  border: 1px solid #e0e0e0;
+  border-top: none;
+  border-radius: 0 0 5px 5px;
 }
 
-.checkmark {
-  width: 24px;
-  height: 24px;
-  background-color: #ddd;
-  border-radius: 5px;
-  margin-right: 10px;
+.captcha-explanation {
+  color: #495057;
+  font-size: 14px;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.g-recaptcha {
   display: flex;
   justify-content: center;
-  align-items: center;
+  margin: 20px 0;
 }
 
-.custom-checkbox input:checked + .checkmark {
-  background-color: #50adc9;
-}
-
-.checkbox-text {
-  font-size: 18px;
-}
-
-.loading-circle-captcha {
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #50adc9;
+.loading-spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
   border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  margin: 20px auto;
-  animation: spin 2s linear infinite;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  to { transform: rotate(360deg); }
 }
 
-button:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
-}
-
-@media (max-width: 600px) {
-  .captcha-box {
+@media (max-width: 768px) {
+  .page {
+    padding: 20px;
+    margin: 10px 0;
+  }
+  
+  .page-title {
+    font-size: 24px;
+  }
+  
+  .section-title h3 {
+    font-size: 18px;
+  }
+  
+  .start-button,
+  .verification-button {
+    padding: 10px 20px;
+    font-size: 14px;
+  }
+  
+  .description-container {
     padding: 15px;
-    width: 90%;
-    max-width: 100%;
   }
   
-  .checkbox-text {
-    font-size: 16px;
+  .description-container p,
+  .captcha-explanation {
+    font-size: 14px;
   }
-
-  .loading-circle-captcha {
-    width: 30px;
-    height: 30px;
-  }
-  
-  .btn-primary {
-    padding: 12px 20px;
-    font-size: 16px;
-  }
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-button:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
 }
 </style>
-
-<style src="/src/assets/css/style_pages.css"></style>

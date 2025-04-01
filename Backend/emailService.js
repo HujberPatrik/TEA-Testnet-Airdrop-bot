@@ -4,6 +4,7 @@ const express = require("express");
 const nodemailer = require("nodemailer");
 const bodyParser = require("body-parser");
 const cors = require("cors"); // Új sor: CORS middleware importálása
+const axios = require("axios"); // Axios a reCAPTCHA ellenőrzéshez
 
 const app = express();
 app.use(bodyParser.json());
@@ -105,6 +106,38 @@ app.post('/verify-code', (req, res) => {
   }
 
   return res.status(400).json({ success: false, message: 'A kód helytelen.' });
+});
+
+// reCAPTCHA ellenőrzés
+app.post('/verify-captcha', async (req, res) => {
+  const { token } = req.body; // A frontend által küldött reCAPTCHA token
+
+  if (!token) {
+    return res.status(400).json({ success: false, message: 'CAPTCHA token szükséges.' });
+  }
+
+  try {
+    // Küldd el a reCAPTCHA token-t a Google szerverének ellenőrzésre
+    const response = await axios.post(
+      `https://www.google.com/recaptcha/api/siteverify`,
+      null,
+      {
+        params: {
+          secret: "6LcOygYrAAAAALuDfA3ui1R_11i0Oeo8e1MMFnQi",
+          response: token,
+        },
+      }
+    );
+
+    if (response.data.success) {
+      return res.status(200).json({ success: true, message: 'CAPTCHA sikeresen ellenőrizve.' });
+    } else {
+      return res.status(400).json({ success: false, message: 'CAPTCHA ellenőrzés sikertelen.', errors: response.data['error-codes'] });
+    }
+  } catch (error) {
+    console.error("Hiba történt a CAPTCHA ellenőrzése során:", error);
+    return res.status(500).json({ success: false, message: 'Szerverhiba történt a CAPTCHA ellenőrzése során.' });
+  }
 });
 
 // Backend indítása
