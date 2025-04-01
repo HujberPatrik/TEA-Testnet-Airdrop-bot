@@ -55,7 +55,7 @@ export default {
       showCaptcha: true,
       isCaptchaVerified: false,
       loading: false,
-      siteKey: "6LcOygYrAAAAAOgz6K5w0i4rE2J4Z7Gviftn73-r",
+      siteKey: import.meta.env.VITE_RECAPTCHA_SITE_KEY, // Környezeti változó használata
       pages: [
         {
           title: "RENDEZVÉNY BEJELENTÉSE",
@@ -88,25 +88,36 @@ export default {
         this.loading = false; // Stop loading animation after 1.5 seconds
       }, 1500); // Delay of 1.5 seconds before going to the next page
     },
+    loadRecaptcha() {
+      const script = document.createElement('script');
+      script.src = 'https://www.google.com/recaptcha/api.js';
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        if (window.grecaptcha) {
+          window.grecaptcha.render('g-recaptcha', {
+            sitekey: this.siteKey,
+            callback: this.onCaptchaVerified,
+          });
+        }
+      };
+      document.head.appendChild(script);
+    },
   },
   mounted() {
-    // Load Google reCAPTCHA script
-    const script = document.createElement("script");
-    script.src = "https://www.google.com/recaptcha/api.js";
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-      if (window.grecaptcha) {
-        window.grecaptcha.render("g-recaptcha", {
-          sitekey: this.siteKey,
-          callback: this.onCaptchaVerified,
-        });
-      } else {
-        console.error("Google reCAPTCHA script not loaded.");
-      }
-    };
-    document.head.appendChild(script);
+    // Debug logolás hozzáadása
+    console.log('Requesting reCAPTCHA site key...');
     
+    axios.get('http://localhost:3000/api/recaptcha-site-key')
+      .then(response => {
+        console.log('Received site key:', response.data);
+        this.siteKey = response.data.siteKey;
+        this.loadRecaptcha();
+      })
+      .catch(error => {
+        console.error('Error fetching reCAPTCHA site key:', error);
+      });
+
     // Load Bootstrap Icons CSS
     const linkElement = document.createElement("link");
     linkElement.rel = "stylesheet";

@@ -1,28 +1,41 @@
 //node emailService.js
 
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+
+// Debug: Környezeti változók ellenőrzése
+console.log('Environment variables:', {
+  RECAPTCHA_SITE_KEY: process.env.RECAPTCHA_SITE_KEY,
+  RECAPTCHA_SECRET_KEY: process.env.RECAPTCHA_SECRET_KEY
+});
+
 const express = require("express");
 const nodemailer = require("nodemailer");
 const bodyParser = require("body-parser");
-const cors = require("cors"); // Új sor: CORS middleware importálása
-const axios = require("axios"); // Axios a reCAPTCHA ellenőrzéshez
+const cors = require("cors");
+const axios = require("axios");
+
+const siteKey = process.env.RECAPTCHA_SITE_KEY;
+const secretKey = process.env.RECAPTCHA_SECRET_KEY;
 
 const app = express();
 app.use(bodyParser.json());
 
 app.use(cors({
-    origin: 'http://localhost:5173', // A Vue.js frontend pontos URL-je
-    methods: ['GET', 'POST'], 
-    allowedHeaders: ['Content-Type', 'Authorization']
-  }));
+  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+  credentials: true,
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // Ideiglenes tároló a verifikációs kódokhoz
 const verificationCodes = {};
 
 // Nodemailer konfiguráció
 const transporter = nodemailer.createTransport({
-  service: "gmail", // Használj megfelelő email szolgáltatót
+  service: "gmail",
   auth: {
-    user: "souris20013@gmail.com", // Saját email címed
+    user: "souris20013@gmail.com",
     pass: "upkh wsof azoo xqmx", // Saját email jelszavad vagy app password
   },
 });
@@ -35,7 +48,6 @@ app.post('/send-verification-code', (req, res) => {
     return res.status(400).json({ success: false, message: 'E-mail cím szükséges.' });
   }
 
-  // Generálj egy 6 számjegyű kódot
   const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
   verificationCodes[email] = verificationCode;
 
@@ -71,8 +83,8 @@ app.post('/send-verification-code', (req, res) => {
     attachments: [
       {
         filename: "logo.png",
-        path: __dirname + "/assets/logo.png", // Helyi fájl elérési útvonala
-        cid: "logo", // Content-ID azonosító
+        path: __dirname + "/assets/logo.png",
+        cid: "logo",
       },
     ],
   };
@@ -91,7 +103,21 @@ app.get("/", (req, res) => {
   res.send("Server is running!");
 });
 
-// Verifikációs kód ellenőrzése
+app.get('/api/recaptcha-site-key', (req, res) => {
+  const siteKey = process.env.RECAPTCHA_SITE_KEY;
+  
+  if (!siteKey) {
+    console.error('RECAPTCHA_SITE_KEY is not set in environment variables');
+    return res.status(500).json({ 
+      success: false, 
+      message: 'reCAPTCHA site key is not configured' 
+    });
+  }
+  
+  console.log('Sending site key:', siteKey);
+  res.json({ siteKey });
+});
+
 app.post('/verify-code', (req, res) => {
   const { email, code } = req.body;
 
@@ -99,31 +125,28 @@ app.post('/verify-code', (req, res) => {
     return res.status(400).json({ success: false, message: 'E-mail és kód szükséges.' });
   }
 
-  // Ellenőrizd, hogy a kód helyes-e
   if (verificationCodes[email] === code) {
-    delete verificationCodes[email]; // Töröld a kódot, miután ellenőrizted
+    delete verificationCodes[email];
     return res.status(200).json({ success: true, message: 'A kód helyes.' });
   }
 
   return res.status(400).json({ success: false, message: 'A kód helytelen.' });
 });
 
-// reCAPTCHA ellenőrzés
 app.post('/verify-captcha', async (req, res) => {
-  const { token } = req.body; // A frontend által küldött reCAPTCHA token
+  const { token } = req.body;
 
   if (!token) {
     return res.status(400).json({ success: false, message: 'CAPTCHA token szükséges.' });
   }
 
   try {
-    // Küldd el a reCAPTCHA token-t a Google szerverének ellenőrzésre
     const response = await axios.post(
       `https://www.google.com/recaptcha/api/siteverify`,
       null,
       {
         params: {
-          secret: "6LcOygYrAAAAALuDfA3ui1R_11i0Oeo8e1MMFnQi",
+          secret: secretKey,
           response: token,
         },
       }
