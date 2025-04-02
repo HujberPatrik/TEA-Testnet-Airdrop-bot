@@ -58,16 +58,31 @@
                     <table class="table text-start align-middle table-bordered table-hover mb-0">
                         <thead>
                             <tr class="text-dark">
-                                <th scope="col">Státusz</th>
-                                <th scope="col">Neve</th>
-                                <th scope="col">Helyszín</th>
-                                <th scope="col">Kezdő Időpont</th>
-                                <th scope="col">Záró Időpont</th>
+                                <th scope="col" @click="sortBy('status')" class="sortable-header">
+                                    Státusz
+                                    <i v-if="sortColumn === 'status'" :class="getSortIconClass()"></i>
+                                </th>
+                                <th scope="col" @click="sortBy('name')" class="sortable-header">
+                                    Neve
+                                    <i v-if="sortColumn === 'name'" :class="getSortIconClass()"></i>
+                                </th>
+                                <th scope="col" @click="sortBy('location')" class="sortable-header">
+                                    Helyszín
+                                    <i v-if="sortColumn === 'location'" :class="getSortIconClass()"></i>
+                                </th>
+                                <th scope="col" @click="sortBy('startTime')" class="sortable-header">
+                                    Kezdő Időpont
+                                    <i v-if="sortColumn === 'startTime'" :class="getSortIconClass()"></i>
+                                </th>
+                                <th scope="col" @click="sortBy('endTime')" class="sortable-header">
+                                    Záró Időpont
+                                    <i v-if="sortColumn === 'endTime'" :class="getSortIconClass()"></i>
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr
-                                v-for="event in filteredEvents"
+                                v-for="event in sortedAndFilteredEvents"
                                 :key="event.id"
                                 :class="getStatusClass(event.status)"
                                 @click="navigateToEvent(event.id)"
@@ -113,6 +128,8 @@ export default {
                 location: "",
                 type: "",
             },
+            sortColumn: 'startTime', // Alapértelmezett rendezési oszlop
+            sortDirection: 'asc' // 'asc' vagy 'desc'
         };
     },
     computed: {
@@ -143,8 +160,47 @@ export default {
                 );
             });
         },
+        sortedAndFilteredEvents() {
+            const filtered = [...this.filteredEvents];
+            
+            return filtered.sort((a, b) => {
+                let valueA = a[this.sortColumn];
+                let valueB = b[this.sortColumn];
+                
+                // Különböző típusok kezelése
+                if (this.sortColumn === 'startTime' || this.sortColumn === 'endTime') {
+                    valueA = new Date(valueA);
+                    valueB = new Date(valueB);
+                } else {
+                    valueA = typeof valueA === 'string' ? valueA.toLowerCase() : valueA;
+                    valueB = typeof valueB === 'string' ? valueB.toLowerCase() : valueB;
+                }
+                
+                if (valueA < valueB) {
+                    return this.sortDirection === 'asc' ? -1 : 1;
+                }
+                if (valueA > valueB) {
+                    return this.sortDirection === 'asc' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
     },
     methods: {
+        sortBy(column) {
+            // Ha ugyanarra az oszlopra kattintunk, megfordítjuk a rendezési irányt
+            if (this.sortColumn === column) {
+                this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                this.sortColumn = column;
+                this.sortDirection = 'asc';
+            }
+        },
+        getSortIconClass() {
+            return this.sortDirection === 'asc' 
+                ? 'fas fa-sort-up ms-1' 
+                : 'fas fa-sort-down ms-1';
+        },
         toggleExpand() {
             this.isExpanded = !this.isExpanded;
             this.$emit("toggle-expand", this.isExpanded);
@@ -224,6 +280,20 @@ export default {
 .table-container .table td {
     border: 1px solid #e5e7eb;
     padding: 8px;
+}
+
+.sortable-header {
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+}
+
+.sortable-header:hover {
+    background-color: #f3f4f6;
+}
+
+.table-container.dark-mode .sortable-header:hover {
+    background-color: #475569;
 }
 
 .table-container.dark-mode .table th,
