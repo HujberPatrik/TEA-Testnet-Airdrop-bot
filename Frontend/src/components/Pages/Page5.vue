@@ -61,7 +61,7 @@
                 <input type="checkbox" id="drinks" value="kávé, tea, üdítő" v-model="inputValues['catering_tipus']" />
                 <label for="drinks" class="checkbox-label">kávé, tea, üdítő</label>
               </div>
-              <span v-if="!inputValues['catering_tipus'].length && errors.catering_tipus" class="error">
+              <span v-if="Array.isArray(inputValues['catering_tipus']) && !inputValues['catering_tipus'].length && errors.catering_tipus" class="error">
                 {{ errors.catering_tipus }}
               </span>
             </div>
@@ -109,7 +109,7 @@ export default {
         foto: null,
         foto_reszletek: null,
         cater: null,
-        catering_tipus: [],
+        catering_tipus: [], // Üres tömbként inicializálva
         oktatastechnika: null,
         oktatas_eszkozok: null,
         korlatozott_mozgas: null,
@@ -127,6 +127,9 @@ export default {
   watch: {
     inputValues: {
       handler(newValues) {
+        if (!Array.isArray(newValues.catering_tipus)) {
+          newValues.catering_tipus = []; // Ha nem tömb, állítsd üres tömbre
+        }
         localStorage.setItem('inputValues', JSON.stringify(newValues)); // Mentés localStorage-be
       },
       deep: true,
