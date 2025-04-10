@@ -1,13 +1,12 @@
-
 const express = require('express');
+const { getAllKerveny, getKervenyById, insertKerveny } = require('../controllers/rendezveny.controller');
 const router = express.Router();
-const Rendezveny = require('../controllers/rendezveny.controller.js');
 
-router.get('/kervenyek', Rendezveny.getAllKerveny);
-router.post('/kervenyHozzaad',Rendezveny.insertKerveny);
-router.patch('/kervenyModosit',Rendezveny.updateKerveny);
-router.delete('/kervenyTorles', Rendezveny.deleteKerveny)
+// Végpontok definiálása
+router.get('/kerveny', getAllKerveny);
+router.get('/kerveny/:id', getKervenyById);
+router.post('/kerveny', insertKerveny);
 
 module.exports = router;
 
-    
+

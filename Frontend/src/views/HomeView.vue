@@ -12,46 +12,46 @@
     />
 
     <!-- Navigáció és kitöltési csík -->
-<div
-  v-if="currentPage !== 'ControlPage'"
-  class="navigation-container bg-light fixed-bottom p-3"
->
-  <button
-    v-if="activePage !== 1 && activePage !== 12"
-    @click="navigate(activePage - 1)"
-    class="nav-button btn btn-primary"
-  >
-    <i class="bi bi-arrow-left"></i>
-  </button>
+    <div
+      v-if="currentPage !== 'ControlPage'"
+      class="navigation-container bg-light fixed-bottom p-3"
+    >
+      <button
+        v-if="activePage !== 1 && activePage !== 12"
+        @click="navigate(activePage - 1)"
+        class="nav-button btn btn-primary"
+      >
+        <i class="bi bi-arrow-left"></i>
+      </button>
 
-  <!-- Kitöltési csík -->
-  <div class="progress-container">
-    <progress :value="progress" max="100" class="custom-progress"></progress>
-    <span>{{ progress }}%</span>
-  </div>
+      <!-- Kitöltési csík -->
+      <div class="progress-container">
+        <progress :value="progress" max="100" class="custom-progress"></progress>
+        <span>{{ progress }}%</span>
+      </div>
 
-  <!-- Jobbra gomb vagy Küldés gomb (utolsó oldalon) -->
-  <button
-    v-if="activePage !== totalPages && activePage !== 12"
-    @click="validateAndNavigate"
-    class="nav-button btn btn-primary"
-  >
-    <i class="bi bi-arrow-right"></i>
-  </button>
-  <button
-    v-else
-    @click="submit"
-    :disabled="!isVerified"
-    class="submit-button btn btn-primary"
-  >
-    Küldés
-  </button>
-</div>
-
+      <!-- Jobbra gomb vagy Küldés gomb (utolsó oldalon) -->
+      <button
+        v-if="activePage !== totalPages && activePage !== 12"
+        @click="validateAndNavigate"
+        class="nav-button btn btn-primary"
+      >
+        <i class="bi bi-arrow-right"></i>
+      </button>
+      <button
+        v-else
+        @click="submitDataToBackend"
+        :disabled="!isVerified"
+        class="submit-button btn btn-primary"
+      >
+        Küldés
+      </button>
+    </div>
   </div>
 </template>
 
 <script>
+import axios from 'axios';
 import Navbar from '../components/Navbar.vue';
 import ControlPage from '../components/Pages/ControlPage.vue'; // ControlPage importálása
 import Page1 from '../components/Pages/Page1.vue';
@@ -95,18 +95,17 @@ export default {
     };
   },
   computed: {
-  progress() {
-    if (this.activePage <= 1) {
-      return 0; // Starting progress
-    }
-    if (this.activePage > this.totalPages) {
-      return 100; // Completed progress
-    }
-    const actualTotalPages = this.totalPages - 1; // Subtract 1 to exclude ControlPage
-    return Math.round(((this.activePage - 1) / actualTotalPages) * 100); // ActivePage - 1 to adjust progress
+    progress() {
+      if (this.activePage <= 1) {
+        return 0; // Starting progress
+      }
+      if (this.activePage > this.totalPages) {
+        return 100; // Completed progress
+      }
+      const actualTotalPages = this.totalPages - 1; // Subtract 1 to exclude ControlPage
+      return Math.round(((this.activePage - 1) / actualTotalPages) * 100); // ActivePage - 1 to adjust progress
+    },
   },
-},
-
   methods: {
     navigate(page) {
       this.saveCurrentPageData();
@@ -153,9 +152,19 @@ export default {
       ];
       return pages[index];
     },
-    submit() {
-      this.currentPage = 'Page12';
-      this.activePage = this.totalPages + 1;
+    async submitDataToBackend() {
+      try {
+        const data = JSON.parse(localStorage.getItem('inputValues')) || {};
+        console.log('Küldött adatok:', data); // Ellenőrizd az adatokat a konzolon
+        const response = await axios.post('http://localhost:3000/api/kerveny', data);
+
+        console.log('Sikeres mentés:', response.data);
+        alert('Az összes oldal adatai sikeresen mentve az adatbázisba!');
+        localStorage.removeItem('inputValues'); // Törlés a localStorage-ből sikeres mentés után
+      } catch (error) {
+        console.error('Hiba történt az API-kérés során:', error);
+        alert('Nem sikerült menteni az adatokat. Próbálja újra később!');
+      }
     },
     updateEmailVerificationStatus(status) {
       this.isEmailVerified = status;

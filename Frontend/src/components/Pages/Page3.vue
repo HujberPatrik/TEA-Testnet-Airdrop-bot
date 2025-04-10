@@ -14,12 +14,12 @@
           <input
             type="text"
             id="eventNature"
-            v-model="eventNature"
+            v-model="inputValues['jelleg']"
             placeholder="Például: konferencia, workshop, koncert, stb."
             class="form-control"
             required
           />
-          <span v-if="errors.eventNature" class="error">{{ errors.eventNature }}</span>
+          <span v-if="errors['jelleg']" class="error">{{ errors['jelleg'] }}</span>
         </div>
       </div>
 
@@ -30,12 +30,12 @@
           <label for="eventProgram">Részletes programterv *</label>
           <textarea
             id="eventProgram"
-            v-model="eventProgram"
+            v-model="inputValues['programterv']"
             placeholder="Adja meg a rendezvény részletes programtervét"
             class="form-control"
             required
           ></textarea>
-          <span v-if="errors.eventProgram" class="error">{{ errors.eventProgram }}</span>
+          <span v-if="errors['programterv']" class="error">{{ errors['programterv'] }}</span>
         </div>
 
         <!-- Helyszín berendezési módja -->
@@ -43,7 +43,7 @@
           <label for="venueSetup">Helyszín berendezési módja</label>
           <textarea
             id="venueSetup"
-            v-model="venueSetup"
+            v-model="inputValues['berendezesi_mod']"
             placeholder="Csatolva is megfelelő, amennyiben nem tudja megadni a berendezés módját, kollégáink felveszik Önnel a kapcsolatot."
             class="form-control"
           ></textarea>
@@ -54,21 +54,21 @@
       <div class="form-row electrician-and-activities">
         <div class="form-group electrician-duty">
           <label for="electricianDuty">Szükséges villanyszerelői ügyelet? *</label>
-          <select id="electricianDuty" v-model="electricianDuty" class="form-control" required>
+          <select id="electricianDuty" v-model="inputValues['villanyszerelo']" class="form-control" required>
             <option value="" disabled>Válasszon egy opciót</option>
             <option value="rendezvény előtt">Rendezvény előtt</option>
             <option value="rendezvény közben">Rendezvény közben</option>
             <option value="rendezvény után">Rendezvény után</option>
             <option value="nem szükséges">Nem szükséges</option>
           </select>
-          <span v-if="errors.electricianDuty" class="error">{{ errors.electricianDuty }}</span>
+          <span v-if="errors['villanyszerelo']" class="error">{{ errors['villanyszerelo'] }}</span>
         </div>
 
         <div class="form-group expected-activities">
           <label for="expectedActivities">Várható-e az alábbi tevékenységek közül valamelyik? *</label>
           <select
             id="expectedActivities"
-            v-model="expectedActivity"
+            v-model="inputValues['leg_szennyezes']"
             class="form-control"
             required
           >
@@ -77,11 +77,11 @@
               {{ activity }}
             </option>
           </select>
-          <span v-if="errors.expectedActivity" class="error">{{ errors.expectedActivity }}</span>
+          <span v-if="errors['leg_szennyezes']" class="error">{{ errors['leg_szennyezes'] }}</span>
           <input
-            v-if="expectedActivity === 'egyéb'"
+            v-if="inputValues['leg_szennyezes'] === 'egyéb'"
             type="text"
-            v-model="otherActivity"
+            v-model="inputValues['egyeb_tevekenyseg']"
             placeholder="Kérjük, adja meg"
             class="form-control mt-2"
           />
@@ -95,83 +95,52 @@
 export default {
   data() {
     return {
-      eventNature: "",
-      eventProgram: "",
-      venueSetup: "",
-      electricianDuty: "",
-      expectedActivity: "",
-      otherActivity: "",
-      activities: ["por", "füst", "páraképződés", "egyik sem várható", "egyéb"],
+      inputValues: JSON.parse(localStorage.getItem('inputValues')) || {}, // Betöltés localStorage-ből
       errors: {},
-      // Példa adatszerkezet a validatePage metódushoz
-      pages: [
-        {
-          inputs: [
-            { placeholder: "eventNature" },
-            { placeholder: "eventProgram" },
-            { placeholder: "electricianDuty" },
-            { placeholder: "expectedActivity" },
-          ],
-        },
-      ],
-      activePage: 1,
-      inputValues: {}, // Az input mezők értékeinek tárolására
+      activities: ["por", "füst", "páraképződés", "egyik sem várható", "egyéb"],
     };
   },
+  watch: {
+    inputValues: {
+      handler(newValues) {
+        localStorage.setItem('inputValues', JSON.stringify(newValues)); // Mentés localStorage-be
+      },
+      deep: true,
+    },
+  },
   methods: {
-    saveDataToLocalStorage() {
-      const formData = {
-        eventNature: this.eventNature,
-        eventProgram: this.eventProgram,
-        venueSetup: this.venueSetup,
-        electricianDuty: this.electricianDuty,
-        expectedActivity: this.expectedActivity,
-        otherActivity: this.otherActivity,
-      };
-      localStorage.setItem('formDataPage3', JSON.stringify(formData));
-      console.log('Adatok mentve a localStorage-ba (Page3):', formData);
-    },
-    loadDataFromLocalStorage() {
-      const savedData = localStorage.getItem('formDataPage3');
-      if (savedData) {
-        const data = JSON.parse(savedData);
-        this.eventNature = data.eventNature || "";
-        this.eventProgram = data.eventProgram || "";
-        this.venueSetup = data.venueSetup || "";
-        this.electricianDuty = data.electricianDuty || "";
-        this.expectedActivity = data.expectedActivity || "";
-        this.otherActivity = data.otherActivity || "";
-        console.log('Adatok betöltve a localStorage-ból (Page3):', data);
-      }
-    },
-    
     validatePage() {
       this.errors = {};
       let isValid = true;
 
-      // Kötelező mezők ellenőrzése az inputValues alapján
-      this.pages[this.activePage - 1].inputs.forEach((input) => {
-        const value = this[input.placeholder];
-        if (!value) {
-          this.errors[input.placeholder] = 'A mező kitöltése kötelező!';
+      // Kötelező mezők ellenőrzése
+      const requiredFields = ['jelleg', 'programterv', 'villanyszerelo', 'leg_szennyezes', 'berendezesi_mod'];
+      requiredFields.forEach((field) => {
+        if (!this.inputValues[field]) {
+          this.errors[field] = 'A mező kitöltése kötelező!';
           isValid = false;
         }
       });
 
+      // Egyéb tevékenység ellenőrzése, ha szükséges
+      if (this.inputValues['leg_szennyezes'] === 'egyéb' && !this.inputValues['egyeb_tevekenyseg']) {
+        this.errors['egyeb_tevekenyseg'] = 'Kérjük, adja meg az egyéb tevékenységet!';
+        isValid = false;
+      }
+
       return isValid;
     },
-    submitForm() {
-      if (this.validateForm()) {
-        this.saveDataToLocalStorage();
-        alert('Adatok sikeresen mentve!');
-      } else {
-        alert('Kérjük, töltse ki az összes kötelező mezőt!');
-      }
+    saveDataToLocalStorage() {
+      localStorage.setItem('inputValues', JSON.stringify(this.inputValues));
+      console.log('Adatok mentve a localStorage-ba:', this.inputValues);
     },
   },
   mounted() {
-    // Az oldal betöltésekor automatikusan betölti az adatokat a localStorage-ból
-    this.loadDataFromLocalStorage();
+    const savedData = localStorage.getItem('inputValues');
+    if (savedData) {
+      this.inputValues = JSON.parse(savedData);
+      console.log('Adatok betöltve a localStorage-ból (Page3):', this.inputValues);
+    }
   },
 };
 </script>

@@ -164,7 +164,7 @@ app.post('/verify-captcha', async (req, res) => {
 });
 
 // Backend indítása
-const PORT = 3000;
+const PORT = 3002;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });

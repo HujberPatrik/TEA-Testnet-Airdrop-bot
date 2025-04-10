@@ -119,7 +119,7 @@ export default {
       this.sendAttempts++;
 
       try {
-        const response = await axios.post('http://localhost:3000/send-verification-code', {
+        const response = await axios.post('http://localhost:3002/send-verification-code', {
           email: this.emailAddress,
           verificationCode: this.generateVerificationCode(),
         });
@@ -163,7 +163,7 @@ export default {
       }
 
       try {
-        const response = await axios.post('http://localhost:3000/verify-code', {
+        const response = await axios.post('http://localhost:3002/verify-code', {
           email: this.emailAddress,
           code: this.verificationCode,
         });

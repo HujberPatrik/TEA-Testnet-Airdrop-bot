@@ -1,83 +1,68 @@
 <template>
   <div class="container">
-    <div v-for="(page, index) in pages" :key="index" :id="'page' + (index + 1)" class="page" :style="{ display: activePage === index + 1 ? 'block' : 'none' }">
+    <div class="page" :style="{ display: 'block' }">
       <!-- Cím rész -->
       <h2>
-        <span>{{ page.title }}</span>
+        <span>MEGRENDELŐ (JOGI HÁTTÉR ESETÉN) ADATAI</span>
         <i class="bi bi-info-circle" title="A * részek kötelezőek"></i>
       </h2>
 
-      <!-- Megrendelő (jogi háttér esetén) adatai -->
-      <div v-if="page.type === 'client'" class="client-details">
-        <!-- Név/Cégnév -->
-        <div class="row">
-          <div class="col-md-12">
-            <input
-              type="text"
-              placeholder="Név/Cégnév *"
-              class="form-control mb-3 uniform-input"
-              v-model="clientDetails.name"
-              required
-            />
-            <span v-if="errors.name" class="error">{{ errors.name }}</span>
-          </div>
+      <!-- Megrendelő adatai -->
+      <div class="row">
+        <div class="col-md-6">
+          <input
+            type="text"
+            placeholder="Név/Cégnév *"
+            class="form-control mb-3 uniform-input"
+            v-model="inputValues['megrendelo_nev']"
+            required
+          />
+          <span v-if="errors.megrendelo_nev" class="error">{{ errors.megrendelo_nev }}</span>
         </div>
-
-        <!-- Cím -->
-        <div class="row">
-          <div class="col-md-12">
-            <input
-              type="text"
-              placeholder="Cím *"
-              class="form-control mb-3 uniform-input"
-              v-model="clientDetails.address"
-              required
-            />
-            <span v-if="errors.address" class="error">{{ errors.address }}</span>
-          </div>
+        <div class="col-md-6">
+          <input
+            type="text"
+            placeholder="Cím *"
+            class="form-control mb-3 uniform-input"
+            v-model="inputValues['megrendelo_cim']"
+            required
+          />
+          <span v-if="errors.megrendelo_cim" class="error">{{ errors.megrendelo_cim }}</span>
         </div>
-
-        <!-- Adószám -->
-        <div class="row">
-          <div class="col-md-12">
-            <input
-              type="text"
-              placeholder="Adószám *"
-              class="form-control mb-3 uniform-input"
-              v-model="clientDetails.taxNumber"
-              required
-            />
-            <span v-if="errors.taxNumber" class="error">{{ errors.taxNumber }}</span>
-          </div>
+      </div>
+      <div class="row">
+        <div class="col-md-6">
+          <input
+            type="text"
+            placeholder="Adószám *"
+            class="form-control mb-3 uniform-input"
+            v-model="inputValues['megrendelo_ado']"
+            required
+          />
+          <span v-if="errors.megrendelo_ado" class="error">{{ errors.megrendelo_ado }}</span>
         </div>
-
-        <!-- Telefonszám -->
-        <div class="row">
-          <div class="col-md-12">
-            <input
-              type="tel"
-              placeholder="Telefonszám *"
-              class="form-control mb-3 uniform-input"
-              v-model="clientDetails.phoneNumber"
-              required
-              title="Formátum: +36 20 123 4567"
-            />
-            <span v-if="errors.phoneNumber" class="error">{{ errors.phoneNumber }}</span>
-          </div>
+        <div class="col-md-6">
+          <input
+            type="tel"
+            placeholder="Telefonszám *"
+            class="form-control mb-3 uniform-input"
+            v-model="inputValues['megrendelo_telefon']"
+            required
+            title="Formátum: +36 20 123 4567"
+          />
+          <span v-if="errors.megrendelo_telefon" class="error">{{ errors.megrendelo_telefon }}</span>
         </div>
-
-        <!-- E-mail cím -->
-        <div class="row">
-          <div class="col-md-12">
-            <input
-              type="email"
-              placeholder="E-mail cím *"
-              class="form-control mb-3 uniform-input"
-              v-model="clientDetails.email"
-              required
-            />
-            <span v-if="errors.email" class="error">{{ errors.email }}</span>
-          </div>
+      </div>
+      <div class="row">
+        <div class="col-md-6">
+          <input
+            type="email"
+            placeholder="E-mail cím *"
+            class="form-control mb-3 uniform-input"
+            v-model="inputValues['megrendelo_email']"
+            required
+          />
+          <span v-if="errors.megrendelo_email" class="error">{{ errors.megrendelo_email }}</span>
         </div>
       </div>
     </div>
@@ -88,88 +73,48 @@
 export default {
   data() {
     return {
-      activePage: 1,
-      clientDetails: {
-        name: '',
-        address: '',
-        taxNumber: '',
-        phoneNumber: '',
-        email: '',
+      inputValues: JSON.parse(localStorage.getItem('inputValues')) || {
+        megrendelo_nev: '',
+        megrendelo_cim: '',
+        megrendelo_ado: '',
+        megrendelo_telefon: '',
+        megrendelo_email: '',
       },
       errors: {},
-      pages: [
-        {
-          title: 'MEGRENDELŐ (JOGI HÁTTÉR ESETÉN) ADATAI',
-          type: 'client',
-        },
-      ],
     };
   },
+  watch: {
+    inputValues: {
+      handler(newValues) {
+        localStorage.setItem('inputValues', JSON.stringify(newValues)); // Mentés localStorage-be
+      },
+      deep: true,
+    },
+  },
   methods: {
-    saveDataToLocalStorage() {
-      const formData = {
-        clientDetails: this.clientDetails,
-      };
-      localStorage.setItem('formDataPage9', JSON.stringify(formData));
-      console.log('Adatok mentve a localStorage-ba (Page9):', formData);
-    },
-    loadDataFromLocalStorage() {
-      const savedData = localStorage.getItem('formDataPage9');
-      if (savedData) {
-        const data = JSON.parse(savedData);
-        this.clientDetails = data.clientDetails || this.clientDetails;
-        console.log('Adatok betöltve a localStorage-ból (Page9):', data);
-      }
-    },
     validatePage() {
       this.errors = {};
       let isValid = true;
 
-      // Reguláris kifejezések
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // Egyszerű e-mail ellenőrzés
-      const phoneRegex = /^\+36\s?\d{1,2}\s?\d{3}\s?\d{4}$/; // Magyar telefonszám formátum: +36 20 123 4567 vagy +36201234567
-      const taxNumberRegex = /^\d{8}-\d{1}-\d{2}$|^\d{10}$/; // Magyar adószám: 12345678-1-12 vagy civil adóigazolvány: 1234567890
-      const addressRegex = /^\d{4,5} [A-Za-záéíóöőúüűÁÉÍÓÖŐÚÜŰ]+, ?.+$/; // Pl. 9026 Győr, Egyetem tér 1 vagy 92026 Győr,Egyetem tér 1
-
-      // Név/Cégnév validálása
-      if (!this.clientDetails.name) {
-        this.errors.name = "A név/cégnév megadása kötelező!";
+      // Kötelező mezők ellenőrzése
+      if (!this.inputValues['megrendelo_nev']) {
+        this.errors['megrendelo_nev'] = 'A mező kitöltése kötelező!';
         isValid = false;
       }
-
-      // Cím validálása
-      if (!this.clientDetails.address) {
-        this.errors.address = "A cím megadása kötelező!";
-        isValid = false;
-      } else if (!addressRegex.test(this.clientDetails.address)) {
-        this.errors.address = "Érvényes címet adjon meg (Pl. 9026 Győr, Egyetem tér 1.)!";
+      if (!this.inputValues['megrendelo_cim']) {
+        this.errors['megrendelo_cim'] = 'A mező kitöltése kötelező!';
         isValid = false;
       }
-
-      // Adószám validálása
-      if (!this.clientDetails.taxNumber) {
-        this.errors.taxNumber = "Az adószám megadása kötelező!";
-        isValid = false;
-      } else if (!taxNumberRegex.test(this.clientDetails.taxNumber)) {
-        this.errors.taxNumber = "Az adószám formátuma nem megfelelő! (pl. 12345678-1-12 vagy 1234567890)";
+      if (!this.inputValues['megrendelo_ado']) {
+        this.errors['megrendelo_ado'] = 'A mező kitöltése kötelező!';
         isValid = false;
       }
-
-      // Telefonszám validálása
-      if (!this.clientDetails.phoneNumber) {
-        this.errors.phoneNumber = "A telefonszám megadása kötelező!";
-        isValid = false;
-      } else if (!phoneRegex.test(this.clientDetails.phoneNumber)) {
-        this.errors.phoneNumber = "A telefonszám formátuma nem megfelelő! (pl. +36 20 123 4567)";
+      if (!this.inputValues['megrendelo_telefon']) {
+        this.errors['megrendelo_telefon'] = 'A mező kitöltése kötelező!';
         isValid = false;
       }
-
-      // E-mail cím validálása
-      if (!this.clientDetails.email) {
-        this.errors.email = "Az e-mail cím megadása kötelező!";
-        isValid = false;
-      } else if (!emailRegex.test(this.clientDetails.email)) {
-        this.errors.email = "Az e-mail cím formátuma nem megfelelő!";
+      if (!this.inputValues['megrendelo_email']) {
+        this.errors['megrendelo_email'] = 'A mező kitöltése kötelező!';
         isValid = false;
       }
 
@@ -177,8 +122,11 @@ export default {
     },
   },
   mounted() {
-    // Az oldal betöltésekor automatikusan betölti az adatokat a localStorage-ból
-    this.loadDataFromLocalStorage();
+    const savedData = localStorage.getItem('inputValues');
+    if (savedData) {
+      this.inputValues = JSON.parse(savedData);
+      console.log('Adatok betöltve a localStorage-ból (Page9):', this.inputValues);
+    }
   },
 };
 </script>

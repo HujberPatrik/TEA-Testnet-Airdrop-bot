@@ -18,8 +18,7 @@
                 :id="field.id + '_igen'"
                 :name="field.id"
                 value="igen"
-                v-model="field.value"
-                @change="logFieldValue(field)"
+                v-model="inputValues[field.dbColumn]"
               />
               <label :for="field.id + '_igen'">Igen</label>
               <input
@@ -27,70 +26,65 @@
                 :id="field.id + '_nem'"
                 :name="field.id"
                 value="nem"
-                v-model="field.value"
+                v-model="inputValues[field.dbColumn]"
                 class="ms-3"
-                @change="logFieldValue(field)"
               />
               <label :for="field.id + '_nem'">Nem</label>
             </div>
 
             <!-- Tűzveszélyes tevékenység leírása -->
-            <div v-if="field.id === 'fireHazard' && field.value === 'igen'" class="form-group">
+            <div v-if="field.id === 'fireHazard' && inputValues[field.dbColumn] === 'igen'" class="form-group">
               <label for="fireHazardDetails">Tűzveszélyes tevékenység leírása *</label>
               <textarea
                 id="fireHazardDetails"
-                v-model="fireHazardDetails"
+                v-model="inputValues['tuzveszelyes_tevekenyseg_leiras']"
                 placeholder="Írja le a tűzveszélyes tevékenységet"
                 class="form-control"
                 required
               ></textarea>
-              <span v-if="errors.fireHazardDetails" class="error">{{ errors.fireHazardDetails }}</span>
+              <span v-if="errors.tuzveszelyes_tevekenyseg_leiras" class="error">{{ errors.tuzveszelyes_tevekenyseg_leiras }}</span>
             </div>
 
             <!-- Vegyi anyag felhasználása várható-e -->
-            <div v-if="field.id === 'chemicals' && field.value === 'igen'" class="form-group">
-              <label for="chemicalsDetails">Tevékenység leírása *</label>
+            <div v-if="field.id === 'chemicals' && inputValues[field.dbColumn] === 'igen'" class="form-group">
+              <label for="chemicalsDetails">Vegyi anyag felhasználásának részletei *</label>
               <textarea
                 id="chemicalsDetails"
-                v-model="chemicalsDetails"
+                v-model="inputValues['vegyi_anyag_leiras']"
                 placeholder="Írja le a vegyi anyag felhasználásával kapcsolatos tevékenységet"
                 class="form-control"
                 required
               ></textarea>
-              <span v-if="errors.chemicalsDetails" class="error">{{ errors.chemicalsDetails }}</span>
+              <span v-if="errors.vegyi_anyag_leiras" class="error">{{ errors.vegyi_anyag_leiras }}</span>
             </div>
 
             <!-- Dekoráció részletei -->
-            <div v-if="field.id === 'decoration' && field.value === 'igen'" class="form-group">
+            <div v-if="field.id === 'decoration' && inputValues[field.dbColumn] === 'igen'" class="form-group">
               <label for="decorationDetails">Dekoráció részletei *</label>
               <textarea
                 id="decorationDetails"
-                v-model="decorationDetails"
+                v-model="inputValues['dekoracio_leiras']"
                 placeholder="Írja le a dekoráció részleteit"
                 class="form-control"
                 required
               ></textarea>
-              <span v-if="errors.decorationDetails" class="error">{{ errors.decorationDetails }}</span>
+              <span v-if="errors.dekoracio_leiras" class="error">{{ errors.dekoracio_leiras }}</span>
             </div>
 
             <!-- Portaszolgálat igénylése részletek -->
-            <div
-              v-if="field.id === 'securityService' && field.value === 'igen'"
-              class="form-group"
-              style="display: block; visibility: visible; opacity: 1;"
-            >
+            <div v-if="field.id === 'securityService' && inputValues[field.dbColumn] === 'igen'" class="form-group">
               <label for="securityServiceDetails">Portaszolgálat részletei *</label>
               <textarea
                 id="securityServiceDetails"
-                v-model="securityServiceDetails"
+                v-model="inputValues['portaszolgalat_leiras']"
                 placeholder="Írja le a portaszolgálat igénylésével kapcsolatos részleteket"
                 class="form-control"
                 required
               ></textarea>
-              <span v-if="errors.securityServiceDetails" class="error">{{ errors.securityServiceDetails }}</span>
+              <span v-if="errors.portaszolgalat_leiras" class="error">{{ errors.portaszolgalat_leiras }}</span>
             </div>
 
-            <span v-if="errors[field.id]" class="error">{{ errors[field.id] }}</span>
+            <span v-if="errors[field.dbColumn]" class="error">{{ errors[field.dbColumn] }}</span>
           </div>
         </div>
       </div>
@@ -102,96 +96,78 @@
 export default {
   data() {
     return {
+      inputValues: JSON.parse(localStorage.getItem('inputValues')) || {
+        tuzveszelyes_tevekenyseg: '',
+        tuzveszelyes_tevekenyseg_leiras: '',
+        vegyi_anyag: '',
+        vegyi_anyag_leiras: '',
+        dekoracio: '',
+        dekoracio_leiras: '',
+        portaszolgalat: '',
+        portaszolgalat_leiras: '',
+      },
       yesNoFields: [
-        { id: "fireHazard", label: "Tűzveszélyes tevékenység várható-e?", value: "" },
-        { id: "chemicals", label: "Vegyi anyag felhasználása várható-e?", value: "" },
-        { id: "decoration", label: "Várható-e dekoráció a helyiség légterében?", value: "" },
-        { id: "securityService", label: "Portaszolgálat igénylése a rendezvény idejére?", value: "" } // Új mező
+        { id: "fireHazard", label: "Tűzveszélyes tevékenység várható-e?", dbColumn: "tuzveszelyes_tevekenyseg" },
+        { id: "chemicals", label: "Vegyi anyag felhasználása várható-e?", dbColumn: "vegyi_anyag" },
+        { id: "decoration", label: "Várható-e dekoráció a helyiség légterében?", dbColumn: "dekoracio" },
+        { id: "securityService", label: "Portaszolgálat igénylése a rendezvény idejére?", dbColumn: "portaszolgalat" },
       ],
-      fireHazardDetails: "", // Tűzveszélyes tevékenység leírása
-      chemicalsDetails: "", // Vegyi anyag felhasználásával kapcsolatos tevékenység leírása
-      decorationDetails: "", // Dekoráció részletei
-      securityServiceDetails: "", // Portaszolgálat részletei
       errors: {},
     };
   },
+  watch: {
+    inputValues: {
+      handler(newValues) {
+        localStorage.setItem('inputValues', JSON.stringify(newValues)); // Mentés localStorage-be
+      },
+      deep: true,
+    },
+  },
   methods: {
-    saveDataToLocalStorage() {
-      const formData = {
-        yesNoFields: this.yesNoFields,
-        fireHazardDetails: this.fireHazardDetails,
-        chemicalsDetails: this.chemicalsDetails,
-        decorationDetails: this.decorationDetails,
-        securityServiceDetails: this.securityServiceDetails, // Új mező
-      };
-      localStorage.setItem("formDataPage7", JSON.stringify(formData));
-      console.log("Adatok mentve a localStorage-ba (Page7):", formData);
-    },
-    loadDataFromLocalStorage() {
-      const savedData = localStorage.getItem("formDataPage7");
-      if (savedData) {
-        const data = JSON.parse(savedData);
-        console.log("Betöltött adatok:", data); // Ellenőrzés
-        this.yesNoFields = data.yesNoFields || this.yesNoFields;
-        this.fireHazardDetails = data.fireHazardDetails || "";
-        this.chemicalsDetails = data.chemicalsDetails || "";
-        this.decorationDetails = data.decorationDetails || "";
-        this.securityServiceDetails = data.securityServiceDetails || ""; // Új mező
-        console.log("Adatok betöltve a localStorage-ból (Page7):", data);
-      }
-    },
     validatePage() {
       this.errors = {};
       let isValid = true;
 
-      // Kötelező mezők ellenőrzése a yesNoFields alapján
+      // Kötelező mezők ellenőrzése
       this.yesNoFields.forEach((field) => {
-        if (!field.value) {
-          this.errors[field.id] = "A mező kitöltése kötelező!";
+        if (!this.inputValues[field.dbColumn]) {
+          this.errors[field.dbColumn] = 'A mező kitöltése kötelező!';
           isValid = false;
         }
       });
 
-      // Tűzveszélyes tevékenység mező ellenőrzése
-      const fireHazardField = this.yesNoFields.find((field) => field.id === "fireHazard");
-      if (fireHazardField && fireHazardField.value === "igen" && !this.fireHazardDetails) {
-        this.errors.fireHazardDetails = "A mező kitöltése kötelező!";
+      // Egyedi mezők validációja
+      if (this.inputValues['tuzveszelyes_tevekenyseg'] === 'igen' && !this.inputValues['tuzveszelyes_tevekenyseg_leiras']) {
+        this.errors['tuzveszelyes_tevekenyseg_leiras'] = 'Adja meg a tűzveszélyes tevékenység részleteit!';
         isValid = false;
       }
-
-      // Vegyi anyag felhasználása mező ellenőrzése
-      const chemicalsField = this.yesNoFields.find((field) => field.id === "chemicals");
-      if (chemicalsField && chemicalsField.value === "igen" && !this.chemicalsDetails) {
-        this.errors.chemicalsDetails = "A mező kitöltése kötelező!";
+      if (this.inputValues['vegyi_anyag'] === 'igen' && !this.inputValues['vegyi_anyag_leiras']) {
+        this.errors['vegyi_anyag_leiras'] = 'Adja meg a vegyi anyag felhasználásának részleteit!';
         isValid = false;
       }
-
-      // Dekoráció részletei mező ellenőrzése
-      const decorationField = this.yesNoFields.find((field) => field.id === "decoration");
-      if (decorationField && decorationField.value === "igen" && !this.decorationDetails) {
-        this.errors.decorationDetails = "A mező kitöltése kötelező!";
+      if (this.inputValues['dekoracio'] === 'igen' && !this.inputValues['dekoracio_leiras']) {
+        this.errors['dekoracio_leiras'] = 'Adja meg a dekoráció részleteit!';
         isValid = false;
       }
-
-      // Portaszolgálat részletei mező ellenőrzése
-      const securityServiceField = this.yesNoFields.find((field) => field.id === "securityService");
-      if (securityServiceField && securityServiceField.value === "igen" && !this.securityServiceDetails) {
-        this.errors.securityServiceDetails = "A mező kitöltése kötelező!";
+      if (this.inputValues['portaszolgalat'] === 'igen' && !this.inputValues['portaszolgalat_leiras']) {
+        this.errors['portaszolgalat_leiras'] = 'Adja meg a portaszolgálat részleteit!';
         isValid = false;
       }
 
       return isValid;
     },
-    logFieldValue(field) {
-      console.log(`Field ID: ${field.id}, Value: ${field.value}`);
+    loadDataFromLocalStorage() {
+      const savedData = localStorage.getItem('inputValues');
+      if (savedData) {
+        this.inputValues = JSON.parse(savedData);
+        console.log('Adatok betöltve a localStorage-ból (Page7):', this.inputValues);
+      }
     },
   },
   mounted() {
-    // Az oldal betöltésekor automatikusan betölti az adatokat a localStorage-ból
     this.loadDataFromLocalStorage();
   },
 };
-
 </script>
 
 <style src="/src/assets/css/style_pages.css"></style>

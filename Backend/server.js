@@ -2,11 +2,13 @@ const express = require('express');
 const rendezvenyRoutes = require('./routes/rendezveny.route');
 const statuszRoutes = require('./routes/statusz.route')
 const pool = require('./config/db')
+const cors = require('cors');
 
 const app = express();
 
 app.use(express.json()); // json formátum beállítása
 app.use(express.urlencoded({extended:true}));
+app.use(cors()); // CORS engedélyezése
 app.use('/api',rendezvenyRoutes);
 app.use('/api',statuszRoutes);
 

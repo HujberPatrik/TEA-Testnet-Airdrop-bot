@@ -70,7 +70,7 @@ export default {
     },
     async onCaptchaVerified(token) {
       try {
-        const response = await axios.post("http://localhost:3000/verify-captcha", { token });
+        const response = await axios.post("http://localhost:3002/verify-captcha", { token });
         if (response.data.success) {
           console.log("CAPTCHA sikeresen ellenőrizve.");
           this.isCaptchaVerified = true;
@@ -108,7 +108,7 @@ export default {
     // Debug logolás hozzáadása
     console.log('Requesting reCAPTCHA site key...');
     
-    axios.get('http://localhost:3000/api/recaptcha-site-key')
+    axios.get('http://localhost:3002/api/recaptcha-site-key')
       .then(response => {
         console.log('Received site key:', response.data);
         this.siteKey = response.data.siteKey;

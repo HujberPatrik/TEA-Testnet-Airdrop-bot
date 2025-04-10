@@ -16,39 +16,36 @@
       <!-- Szöveges inputok -->
       <div v-if="page.type === 'text'" class="row">
         <div class="col-md-6" v-for="input in page.inputs" :key="input.placeholder">
-          <label v-if="input.type === 'date' && input.placeholder.includes('kezdő')">Rendezvény kezdő dátuma *</label>
-          <label v-if="input.type === 'date' && input.placeholder.includes('záró')">Rendezvény záró dátuma *</label>
-          <label v-if="input.type === 'time' && input.placeholder.includes('kezdő')">Rendezvény kezdő időpontja *</label>
-          <label v-if="input.type === 'time' && input.placeholder.includes('záró')">Rendezvény záró időpontja *</label>
+          <label :for="input.id" class="form-label">{{ input.placeholder }}</label>
           <input
             v-if="input.type === 'text'"
             type="text"
+            :id="input.id"
             :placeholder="input.placeholder"
             class="form-control mb-3"
-            v-model="inputValues[input.placeholder]"
-            :class="{ 'is-invalid': errors[input.placeholder] }"
+            v-model.trim="inputValues[input.id]"
+            :class="{ 'is-invalid': errors[input.id] }"
             required
-            :title="input.placeholder.includes('pontos címe') ? 'Formátum: 9026 Győr, Egyetem tér 1.' : ''"
           />
           <input
             v-else-if="input.type === 'date'"
             type="date"
-            :placeholder="input.placeholder"
+            :id="input.id"
             class="form-control mb-3"
-            v-model="inputValues[input.placeholder]"
-            :class="{ 'is-invalid': errors[input.placeholder] }"
+            v-model="inputValues[input.id]"
+            :class="{ 'is-invalid': errors[input.id] }"
             required
           />
           <input
             v-else-if="input.type === 'time'"
             type="time"
-            :placeholder="input.placeholder"
+            :id="input.id"
             class="form-control mb-3"
-            v-model="inputValues[input.placeholder]"
-            :class="{ 'is-invalid': errors[input.placeholder] }"
+            v-model="inputValues[input.id]"
+            :class="{ 'is-invalid': errors[input.id] }"
             required
           />
-          <span v-if="errors[input.placeholder]" class="error">{{ errors[input.placeholder] }}</span>
+          <span v-if="errors[input.id]" class="error">{{ errors[input.id] }}</span>
         </div>
       </div>
     </div>
@@ -56,108 +53,116 @@
 </template>
 
 <script>
+import axios from 'axios';
+
 export default {
   data() {
     return {
       activePage: 1,
-      inputValues: {},
+      inputValues: JSON.parse(localStorage.getItem('inputValues')) || {
+        nev: '',
+        leiras: '',
+        helyszin: '',
+        cim: '',
+        kezdo_datum: '',
+        veg_datum: '',
+        kezdo_idopont: '',
+        veg_idopont: '',
+      },
       errors: {},
       pages: [
         {
           title: 'A RENDEZVÉNY ADATAI',
           type: 'text',
           inputs: [
-            { placeholder: 'Rendezvény neve *', type: 'text' },
-            { placeholder: 'Rendezvény leírása *', type: 'text' },
-            { placeholder: 'Rendezvény helyszíne *', type: 'text' },
-            { placeholder: 'Rendezvény pontos címe *', type: 'text' },
-            { placeholder: 'Rendezvény kezdő dátuma *', type: 'date' },
-            { placeholder: 'Rendezvény kezdő időpontja *', type: 'time' },
-            { placeholder: 'Rendezvény záró dátuma *', type: 'date' },
-            { placeholder: 'Rendezvény záró időpontja *', type: 'time' },
+            { id: 'nev', placeholder: 'Rendezvény neve *', type: 'text' },
+            { id: 'leiras', placeholder: 'Rendezvény leírása *', type: 'text' },
+            { id: 'helyszin', placeholder: 'Rendezvény helyszíne *', type: 'text' },
+            { id: 'cim', placeholder: 'Rendezvény pontos címe *', type: 'text' },
+            { id: 'kezdo_datum', placeholder: 'Rendezvény kezdő dátuma *', type: 'date' },
+            { id: 'kezdo_idopont', placeholder: 'Rendezvény kezdő időpontja *', type: 'time' },
+            { id: 'veg_datum', placeholder: 'Rendezvény záró dátuma *', type: 'date' },
+            { id: 'veg_idopont', placeholder: 'Rendezvény záró időpontja *', type: 'time' },
           ],
         },
       ],
     };
   },
+  watch: {
+    inputValues: {
+      handler(newValues) {
+        localStorage.setItem('inputValues', JSON.stringify(newValues)); // Mentés localStorage-be
+      },
+      deep: true,
+    },
+  },
   methods: {
     saveDataToLocalStorage() {
-      const formData = {
-        inputValues: this.inputValues,
-      };
-      localStorage.setItem(`formDataPage${this.activePage}`, JSON.stringify(formData));
-      console.log(`Adatok mentve a localStorage-ba (Page${this.activePage}):`, formData);
+      localStorage.setItem('inputValues', JSON.stringify(this.inputValues));
+      console.log('Adatok mentve a localStorage-ba:', this.inputValues);
     },
     loadDataFromLocalStorage() {
-      const savedData = localStorage.getItem(`formDataPage${this.activePage}`);
+      const savedData = localStorage.getItem('inputValues');
       if (savedData) {
-        const data = JSON.parse(savedData);
-        this.inputValues = data.inputValues || {};
-        console.log(`Adatok betöltve a localStorage-ból (Page${this.activePage}):`, data);
+        this.inputValues = JSON.parse(savedData);
+        console.log('Adatok betöltve a localStorage-ból:', this.inputValues);
       }
     },
     validatePage() {
       this.errors = {};
       let isValid = true;
 
+      // Kötelező mezők ellenőrzése
       this.pages[this.activePage - 1].inputs.forEach((input) => {
-        const value = this.inputValues[input.placeholder];
-
-        // Kötelező mezők ellenőrzése
-        if (!value) {
-          this.errors[input.placeholder] = 'A mező kitöltése kötelező!';
+        const value = this.inputValues[input.id];
+        if (!value || value.toString().trim() === '') {
+          this.errors[input.id] = 'A mező kitöltése kötelező!';
           isValid = false;
-        }
-
-        // Dátum formátum ellenőrzése
-        if (input.type === 'date' && value) {
-          const dateRegex = /^\d{4}-\d{2}-\d{2}$/; // YYYY-MM-DD formátum
-          if (!dateRegex.test(value)) {
-            this.errors[input.placeholder] = 'Érvényes dátumot adjon meg (YYYY-MM-DD formátumban)!';
-            isValid = false;
-          }
-        }
-
-        // Idő formátum ellenőrzése
-        if (input.type === 'time' && value) {
-          const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/; // HH:MM formátum
-          if (!timeRegex.test(value)) {
-            this.errors[input.placeholder] = 'Érvényes időpontot adjon meg (HH:MM formátumban)!';
-            isValid = false;
-          }
-        }
-
-        // Cím formátum ellenőrzése
-        if (input.placeholder.includes('pontos címe') && value) {
-          const addressRegex = /^\d{4,5} [A-Za-záéíóöőúüűÁÉÍÓÖŐÚÜŰ]+, ?.+$/; // Pl. 9026 Győr, Egyetem tér 1 vagy 92026 Győr,Egyetem tér 1
-          if (!addressRegex.test(value)) {
-            this.errors[input.placeholder] = 'Érvényes címet adjon meg (Pl. 9026 Győr, Egyetem tér 1.)!';
-            isValid = false;
-          }
         }
       });
 
       return isValid;
     },
-    navigate(page) {
+    async sendDataToBackend() {
       if (this.validatePage()) {
-        // Mentés a localStorage-ba
-        this.saveDataToLocalStorage();
-
-        if (page >= 1 && page <= this.pages.length) {
-          this.activePage = page;
-
-          // Betöltés a localStorage-ból
-          this.loadDataFromLocalStorage();
+        try {
+          const response = await axios.post('http://localhost:3000/api/kerveny', this.inputValues);
+          console.log('Sikeres mentés:', response.data);
+          alert('A rendezvény adatai sikeresen mentve az adatbázisba!');
+          localStorage.removeItem('inputValues'); // Törlés a localStorage-ből sikeres mentés után
+        } catch (error) {
+          console.error('Hiba történt az API-kérés során:', error);
+          alert('Nem sikerült menteni a rendezvény adatait. Próbálja újra később!');
         }
+      } else {
+        alert('Kérjük, töltse ki az összes kötelező mezőt!');
       }
     },
   },
   mounted() {
-    // Az aktuális oldal adatainak betöltése a localStorage-ból
     this.loadDataFromLocalStorage();
   },
 };
 </script>
 
-<style src="/src/assets/css/style_pages.css"></style>
+<style>
+.error {
+  color: red;
+  font-size: 0.8rem;
+  display: block;
+  margin-top: -10px;
+  margin-bottom: 10px;
+}
+
+.page {
+  padding: 20px;
+  background-color: #f8f9fa;
+  border-radius: 5px;
+  margin-bottom: 20px;
+}
+
+.is-invalid {
+  border-color: #dc3545 !important;
+  box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25) !important;
+}
+</style>
