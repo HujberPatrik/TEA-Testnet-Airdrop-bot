@@ -20,6 +20,14 @@ TABLESPACE pg_default;
 ALTER TABLE IF EXISTS public."statusz"
     OWNER to postgres;
 
+-- Alapértelmezett státuszok beszúrása
+INSERT INTO public.statusz (id, statusz) VALUES
+(0, 'Feldolgozás alatt'), -- Új státusz hozzáadása
+(1, 'Elfogadásra vár'),
+(2, 'Elfogadva'),
+(3, 'Elutasítva')
+ON CONFLICT (id) DO NOTHING; -- Elkerüli a duplikált beszúrást, ha már léteznek az értékek
+
 CREATE TABLE IF NOT EXISTS public.kerveny
 (
     id integer GENERATED ALWAYS AS IDENTITY ( INCREMENT 1 START 1 MINVALUE 1 MAXVALUE 2147483647 CACHE 1 ),
@@ -46,7 +54,7 @@ CREATE TABLE IF NOT EXISTS public.kerveny
     hulladek_elszallitas_modja character varying(50) COLLATE pg_catalog."default",
     hulladek_elszallitas_felelos character varying(100) COLLATE pg_catalog."default",
     letszam integer,
-    statusz integer,
+    statusz integer DEFAULT 0, -- Alapértelmezett érték 0
     email character varying(100) COLLATE pg_catalog."default",
     telefon character varying(20) COLLATE pg_catalog."default",
     oktatastechnika boolean,
