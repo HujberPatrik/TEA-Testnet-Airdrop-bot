@@ -7,13 +7,11 @@
       class="page"
       :style="{ display: activePage === index + 1 ? 'block' : 'none' }"
     >
-      <!-- Cím rész -->
       <h2>
         <span>{{ page.title }}</span>
         <i class="bi bi-info-circle" title="A * részek kötelezőek"></i>
       </h2>
 
-      <!-- Szöveges inputok -->
       <div v-if="page.type === 'text'" class="row">
         <div class="col-md-6" v-for="input in page.inputs" :key="input.placeholder">
           <label :for="input.id" class="form-label">{{ input.placeholder }}</label>
@@ -91,7 +89,7 @@ export default {
   watch: {
     inputValues: {
       handler(newValues) {
-        localStorage.setItem('inputValues', JSON.stringify(newValues)); // Mentés localStorage-be
+        localStorage.setItem('inputValues', JSON.stringify(newValues));
       },
       deep: true,
     },
@@ -112,12 +110,28 @@ export default {
       this.errors = {};
       let isValid = true;
 
-      // Kötelező mezők ellenőrzése
       this.pages[this.activePage - 1].inputs.forEach((input) => {
         const value = this.inputValues[input.id];
         if (!value || value.toString().trim() === '') {
           this.errors[input.id] = 'A mező kitöltése kötelező!';
           isValid = false;
+        } else if (input.id === 'cim') {
+          // Rugalmasabb címformátum-ellenőrzés
+          const cimFormat = /^[0-9]{4}\s+[A-Za-zÁÉÍÓÖŐÚÜŰáéíóöőúüű]+(?:\s+[A-Za-zÁÉÍÓÖŐÚÜŰáéíóöőúüű]+)*(?:,\s*)?(?:utca|u\.|tér|út|köz|krt\.|körút|liget|tér|sq\.|square|street|st\.|avenue|ave\.|road|rd\.|boulevard|blvd\.)?\s*[0-9]+(?:\s*[A-Za-z]?)?(?:\s*[/-]\s*[0-9]+)?(?:\s*[A-Za-z])?$/i;
+          
+          if (!cimFormat.test(value)) {
+            this.errors[input.id] = 'Kérjük, adja meg a címet érvényes formátumban! Példák: "9026 Győr, Egyetem tér 1." vagy "4028 Debrecen Kassai út 26"';
+            isValid = false;
+          }
+        } else if (input.type === 'date') {
+          const selectedDate = new Date(value);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
+          if (selectedDate < today) {
+            this.errors[input.id] = 'A kezdő dátum nem lehet korábbi a mai dátumnál!';
+            isValid = false;
+          }
         }
       });
 
@@ -129,13 +143,13 @@ export default {
           const response = await axios.post('http://localhost:3000/api/kerveny', this.inputValues);
           console.log('Sikeres mentés:', response.data);
           alert('A rendezvény adatai sikeresen mentve az adatbázisba!');
-          localStorage.removeItem('inputValues'); // Törlés a localStorage-ből sikeres mentés után
+          localStorage.removeItem('inputValues');
         } catch (error) {
           console.error('Hiba történt az API-kérés során:', error);
           alert('Nem sikerült menteni a rendezvény adatait. Próbálja újra később!');
         }
       } else {
-        alert('Kérjük, töltse ki az összes kötelező mezőt!');
+        alert('Kérjük, javítsa a hibákat a mezőkben!');
       }
     },
   },

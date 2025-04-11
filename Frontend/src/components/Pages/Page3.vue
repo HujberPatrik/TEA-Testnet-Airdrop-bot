@@ -114,7 +114,7 @@ export default {
       let isValid = true;
 
       // Kötelező mezők ellenőrzése
-      const requiredFields = ['jelleg', 'programterv', 'villanyszerelo', 'leg_szennyezes', 'berendezesi_mod'];
+      const requiredFields = ['jelleg', 'programterv', 'villanyszerelo', 'leg_szennyezes'];
       requiredFields.forEach((field) => {
         if (!this.inputValues[field]) {
           this.errors[field] = 'A mező kitöltése kötelező!';

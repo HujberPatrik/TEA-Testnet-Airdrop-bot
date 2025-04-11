@@ -1,4 +1,4 @@
-<template>
+<template> 
   <div class="container">
     <div class="page" :style="{ display: 'block' }">
       <!-- Cím rész -->
@@ -109,7 +109,7 @@ export default {
         foto: null,
         foto_reszletek: null,
         cater: null,
-        catering_tipus: [], // Üres tömbként inicializálva
+        catering_tipus: [],
         oktatastechnika: null,
         oktatas_eszkozok: null,
         korlatozott_mozgas: null,
@@ -118,7 +118,7 @@ export default {
       yesNoFields: [
         { id: "photography", label: "Fotó és/vagy videófelvétel készül-e a rendezvényen?", dbColumn: "foto" },
         { id: "catering", label: "Lesz a rendezvény területén catering?", dbColumn: "cater" },
-        { id: "technicalSupport", label: "Szükséges-e oktatástechnikai támogatás?", dbColumn: "oktatastechnika" }, 
+        { id: "technicalSupport", label: "Szükséges-e oktatástechnikai támogatás?", dbColumn: "oktatastechnika" },
         { id: "disabledAccess", label: "Korlátozott mozgású személyek részt vesznek?", dbColumn: "korlatozott_mozgas" },
       ],
       errors: {},
@@ -128,9 +128,9 @@ export default {
     inputValues: {
       handler(newValues) {
         if (!Array.isArray(newValues.catering_tipus)) {
-          newValues.catering_tipus = []; // Ha nem tömb, állítsd üres tömbre
+          newValues.catering_tipus = [];
         }
-        localStorage.setItem('inputValues', JSON.stringify(newValues)); // Mentés localStorage-be
+        localStorage.setItem('inputValues', JSON.stringify(newValues));
       },
       deep: true,
     },
@@ -140,14 +140,13 @@ export default {
       this.errors = {};
       let isValid = true;
 
-      // Kötelező mezők ellenőrzése
       this.yesNoFields.forEach((field) => {
         if (!this.inputValues[field.dbColumn]) {
-          this.inputValues[field.dbColumn] = null; // Ha nincs adat, állítsuk null-ra
+          this.errors[field.dbColumn] = 'A mező kitöltése kötelező!';
+          isValid = false;
         }
       });
 
-      // Egyedi mezők validációja
       if (this.inputValues['foto'] === 'igen' && !this.inputValues['foto_reszletek']) {
         this.errors['foto_reszletek'] = 'Adja meg a fotó/videó részleteit!';
         isValid = false;
@@ -186,25 +185,22 @@ export default {
       const savedData = localStorage.getItem('inputValues');
       if (savedData) {
         this.inputValues = JSON.parse(savedData);
-
-        // Állítsuk null-ra a hiányzó mezőket
         Object.keys(this.inputValues).forEach((key) => {
           if (this.inputValues[key] === undefined || this.inputValues[key] === '') {
             this.inputValues[key] = null;
           }
         });
-
         console.log('Adatok betöltve a localStorage-ból (Page5):', this.inputValues);
       }
     },
     async sendDataToBackend() {
       if (this.validatePage()) {
         try {
-          console.log('Küldött adatok:', this.inputValues); // Ellenőrizd a foto_reszletek mezőt
+          console.log('Küldött adatok:', this.inputValues);
           const response = await axios.post('http://localhost:3000/api/kerveny', this.inputValues);
           console.log('Sikeres mentés:', response.data);
           alert('A rendezvény adatai sikeresen mentve az adatbázisba!');
-          localStorage.removeItem('inputValues'); // Törlés a localStorage-ből sikeres mentés után
+          localStorage.removeItem('inputValues');
         } catch (error) {
           console.error('Hiba történt az API-kérés során:', error);
           alert('Nem sikerült menteni a rendezvény adatait. Próbálja újra később!');
@@ -221,14 +217,3 @@ export default {
 </script>
 
 <style src="/src/assets/css/style_pages.css"></style>
-
-<style scoped>
-/* A "Catering típusa" style */
-label {
-  font-weight: bold;
-}
-.checkbox-label {
-  margin-left: 1.5rem; 
-  display: inline-block; 
-}
-</style>

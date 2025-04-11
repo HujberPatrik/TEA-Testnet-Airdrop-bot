@@ -45,7 +45,7 @@
         <div class="col-md-6">
           <input
             type="text"
-            placeholder="Lakcím *"
+            placeholder="Lakcím * (pl: 1061 Budapest, Andrássy út 1.)"
             class="form-control mb-3 uniform-input"
             v-model="inputValues['lakcim']"
             required
@@ -133,7 +133,7 @@
           <div class="col-md-12">
             <input
               type="text"
-              placeholder="Lakcím *"
+              placeholder="Lakcím * (pl: 1061 Budapest, Andrássy út 1.)"
               class="form-control mb-3 uniform-input"
               v-model="inputValues['tovabbi_lakcim']"
               required
@@ -168,12 +168,25 @@ export default {
   watch: {
     inputValues: {
       handler(newValues) {
-        localStorage.setItem('inputValues', JSON.stringify(newValues)); // Mentés localStorage-be
+        localStorage.setItem('inputValues', JSON.stringify(newValues));
       },
       deep: true,
     },
   },
   methods: {
+    validateEmail(email) {
+      const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return re.test(email);
+    },
+    validatePhone(phone) {
+      // Elfogadja a magyar telefonszámokat különböző formátumokban
+      const re = /^(\+36|06|36)[\s-]?(\d{1,2})[\s-]?(\d{3})[\s-]?(\d{3,4})$/;
+      return re.test(phone);
+    },
+    validateAddress(address) {
+      // Egyszerű lakcím ellenőrzés - tartalmaznia kell számot és várost/utcanevet
+      return /.*\d+.*/.test(address) && /[a-zA-ZáéíóöőúüűÁÉÍÓÖŐÚÜŰ]/.test(address);
+    },
     validatePage() {
       this.errors = {};
       let isValid = true;
@@ -183,18 +196,34 @@ export default {
         this.errors['felelos'] = 'A mező kitöltése kötelező!';
         isValid = false;
       }
+      
+      // Telefonszám ellenőrzése
       if (!this.inputValues['telefon']) {
         this.errors['telefon'] = 'A mező kitöltése kötelező!';
         isValid = false;
+      } else if (!this.validatePhone(this.inputValues['telefon'])) {
+        this.errors['telefon'] = 'Érvénytelen telefonszám formátum! Példa: +36 20 123 4567';
+        isValid = false;
       }
+      
+      // Email ellenőrzése
       if (!this.inputValues['email']) {
         this.errors['email'] = 'A mező kitöltése kötelező!';
         isValid = false;
+      } else if (!this.validateEmail(this.inputValues['email'])) {
+        this.errors['email'] = 'Érvénytelen email cím formátum!';
+        isValid = false;
       }
+      
+      // Lakcím ellenőrzése
       if (!this.inputValues['lakcim']) {
         this.errors['lakcim'] = 'A mező kitöltése kötelező!';
         isValid = false;
+      } else if (!this.validateAddress(this.inputValues['lakcim'])) {
+        this.errors['lakcim'] = 'Érvénytelen cím formátum! Példa: 1061 Budapest, Andrássy út 1.';
+        isValid = false;
       }
+      
       if (!this.inputValues['tovabbi_szervezo']) {
         this.errors['tovabbi_szervezo'] = 'A mező kitöltése kötelező!';
         isValid = false;
@@ -206,16 +235,31 @@ export default {
           this.errors['tovabbi_nev'] = 'A mező kitöltése kötelező!';
           isValid = false;
         }
+        
+        // További telefonszám ellenőrzése
         if (!this.inputValues['tovabbi_telefon']) {
           this.errors['tovabbi_telefon'] = 'A mező kitöltése kötelező!';
           isValid = false;
+        } else if (!this.validatePhone(this.inputValues['tovabbi_telefon'])) {
+          this.errors['tovabbi_telefon'] = 'Érvénytelen telefonszám formátum! Példa: +36 20 123 4567';
+          isValid = false;
         }
+        
+        // További email ellenőrzése
         if (!this.inputValues['tovabbi_email']) {
           this.errors['tovabbi_email'] = 'A mező kitöltése kötelező!';
           isValid = false;
+        } else if (!this.validateEmail(this.inputValues['tovabbi_email'])) {
+          this.errors['tovabbi_email'] = 'Érvénytelen email cím formátum!';
+          isValid = false;
         }
+        
+        // További lakcím ellenőrzése
         if (!this.inputValues['tovabbi_lakcim']) {
           this.errors['tovabbi_lakcim'] = 'A mező kitöltése kötelező!';
+          isValid = false;
+        } else if (!this.validateAddress(this.inputValues['tovabbi_lakcim'])) {
+          this.errors['tovabbi_lakcim'] = 'Érvénytelen cím formátum! Példa: 1061 Budapest, Andrássy út 1.';
           isValid = false;
         }
       }

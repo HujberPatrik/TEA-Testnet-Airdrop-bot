@@ -22,7 +22,7 @@
         <div class="col-md-6">
           <input
             type="text"
-            placeholder="Cím *"
+            placeholder="Cím * (pl: 1061 Budapest, Andrássy út 1.)"
             class="form-control mb-3 uniform-input"
             v-model="inputValues['megrendelo_cim']"
             required
@@ -34,7 +34,7 @@
         <div class="col-md-6">
           <input
             type="text"
-            placeholder="Adószám *"
+            placeholder="Adószám * (pl: 12345678-1-23)"
             class="form-control mb-3 uniform-input"
             v-model="inputValues['megrendelo_ado']"
             required
@@ -44,11 +44,10 @@
         <div class="col-md-6">
           <input
             type="tel"
-            placeholder="Telefonszám *"
+            placeholder="Telefonszám * (+36 20 123 4567)"
             class="form-control mb-3 uniform-input"
             v-model="inputValues['megrendelo_telefon']"
             required
-            title="Formátum: +36 20 123 4567"
           />
           <span v-if="errors.megrendelo_telefon" class="error">{{ errors.megrendelo_telefon }}</span>
         </div>
@@ -57,7 +56,7 @@
         <div class="col-md-6">
           <input
             type="email"
-            placeholder="E-mail cím *"
+            placeholder="E-mail cím * (pl: pelda@email.hu)"
             class="form-control mb-3 uniform-input"
             v-model="inputValues['megrendelo_email']"
             required
@@ -86,12 +85,30 @@ export default {
   watch: {
     inputValues: {
       handler(newValues) {
-        localStorage.setItem('inputValues', JSON.stringify(newValues)); // Mentés localStorage-be
+        localStorage.setItem('inputValues', JSON.stringify(newValues));
       },
       deep: true,
     },
   },
   methods: {
+    validateEmail(email) {
+      const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return re.test(email);
+    },
+    validatePhone(phone) {
+      // Elfogadja a magyar telefonszámokat különböző formátumokban
+      const re = /^(\+36|06|36)[\s-]?(\d{1,2})[\s-]?(\d{3})[\s-]?(\d{3,4})$/;
+      return re.test(phone);
+    },
+    validateAddress(address) {
+      // Egyszerű lakcím ellenőrzés - tartalmaznia kell számot és várost/utcanevet
+      return /.*\d+.*/.test(address) && /[a-zA-ZáéíóöőúüűÁÉÍÓÖŐÚÜŰ]/.test(address);
+    },
+    validateTaxNumber(taxNumber) {
+      // Magyar adószám ellenőrzése (8 számjegy, kötőjel, 1 számjegy, kötőjel, 2 számjegy)
+      const re = /^\d{8}-\d{1}-\d{2}$/;
+      return re.test(taxNumber);
+    },
     validatePage() {
       this.errors = {};
       let isValid = true;
@@ -101,20 +118,40 @@ export default {
         this.errors['megrendelo_nev'] = 'A mező kitöltése kötelező!';
         isValid = false;
       }
+      
+      // Cím ellenőrzése
       if (!this.inputValues['megrendelo_cim']) {
         this.errors['megrendelo_cim'] = 'A mező kitöltése kötelező!';
         isValid = false;
+      } else if (!this.validateAddress(this.inputValues['megrendelo_cim'])) {
+        this.errors['megrendelo_cim'] = 'Érvénytelen cím formátum! Példa: 1061 Budapest, Andrássy út 1.';
+        isValid = false;
       }
+      
+      // Adószám ellenőrzése
       if (!this.inputValues['megrendelo_ado']) {
         this.errors['megrendelo_ado'] = 'A mező kitöltése kötelező!';
         isValid = false;
+      } else if (!this.validateTaxNumber(this.inputValues['megrendelo_ado'])) {
+        this.errors['megrendelo_ado'] = 'Érvénytelen adószám formátum! Példa: 12345678-1-23';
+        isValid = false;
       }
+      
+      // Telefonszám ellenőrzése
       if (!this.inputValues['megrendelo_telefon']) {
         this.errors['megrendelo_telefon'] = 'A mező kitöltése kötelező!';
         isValid = false;
+      } else if (!this.validatePhone(this.inputValues['megrendelo_telefon'])) {
+        this.errors['megrendelo_telefon'] = 'Érvénytelen telefonszám formátum! Példa: +36 20 123 4567';
+        isValid = false;
       }
+      
+      // Email ellenőrzése
       if (!this.inputValues['megrendelo_email']) {
         this.errors['megrendelo_email'] = 'A mező kitöltése kötelező!';
+        isValid = false;
+      } else if (!this.validateEmail(this.inputValues['megrendelo_email'])) {
+        this.errors['megrendelo_email'] = 'Érvénytelen email cím formátum! Példa: pelda@email.hu';
         isValid = false;
       }
 
