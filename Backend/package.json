@@ -14,12 +14,14 @@
     "axios": "^1.x.x",
     "body-parser": "^1.20.3",
     "cors": "^2.8.5",
+    "docxtemplater": "^3.61.1",
     "dotenv": "^16.4.7",
     "ejs": "^3.1.10",
     "express": "^4.21.2",
     "mysql": "^2.18.1",
     "nodemailer": "^6.x.x",
     "pg": "^8.13.3",
+    "pizzip": "^3.1.8",
     "sql": "^0.78.0"
   }
 }

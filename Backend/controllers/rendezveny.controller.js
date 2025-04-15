@@ -1,4 +1,6 @@
 const pool = require('../config/db');
+const { sendSuccessEmail } = require('../emailService');
+require('dotenv').config();
 
 // Összes kérvény lekérdezése
 const getAllKerveny = async (req, res) => {
@@ -35,8 +37,8 @@ const insertKerveny = async (req, res) => {
   const data = req.body;
 
   const convertToBoolean = (value) => {
-    if (value === "igen") return true;
-    if (value === "nem") return false;
+    if (value === 'igen') return true;
+    if (value === 'nem') return false;
     return null;
   };
 
@@ -62,12 +64,12 @@ const insertKerveny = async (req, res) => {
   )
   RETURNING id
   `;
-  
+
   const values = [
     data.nev || null, data.leiras || null, data.helyszin || null, data.cim || null, data.kezdo_datum || null, data.veg_datum || null, data.kezdo_idopont || null, data.veg_idopont || null,
     data.tipus || null, data.minosites || null, convertToBoolean(data.sajto), data.jelleg || null, data.programterv || null, data.berendezesi_mod || null, convertToBoolean(data.szallasigeny),
     data.szallasigeny_letszam || null, convertToBoolean(data.parkolo), data.parkolo_reszletek || null, convertToBoolean(data.internet), convertToBoolean(data.hulladek),
-    data.hulladek_elszallitas_modja || null, data.hulladek_elszallitas_felelos || null, data.letszam || null, data.statusz || null,
+    data.hulladek_elszallitas_modja || null, data.hulladek_elszallitas_felelos || null, data.letszam || null, data.statusz || 0,
     data.email || null, data.telefon || null, convertToBoolean(data.oktatastechnika), data.oktatas_eszkozok || null, convertToBoolean(data.korlatozott_mozgas), data.korlatozott_mozgas_reszletek || null,
     convertToBoolean(data.foto), data.foto_reszletek || null, convertToBoolean(data.cater), data.catering_tipus ? JSON.stringify(data.catering_tipus) : null, convertToBoolean(data.epites), data.epites_kezdet || null, data.epites_veg || null, data.epites_vallalkozok || null,
     convertToBoolean(data.epites_magas), convertToBoolean(data.epites_allvany), convertToBoolean(data.epites_kezi), convertToBoolean(data.epites_gepi), convertToBoolean(data.takaritas), convertToBoolean(data.takaritas_alatt),
@@ -80,10 +82,14 @@ const insertKerveny = async (req, res) => {
 
   try {
     const result = await pool.query(sql, values);
+
+    // Hívja meg az emailService-t
+    await sendSuccessEmail(data.email, data.nev);
+
     res.status(201).json({ id: result.rows[0].id });
   } catch (error) {
-    console.error('Hiba az adatbázis művelet során:', error);
-    res.status(500).json({ error: 'Adatbázis hiba történt.', details: error.message });
+    console.error('Hiba a kérvény beszúrása során:', error);
+    res.status(500).json({ message: 'Hiba történt a kérvény beszúrása során.' });
   }
 };
 
@@ -185,5 +191,5 @@ module.exports = {
   getKervenyById,
   insertKerveny,
   updateKerveny,
-  updateKervenyStatus // Exportáljuk az új metódust
+  updateKervenyStatus
 };

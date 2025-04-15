@@ -4,7 +4,7 @@
       <div class="d-flex align-items-center justify-content-between mb-4">
         <h6 class="mb-0">Rendezvények</h6>
         <div>
-          <button @click="toggleExpand" class="btn btn-sm btn-outline-secondary me-2">
+          <button @click="toggleExpand" class="btn btn-sm btn-outline-secondary me-2" title="Kinagyítás/Kicsinyítés">
             <i :class="isExpanded ? 'fas fa-compress' : 'fas fa-expand'"></i>
           </button>
         </div>
@@ -89,11 +89,12 @@
                   Záró Időpont
                   <i v-if="sortColumn === 'veg_datum'" :class="getSortIconClass()"></i>
                 </th>
+                <th>Műveletek</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="sortedAndFilteredEvents.length === 0">
-                <td colspan="5" class="text-center">Nincs megjeleníthető rendezvény</td>
+                <td colspan="6" class="text-center">Nincs megjeleníthető rendezvény</td>
               </tr>
               <tr
                 v-for="event in sortedAndFilteredEvents"
@@ -104,13 +105,23 @@
               >
                 <td style="width: 50px; text-align: center;">
                   <span class="status-icon" :title="getStatusText(event.statusz)">
-                    <i :class="getStatusIcon(getStatusText(event.statusz))" class="me-2"></i>
+                    <i :class="getStatusIcon(getStatusText(event.statusz))"></i>
                   </span>
                 </td>
                 <td>{{ event.nev }}</td>
                 <td>{{ event.helyszin }}</td>
                 <td>{{ formatDateTime(event.kezdo_datum, event.kezdo_idopont) }}</td>
                 <td>{{ formatDateTime(event.veg_datum, event.veg_idopont) }}</td>
+                <td class="text-center">
+                  <div class="btn-group">
+                    <button 
+                      class="btn btn-sm btn-outline-primary" 
+                      @click.stop="exportDocument(event)" 
+                      title="Dokumentum exportálása">
+                      <i class="fas fa-file-word"></i>
+                    </button>
+                  </div>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -572,6 +583,21 @@
       </div>
     </div>
   </div>
+
+  <!-- Opcionális - Exportálási állapot jelző -->
+  <div v-if="exportStatus.isLoading" class="position-fixed bottom-0 end-0 p-3">
+    <div class="toast show" role="alert">
+      <div class="toast-header">
+        <strong class="me-auto">Dokumentum exportálása</strong>
+      </div>
+      <div class="toast-body">
+        <div class="d-flex align-items-center">
+          <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+          Dokumentum generálása folyamatban...
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script>
@@ -605,7 +631,11 @@ export default {
       editMode: false,
       editedEvent: {},
       isSaving: false,
-      saveError: null
+      saveError: null,
+      exportStatus: {
+        isLoading: false,
+        error: null
+      }
     };
   },
   computed: {
@@ -711,6 +741,22 @@ export default {
     
     toggleExpand() {
       this.isExpanded = !this.isExpanded;
+      const container = document.querySelector('.table-container');
+      if (this.isExpanded) {
+        container.style.width = '100vw';
+        container.style.maxWidth = '100vw';
+        container.style.marginLeft = '0';
+        container.style.marginRight = '0';
+        container.style.paddingLeft = '0';
+        container.style.paddingRight = '0';
+      } else {
+        container.style.width = '';
+        container.style.maxWidth = '';
+        container.style.marginLeft = '';
+        container.style.marginRight = '';
+        container.style.paddingLeft = '';
+        container.style.paddingRight = '';
+      }
     },
     
     showEventDetails(event) {
@@ -854,12 +900,11 @@ export default {
     
     getStatusIcon(statusText) {
       const iconMap = {
-        'Feldolgozás alatt': 'fas fa-spinner fa-pulse status-icon-processing',
-        'Elfogadásra vár': 'fas fa-clock status-icon-pending',
-        'Elfogadva': 'fas fa-check-circle status-icon-approved',
-        'Elutasítva': 'fas fa-times-circle status-icon-rejected'
+        'Feldolgozás alatt': 'fas fa-spinner fa-pulse',
+        'Elfogadásra vár': 'fas fa-clock',
+        'Elfogadva': 'fas fa-check-circle',
+        'Elutasítva': 'fas fa-times-circle'
       };
-      
       return iconMap[statusText] || 'fas fa-question-circle';
     },
     
@@ -969,6 +1014,36 @@ export default {
       if (!dateString) return '';
       const date = new Date(dateString);
       return date.toISOString().slice(0, 10);
+    },
+
+    async exportDocument(event) {
+      try {
+        const response = await fetch('http://localhost:3000/api/document/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            data: event, // Az esemény adatai
+          }),
+        });
+    
+        if (!response.ok) {
+          throw new Error('Dokumentum generálás sikertelen');
+        }
+    
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${event.nev || 'dokumentum'}.docx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error('Hiba a dokumentum generálása során:', err);
+        alert('Hiba történt a dokumentum generálása során.');
+      }
     }
   },
   mounted() {
@@ -990,6 +1065,7 @@ export default {
   margin-right: 0 !important;
   padding-left: 0 !important;
   padding-right: 0 !important;
+  transition: all 0.3s ease;
 }
 .table-scrollable {
   overflow-x: auto;
@@ -1020,7 +1096,7 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 1200;
   overflow-y: auto;
   padding: 20px;
 }
@@ -1195,7 +1271,7 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1100;
+  z-index: 1300;
 }
 
 .status-modal-content {
@@ -1498,5 +1574,107 @@ export default {
     padding: 0.4rem 0.75rem;
     font-size: 0.9rem;
   }
+}
+
+/* Státusz szövegek és ikonok színezése */
+.status-processing .status-icon,
+.status-processing {
+  color: #f0ad4e; /* Narancssárga szín */
+}
+
+.status-pending .status-icon,
+.status-pending {
+  color: #6c757d; /* Szürke szín */
+}
+
+.status-approved .status-icon,
+.status-approved {
+  color: #5cb85c; /* Zöld szín */
+}
+
+.status-rejected .status-icon,
+.status-rejected {
+  color: #d9534f; /* Piros szín */
+}
+
+/* Táblázat cellák háttérszíne fehér marad */
+.table-scrollable table tbody tr td {
+  background-color: #ffffff; /* Fehér háttér */
+}
+
+/* Általános ikon stílusok */
+.status-icon {
+  font-size: 20px; /* Ikon mérete */
+  color: inherit; /* Örökölje a színt a szülő osztályból */
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* Specifikus státusz ikon színek */
+.status-processing .status-icon {
+  color: #f0ad4e; /* Narancssárga */
+}
+
+.status-pending .status-icon {
+  color: #6c757d; /* Szürke */
+}
+
+.status-approved .status-icon {
+  color: #5cb85c; /* Zöld */
+}
+
+.status-rejected .status-icon {
+  color: #d9534f; /* Piros */
+}
+
+.event-details-header .close-button {
+  display: none;
+}
+
+/* Popup státusz színezése */
+.event-details-modal .event-status.status-processing {
+  background-color: #f0ad4e; /* Narancssárga */
+  color: white;
+}
+
+.event-details-modal .event-status.status-pending {
+  background-color: #6c757d; /* Szürke */
+  color: white;
+}
+
+.event-details-modal .event-status.status-approved {
+  background-color: #5cb85c; /* Zöld */
+  color: white;
+}
+
+.event-details-modal .event-status.status-rejected {
+  background-color: #d9534f; /* Piros */
+  color: white;
+}
+
+/* Státusz módosító modal szöveg színezése */
+.status-modal-content .status-label {
+  color: white; /* Szöveg színe fehér */
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+/* Színek a státuszokhoz */
+.status-modal-content .status-label.status-processing {
+  background-color: #f0ad4e; /* Narancssárga */
+}
+
+.status-modal-content .status-label.status-pending {
+  background-color: #6c757d; /* Szürke */
+}
+
+.status-modal-content .status-label.status-approved {
+  background-color: #5cb85c; /* Zöld */
+}
+
+.status-modal-content .status-label.status-rejected {
+  background-color: #d9534f; /* Piros */
 }
 </style>

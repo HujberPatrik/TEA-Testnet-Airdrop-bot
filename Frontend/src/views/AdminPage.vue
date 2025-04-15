@@ -320,4 +320,15 @@ export default {
   background-color: var(--dark-bg-tertiary) !important; /* Header background */
   color: var(--dark-text-primary) !important; /* Header text color */
 }
+
+/* Táblázat Z-index beállítása */
+.table-scrollable {
+  position: relative; /* A z-index működéséhez szükséges */
+  z-index: 1050; /* Magasabb érték, hogy a navbar előtt legyen */
+}
+
+.navbar {
+  position: relative;
+  z-index: 1000; /* Alacsonyabb, mint a táblázaté */
+}
 </style>
