@@ -15,6 +15,9 @@
         <a href="#" @click.prevent="navigateTo('/admin/archived')" class="nav-item nav-link" :class="{ active: isActivePath('/admin/archived') }">
           <i class="fa fa-archive me-2"></i>Archivált
         </a>
+        <a href="#" @click.prevent="navigateToRoot" class="nav-item nav-link">
+          <i class="fa fa-home me-2"></i>Űrlap
+        </a>
         <a href="signin.html" class="nav-item nav-link"><i class="fa fa-chart-bar me-2"></i>Teszt </a>
         <div class="nav-item dropdown">
           <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown"><i class="far fa-file-alt me-2"></i>Egyéb</a>
@@ -40,6 +43,10 @@ export default {
     },
     isActivePath(path) {
       return this.$route && this.$route.path === path;
+    },
+    navigateToRoot() {
+      // A böngésző ablakot irányítja át a localhost gyökeréhez
+      window.location.href = "http://localhost:5173/";
     }
   }
 };
@@ -59,5 +66,17 @@ export default {
   max-height: 65px; /* Növeltem a magasságot 50-ről 65-re */
   width: auto;
   object-fit: contain;
+}
+
+/* Aktív menüpont kiemelése */
+.nav-item.active, .nav-link.active {
+  color: #50adc9 !important;
+  font-weight: bold;
+}
+
+/* Hover effektus a menüpontokra */
+.nav-item:hover {
+  background-color: rgba(80, 173, 201, 0.1);
+  border-radius: 5px;
 }
 </style>

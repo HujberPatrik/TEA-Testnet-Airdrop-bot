@@ -26,6 +26,7 @@ INSERT INTO public.statusz (id, statusz) VALUES
 (1, 'Elfogadásra vár'),
 (2, 'Elfogadva'),
 (3, 'Elutasítva')
+(4, 'Archivált')
 ON CONFLICT (id) DO NOTHING; -- Elkerüli a duplikált beszúrást, ha már léteznek az értékek
 
 CREATE TABLE IF NOT EXISTS public.kerveny
