@@ -2,10 +2,6 @@
   <nav class="navbar navbar-expand-lg navbar-light sticky-top px-4 py-0" 
        :class="{ 'navbar-dark bg-dark': isDarkMode, 'navbar-light bg-light': !isDarkMode }"
        style="z-index: 1100;">
-    <a href="index.html" class="navbar-brand d-flex me-4 d-none d-md-flex">
-      <img src="../img/egyetemi logo/allo_RGB/sze_logo_allo_RGB_white_bg.png"
-           alt="SZE Logó" class="img-fluid" style="max-height: 50px;">
-    </a>
 
     <div class="d-flex align-items-center flex-nowrap flex-grow-1">
       <a href="#" class="sidebar-toggler flex-shrink-0 me-3">

@@ -10,8 +10,16 @@
       <Navbar_AdminPage :isDarkMode="isDarkMode" @toggle-dark-mode="toggleDarkMode" />
       <!-- Navbar End -->
 
-      <!-- <Graphs></Graphs> -->
-      <Table :isDarkMode="isDarkMode" />
+      <!-- Státusz szűrő gombok -->
+      <FilterButtons 
+        @filter-status="filterByStatus"
+      />
+
+      <!-- Táblázat komponens -->
+      <Table 
+        :status-filter="statusFilter" 
+        :is-dark-mode="isDarkMode"
+      />
     </div>
   </div>
 </template>
@@ -20,17 +28,20 @@
 import Sidebar from '../components/Sidebar.vue';
 import Navbar_AdminPage from '../components/Navbar_AdminPage.vue';
 import Table from '../components/Table.vue';
+import FilterButtons from '../components/FilterButtons.vue';
 
 export default {
   name: 'AdminPage',
   components: {
     Sidebar,
     Navbar_AdminPage,
-    Table
+    Table,
+    FilterButtons
   },
   data() {
     return {
-      isDarkMode: localStorage.getItem('darkMode') === 'true' || false
+      isDarkMode: localStorage.getItem('darkMode') === 'true' || false,
+      statusFilter: null
     };
   },
   mounted() {
@@ -52,6 +63,9 @@ export default {
       } else {
         document.body.classList.remove('dark-mode');
       }
+    },
+    filterByStatus(status) {
+      this.statusFilter = status;
     }
   }
 };
@@ -319,12 +333,6 @@ export default {
 .dark-mode .dropdown-menu .dropdown-header {
   background-color: var(--dark-bg-tertiary) !important; /* Header background */
   color: var(--dark-text-primary) !important; /* Header text color */
-}
-
-/* Táblázat Z-index beállítása */
-.table-scrollable {
-  position: relative; /* A z-index működéséhez szükséges */
-  z-index: 1050; /* Magasabb érték, hogy a navbar előtt legyen */
 }
 
 .navbar {
