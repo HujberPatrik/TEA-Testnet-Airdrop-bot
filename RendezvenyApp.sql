@@ -106,6 +106,14 @@ CREATE TABLE IF NOT EXISTS public.kerveny
         ON DELETE NO ACTION
 )
 TABLESPACE pg_default;
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100),
+    email VARCHAR(100) UNIQUE,
+    password_hash VARCHAR(255),
+    role VARCHAR(50) CHECK (role IN ('szervező', 'admin', 'főadmin')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
 ALTER TABLE IF EXISTS public."kerveny"
     OWNER to postgres;

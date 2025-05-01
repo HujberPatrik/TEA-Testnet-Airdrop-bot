@@ -16,11 +16,11 @@
                             <h3>Bejelentkezés</h3>
                         </div>
                         <div class="form-floating mb-3">
-                            <input type="email" class="form-control" id="floatingInput" placeholder="name@example.com">
+                            <input type="email" class="form-control" v-model="email" placeholder="name@example.com">
                             <label for="floatingInput">Email cím</label>
                         </div>
                         <div class="form-floating mb-4">
-                            <input type="password" class="form-control" id="floatingPassword" placeholder="Password">
+                            <input type="password" class="form-control" v-model="password" placeholder="Password">
                             <label for="floatingPassword">Jelszó</label>
                         </div>
                         <div class="d-flex align-items-center justify-content-between mb-4">
@@ -30,11 +30,74 @@
                             </div>
                             <a href="">Elfelejtette a jelszavát?</a>
                         </div>
-                        <a href="/admin" class="btn btn-primary py-3 w-100 mb-4">Bejelentkezés</a>
+                        <button @click="login" class="btn btn-primary py-3 w-100 mb-4">Bejelentkezés</button>
+                        <p class="text-center mb-0 text-danger">{{ errorMessage }}</p>
                         <p class="text-center mb-0">Nincs még fiókja? <a href="">Regisztráció</a></p>
                     </div>
                 </div>
             </div>
         </div>
         <!-- Sign In End -->
-    </div></template>
+    </div>
+</template>
+
+<script>
+import axios from 'axios';
+
+// Axios alapértelmezett beállítások
+axios.defaults.baseURL = 'http://localhost:3003';
+axios.defaults.headers.common['Authorization'] = `Bearer ${localStorage.getItem('authToken')}`;
+
+export default {
+  data() {
+    return {
+      email: '',
+      password: '',
+      errorMessage: ''
+    };
+  },
+  methods: {
+    async login() {
+      try {
+        // Ha a mezők üresek, állítsuk be alapértelmezett értékeket
+        if (!this.email && !this.password) {
+          const guestPayload = {
+            name: 'Guest Pista',
+            role: 'Admin'
+          };
+
+          // Token szimulálása (JWT formátumú)
+          const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+          const payload = btoa(JSON.stringify(guestPayload));
+          const signature = btoa('guest-signature'); // Szimulált aláírás
+          const token = `${header}.${payload}.${signature}`;
+
+          localStorage.setItem('authToken', token);
+
+          console.log('Guest felhasználóként belépve:', guestPayload);
+
+          // Átirányítás az admin oldalra
+          this.$router.push('/admin/');
+          return;
+        }
+
+        // Normál bejelentkezés
+        const response = await axios.post('http://localhost:3003/api/login', {
+          email: this.email,
+          password: this.password
+        });
+
+        const { token } = response.data;
+
+        // Token mentése helyi tárolóba
+        localStorage.setItem('authToken', token);
+
+        // Átirányítás az admin oldalra
+        this.$router.push('/admin/');
+      } catch (error) {
+        this.errorMessage = 'Hibás email vagy jelszó!';
+      }
+    }
+  }
+};
+</script>

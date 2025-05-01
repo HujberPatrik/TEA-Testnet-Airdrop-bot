@@ -8,7 +8,7 @@
       <div class="d-flex align-items-center ms-4 mb-4"></div>
       <div class="navbar-nav w-100" style="flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; position: relative;">
         <a href="index.html" class="nav-item nav-link active"><i class="fa fa-tachometer-alt me-2"></i>Főoldal</a>
-        <a href="bejelentes.html" class="nav-item nav-link"><i class="fa fa-table me-2"></i>Teszt </a>
+        <a href="bejelentes.html" class="nav-item nav-link"><i class="fa fa-table me-2"></i>Archivált</a>
         <a href="signin.html" class="nav-item nav-link"><i class="fa fa-chart-bar me-2"></i>Teszt </a>
         <div class="nav-item dropdown">
           <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown"><i class="far fa-file-alt me-2"></i>Egyéb</a>

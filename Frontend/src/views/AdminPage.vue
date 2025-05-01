@@ -46,6 +46,26 @@ export default {
   },
   mounted() {
     this.applyTheme();
+
+    // Ellenőrizd a token érvényességét
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        console.log('Felhasználói adatok:', payload);
+
+        // Ellenőrizd, hogy a token tartalmazza a szükséges adatokat
+        if (!payload.name || !payload.role) {
+          throw new Error('Érvénytelen token');
+        }
+      } catch (error) {
+        console.error('Hiba a token dekódolásakor:', error);
+        this.$router.push('/login'); // Átirányítás a bejelentkezési oldalra
+      }
+    } else {
+      this.$router.push('/login'); // Átirányítás, ha nincs token
+    }
+
     // Dynamically import the external JavaScript file
     import('../assets/js/main.js').then(() => {
       console.log('main.js loaded');
