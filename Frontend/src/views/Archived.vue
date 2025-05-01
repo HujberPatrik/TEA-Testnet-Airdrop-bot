@@ -2,7 +2,10 @@
   <div :class="['container-fluid pt-4 px-4 table-container']">
     <div class="bg-light text-center rounded p-4">
       <div class="d-flex align-items-center justify-content-between mb-4">
-        <h6 class="mb-0">Rendezvények</h6>
+        <h6 class="mb-0">Archivált Rendezvények</h6>
+        <router-link to="/admin" class="btn btn-sm btn-outline-primary">
+          <i class="fas fa-arrow-left me-2"></i>Vissza az aktív rendezvényekhez
+        </router-link>
       </div>
 
       <div v-if="loading" class="text-center my-5">
@@ -64,10 +67,6 @@
           <table class="table text-start align-middle table-bordered table-hover mb-0">
             <thead>
               <tr class="text-dark">
-                <th scope="col" @click="sortBy('statusz')" class="sortable-header">
-                  Státusz
-                  <i v-if="sortColumn === 'statusz'" :class="getSortIconClass()"></i>
-                </th>
                 <th scope="col" @click="sortBy('nev')" class="sortable-header">
                   Neve
                   <i v-if="sortColumn === 'nev'" :class="getSortIconClass()"></i>
@@ -89,20 +88,15 @@
             </thead>
             <tbody>
               <tr v-if="sortedAndFilteredEvents.length === 0">
-                <td colspan="6" class="text-center">Nincs megjeleníthető rendezvény</td>
+                <td colspan="5" class="text-center">Nincs megjeleníthető archivált rendezvény</td>
               </tr>
               <tr
                 v-for="event in sortedAndFilteredEvents"
                 :key="event.id"
-                :class="getStatusClass(getStatusText(event.statusz))"
+                class="status-archived"
                 @click="showEventDetails(event)"
                 style="cursor: pointer;"
               >
-                <td style="width: 50px; text-align: center;">
-                  <span class="status-icon" :title="getStatusText(event.statusz)">
-                    <i :class="getStatusIcon(getStatusText(event.statusz))"></i>
-                  </span>
-                </td>
                 <td>{{ event.nev }}</td>
                 <td>{{ event.helyszin }}</td>
                 <td>{{ formatDateTime(event.kezdo_datum, event.kezdo_idopont) }}</td>
@@ -114,6 +108,12 @@
                       @click.stop="exportDocument(event)" 
                       title="Dokumentum exportálása">
                       <i class="fas fa-file-word"></i>
+                    </button>
+                    <button 
+                      class="btn btn-sm btn-outline-success" 
+                      @click.stop="restoreEvent(event)" 
+                      title="Visszaállítás">
+                      <i class="fas fa-undo"></i>
                     </button>
                   </div>
                 </td>
@@ -133,7 +133,6 @@
     @close="closeEventDetails"
     @status-updated="handleStatusUpdated"
     @event-updated="handleEventUpdated"
-    @archived="handleArchived"
   />
 
   <!-- Opcionális - Exportálási állapot jelző -->
@@ -154,7 +153,7 @@
 
 <script>
 import axios from 'axios';
-import ModificationPopup from './ModificationPopup.vue';
+import ModificationPopup from '../components/ModificationPopup.vue';
 
 export default {
   components: {
@@ -164,10 +163,6 @@ export default {
     isDarkMode: {
       type: Boolean,
       default: false
-    },
-    statusFilter: {
-      type: Number,
-      default: null
     }
   },
   data() {
@@ -200,15 +195,8 @@ export default {
     sortedAndFilteredEvents() {
       let filteredEvents = [...this.events];
       
-      // Archivált elemek kiszűrése (statusz = 4)
-      filteredEvents = filteredEvents.filter(event => event.statusz !== 4);
-      
-      // Státusz szűrés
-      if (this.statusFilter !== null) {
-        filteredEvents = filteredEvents.filter(event => {
-          return event.statusz === this.statusFilter;
-        });
-      }
+      // Csak archivált elemek megjelenítése (statusz = 4)
+      filteredEvents = filteredEvents.filter(event => event.statusz === 4);
       
       // Név/leírás szűrés
       if (this.filters.name) {
@@ -325,17 +313,6 @@ export default {
       this.fetchEvents();
     },
     
-    handleArchived(eventId) {
-      // Frissítsük az események listáját
-      this.fetchEvents();
-      
-      // Vagy közvetlenül frissíthetjük az adatot a táblázatban
-      // const index = this.events.findIndex(event => event.id === eventId);
-      // if (index !== -1) {
-      //   this.events[index].statusz = 4;
-      // }
-    },
-    
     formatDateTime(date, time) {
       if (!date) return 'Nincs megadva';
       
@@ -355,47 +332,26 @@ export default {
       return formattedDate;
     },
     
-    getStatusText(statusId) {
-      const statusMap = {
-        0: 'Feldolgozás alatt',
-        1: 'Elfogadásra vár',
-        2: 'Elfogadva',
-        3: 'Elutasítva',
-        4: 'Archivált'
-      };
-      
-      return statusMap[statusId] || 'Ismeretlen';
-    },
-    
-    getStatusClass(statusText) {
-      const classMap = {
-        'Feldolgozás alatt': 'status-processing',
-        'Elfogadásra vár': 'status-pending',
-        'Elfogadva': 'status-approved',
-        'Elutasítva': 'status-rejected',
-        'Archivált': 'status-archived'
-      };
-      
-      return classMap[statusText] || '';
-    },
-    
-    getStatusIcon(statusText) {
-      const iconMap = {
-        'Feldolgozás alatt': 'fas fa-spinner fa-pulse',
-        'Elfogadásra vár': 'fas fa-clock',
-        'Elfogadva': 'fas fa-check-circle',
-        'Elutasítva': 'fas fa-times-circle',
-        'Archivált': 'fas fa-archive'
-      };
-      return iconMap[statusText] || 'fas fa-question-circle';
-    },
-    
-    formatDateForInput(dateString) {
-      if (!dateString) return '';
-      const date = new Date(dateString);
-      return date.toISOString().slice(0, 10);
-    },
+    async restoreEvent(event) {
+      if (confirm('Biztosan visszaállítja ezt az eseményt az aktív rendezvények közé?')) {
+        try {
+          // Itt visszaállítjuk az eseményt (státusz 2 = elfogadva)
+          const response = await axios.patch(
+            `http://localhost:3000/api/kerveny/${event.id}/status`,
+            { statusz: 2 } // Visszaállítás elfogadott státuszra
+          );
 
+          if (response.status === 200) {
+            alert('Az esemény sikeresen visszaállítva!');
+            this.fetchEvents(); // Frissítsük a listát
+          }
+        } catch (error) {
+          console.error('Hiba az esemény visszaállítása során:', error);
+          alert('Nem sikerült visszaállítani az eseményt. Kérjük, próbálja újra később!');
+        }
+      }
+    },
+    
     async exportDocument(event) {
       try {
         this.exportStatus.isLoading = true;
@@ -458,68 +414,19 @@ export default {
   margin-left: 5px;
 }
 
-.status-icon {
-  font-size: 16px;
-}
-
-/* Státusz szövegek és ikonok színezése */
-.status-processing .status-icon,
-.status-processing {
-  color: #f0ad4e; /* Narancssárga szín */
-}
-
-.status-pending .status-icon,
-.status-pending {
-  color: #6c757d; /* Szürke szín */
-}
-
-.status-approved .status-icon,
-.status-approved {
-  color: #5cb85c; /* Zöld szín */
-}
-
-.status-rejected .status-icon,
-.status-rejected {
-  color: #d9534f; /* Piros szín */
-}
-
 /* Archivált státusz színezése */
-.status-archived .status-icon,
 .status-archived {
   color: #6c757d; /* Szürke szín */
+  background-color: #f8f9fa; /* Enyhén világosabb háttér */
 }
 
 /* Táblázat cellák háttérszíne fehér marad */
 .table-scrollable table tbody tr td {
-  background-color: #ffffff; /* Fehér háttér */
+  background-color: inherit; /* Örökli a sor háttérszínét */
 }
 
-/* Általános ikon stílusok */
-.status-icon {
-  font-size: 20px; /* Ikon mérete */
-  color: inherit; /* Örökölje a színt a szülő osztályból */
-  display: inline-block;
-  vertical-align: middle;
-}
-
-/* Specifikus státusz ikon színek */
-.status-processing .status-icon {
-  color: #f0ad4e; /* Narancssárga */
-}
-
-.status-pending .status-icon {
-  color: #6c757d; /* Szürke */
-}
-
-.status-approved .status-icon {
-  color: #5cb85c; /* Zöld */
-}
-
-.status-rejected .status-icon {
-  color: #d9534f; /* Piros */
-}
-
-.status-archived .status-icon {
-  color: #6c757d; /* Szürke */
+/* Hover hatások */
+.table tbody tr:hover td {
+  background-color: #e9ecef !important; /* Szürkés háttér hoverre */
 }
 </style>

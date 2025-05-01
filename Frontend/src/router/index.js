@@ -4,7 +4,7 @@ import AdminPage from "../views/AdminPage.vue";
 import Login from "../views/Login.vue";
 import Event from "../views/event.vue";
 import Test from "../views/test.vue";
-
+import Archived from "../views/Archived.vue";
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -33,7 +33,15 @@ const router = createRouter({
       path: "/test",
       name: "test",
       component: Test,
-    }
+    },
+    {
+      path: "/admin/archived",
+      name: "ArchivedEvents",
+      component: Archived,
+      meta: {
+        requiresAuth: true,
+      },
+    },
   ],
 });
 

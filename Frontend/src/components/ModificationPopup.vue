@@ -430,7 +430,7 @@
     <div class="status-modal-content">
       <h3>Státusz módosítása</h3>
       <div class="status-options">
-        <div class="status-option" v-for="status in [0, 1, 2, 3]" :key="status">
+        <div class="status-option" v-for="status in [0, 1, 2, 3, 4]" :key="status">
           <input
             type="radio"
             :id="'status-' + status"
@@ -559,6 +559,13 @@ export default {
     async changeStatus(newStatus) {
       if (!this.event) return;
 
+      // Megerősítés kérése archiválás előtt
+      if (newStatus === 4) {
+        if (!confirm('Biztosan archiválni szeretné ezt az eseményt? Az archivált események nem fognak megjelenni a táblázatban.')) {
+          return;
+        }
+      }
+
       try {
         // Csak a státuszt módosítjuk, más adatot nem érintünk
         const response = await axios.patch(
@@ -569,6 +576,12 @@ export default {
         if (response.status === 200) {
           this.statusModalVisible = false;
           this.$emit('status-updated', { ...this.event, statusz: newStatus });
+          
+          // Archiválás esetén külön üzenet
+          if (newStatus === 4) {
+            this.$emit('close'); // Bezárjuk a részletezőt
+            this.$emit('archived', this.event.id); // Értesítjük a szülő komponenst az archiválásról
+          }
         }
       } catch (error) {
         console.error('Hiba a státusz módosítása során:', error);
@@ -608,18 +621,20 @@ export default {
         0: 'Feldolgozás alatt',
         1: 'Elfogadásra vár',
         2: 'Elfogadva',
-        3: 'Elutasítva'
+        3: 'Elutasítva',
+        4: 'Archivált'
       };
       
       return statusMap[statusId] || 'Ismeretlen';
     },
-    
+
     getStatusClass(statusText) {
       const classMap = {
         'Feldolgozás alatt': 'status-processing',
         'Elfogadásra vár': 'status-pending',
         'Elfogadva': 'status-approved',
-        'Elutasítva': 'status-rejected'
+        'Elutasítva': 'status-rejected',
+        'Archivált': 'status-archived'
       };
       
       return classMap[statusText] || '';
@@ -790,6 +805,11 @@ export default {
 
 .status-rejected {
   background-color: #d9534f;
+  color: white;
+}
+
+.status-archived {
+  background-color: #8a8a8a;
   color: white;
 }
 
