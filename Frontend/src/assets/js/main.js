@@ -120,7 +120,15 @@ darkModeToggle.addEventListener('click', () => {
         }
     });
 
- 
+
+    // Waypoint for element with class 'waypoint'
+if (typeof $.fn.waypoint !== 'undefined') {
+  $('.waypoint').waypoint(function() {
+    // your waypoint code
+  }, { offset: '100%' });
+} else {
+  console.log('Waypoint plugin not available');
+}
 
 })(jQuery);
 

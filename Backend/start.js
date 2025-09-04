@@ -4,7 +4,9 @@ const { spawn } = require('child_process');
 const dataService = spawn('node', ['data.js'], { stdio: 'inherit' });
 
 // Indítsd el a server.js fájlt
+
 const serverService = spawn('node', ['server.js'], { stdio: 'inherit' });
+
 
 dataService.on('error', (err) => {
   console.error('Hiba a data.js futtatása közben:', err);

@@ -41,7 +41,9 @@ export default {
   data() {
     return {
       isDarkMode: localStorage.getItem('darkMode') === 'true' || false,
-      statusFilter: null
+      statusFilter: null,
+      userImage: null,
+      userName: null
     };
   },
   mounted() {
@@ -70,6 +72,7 @@ export default {
     import('../assets/js/main.js').then(() => {
       console.log('main.js loaded');
     });
+
   },
   methods: {
     toggleDarkMode() {

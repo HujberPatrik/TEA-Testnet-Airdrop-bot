@@ -115,6 +115,13 @@
                       title="Dokumentum exportálása">
                       <i class="fas fa-file-word"></i>
                     </button>
+                    <button
+                      class="btn btn-sm btn-outline-secondary"
+                      @click.stop="openCostCalculator(event)"
+                      title="Szolgáltatási költség kalkulálása"
+                    >
+                      <i class="fas fa-calculator"></i>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -127,6 +134,7 @@
 
   <!-- A ModificationPopup komponens használata az esemény részletes megjelenítéséhez -->
   <ModificationPopup 
+    ref="modPopup"
     v-if="selectedEvent"
     :event="selectedEvent" 
     :is-dark-mode="isDarkMode"
@@ -150,15 +158,24 @@
       </div>
     </div>
   </div>
+
+  <!-- Szolgáltatási költség kalkulátor komponens -->
+  <ServiceCostCalculator
+    ref="serviceCost"
+    :event="costEvent"
+    @calculated="handleCostCalculated"
+  />
 </template>
 
 <script>
 import axios from 'axios';
 import ModificationPopup from './ModificationPopup.vue';
+import ServiceCostCalculator from './ServiceCostCalculator.vue';
 
 export default {
   components: {
-    ModificationPopup
+    ModificationPopup,
+    ServiceCostCalculator
   },
   props: {
     isDarkMode: {
@@ -187,7 +204,9 @@ export default {
       exportStatus: {
         isLoading: false,
         error: null
-      }
+      },
+      showCostModal: false,
+      costEvent: null
     };
   },
   computed: {
@@ -304,9 +323,19 @@ export default {
     showEventDetails(event) {
       this.selectedEvent = { ...event };
       document.body.style.overflow = 'hidden';
+      // ha a gyerek komponens bootstrap modalt használ, kérjük meg, hogy mutassa meg magát
+      this.$nextTick(() => {
+        const mp = this.$refs.modPopup;
+        if (!mp) return;
+        if (typeof mp.show === 'function') mp.show();
+        else if (typeof mp.open === 'function') mp.open();
+      });
     },
     
     closeEventDetails() {
+      // próbáljuk meg elrejteni a gyerek modalt is, ha van ilyen metódus
+      const mp = this.$refs.modPopup;
+      if (mp && typeof mp.hide === 'function') mp.hide();
       this.selectedEvent = null;
       document.body.style.overflow = '';
     },
@@ -429,6 +458,29 @@ export default {
         alert('Hiba történt a dokumentum generálása során.');
       } finally {
         this.exportStatus.isLoading = false;
+      }
+    },
+
+    openCostCalculator(event) {
+      // megnyitjuk a komponens modálját
+      this.costEvent = event;
+      // referenciaként a gyerek komponens show() metódusát hívjuk
+      this.$nextTick(() => {
+        const comp = this.$refs.serviceCost;
+        if (comp && comp.show) comp.show();
+      });
+    },
+
+    handleCostCalculated(payload) {
+      // payload: { event, breakdown, total }
+      // itt eldöntheted, hogy elmented az eredményt az eseményhez, vagy csak megjeleníted
+      console.log('Kalkuláció eredmény:', payload);
+      // például figyelmeztetésként mutatjuk az összeget
+      alert(`Kalkulált összeg: ${Number(payload.total).toLocaleString('hu-HU')} Ft`);
+      // opcionálisan hozzárendeljük az eseményhez a kalkulációt:
+      const idx = this.events.findIndex(e => e.id === payload.event.id);
+      if (idx !== -1) {
+        this.events[idx].calculation = payload;
       }
     }
   },

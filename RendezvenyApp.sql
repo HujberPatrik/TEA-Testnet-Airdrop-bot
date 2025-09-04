@@ -115,6 +115,17 @@ CREATE TABLE users (
     role VARCHAR(50) CHECK (role IN ('szervező', 'admin', 'főadmin')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE prices (
+  id BIGSERIAL PRIMARY KEY,
+  megnevezes VARCHAR(255) NOT NULL,
+  kategoria VARCHAR(100) NOT NULL DEFAULT 'Általános',
+  mertekegyseg VARCHAR(80),
+  ar_egyetem NUMERIC(12,2) NOT NULL DEFAULT 0,
+  ar_egyetem_hetvege NUMERIC(12,2) NOT NULL DEFAULT 0,
+  ar_kulso NUMERIC(12,2) NOT NULL DEFAULT 0,
+  ar_kulso_hetvege NUMERIC(12,2) NOT NULL DEFAULT 0,
+  megjegyzes TEXT,
+);
 
 ALTER TABLE IF EXISTS public."kerveny"
     OWNER to postgres;

@@ -84,7 +84,7 @@ const insertKerveny = async (req, res) => {
     const result = await pool.query(sql, values);
 
     // Hívja meg az emailService-t
-    await sendSuccessEmail(data.email, data.nev);
+    await sendSuccessEmail(data.email, data.megrendelo_nev);
 
     res.status(201).json({ id: result.rows[0].id });
   } catch (error) {

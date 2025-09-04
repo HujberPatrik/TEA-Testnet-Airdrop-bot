@@ -5,6 +5,7 @@ import Login from "../views/Login.vue";
 import Event from "../views/event.vue";
 import Test from "../views/test.vue";
 import Archived from "../views/Archived.vue";
+import PriceListPage from '../views/Prices.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -41,6 +42,12 @@ const router = createRouter({
       meta: {
         requiresAuth: true,
       },
+    },
+    {
+      path: '/price-list',
+      name: 'PriceList',
+      component: PriceListPage,
+      meta: { requiresAuth: true }  // Ha csak bejelentkezett felhasználóknak szeretnéd mutatni
     },
   ],
 });
