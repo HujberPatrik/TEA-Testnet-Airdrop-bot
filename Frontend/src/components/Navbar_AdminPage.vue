@@ -1,5 +1,5 @@
 <template>
-  <nav class="navbar navbar-expand-lg navbar-light sticky-top px-4 py-0" 
+  <nav class="navbar navbar-expand-lg navbar-light sticky-top px-4 py-0"
        :class="{ 'navbar-dark bg-dark': isDarkMode, 'navbar-light bg-light': !isDarkMode }"
        style="z-index: 1100;">
 
@@ -22,13 +22,18 @@
           <i :class="isDarkMode ? 'fa fa-sun' : 'fa fa-moon'" :style="{ color: isDarkMode ? '#ffffff' : '#242943' }"></i>
         </button>
       </div>
-      <div class="nav-item dropdown position-relative">
-        <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown">
+
+      <div class="nav-item dropdown position-relative" ref="profileRoot">
+        <!-- ref és @click.prevent hozzáadva, aria attribútum kezelve -->
+        <a href="#" ref="dropdownToggle" class="nav-link dropdown-toggle" role="button"
+           aria-expanded="false" @click.prevent="onToggleClick">
           <img class="rounded-circle me-lg-2" src="../img/user.jpg" alt="" style="width: 40px; height: 40px;">
-          <span class="d-none d-lg-inline-flex" :style="{ color: isDarkMode ? '#ffffff' : '#50adc9' }">{{ userName }}</span> 
+          <span class="d-none d-lg-inline-flex" :style="{ color: isDarkMode ? '#ffffff' : '#50adc9' }">{{ userName }}</span>
           <span class="d-none d-lg-inline-flex ms-1 text-muted" style="font-size: 0.8rem;">({{ userRole }})</span>
         </a>
-        <div class="dropdown-menu dropdown-menu-end bg-light border-0 rounded-0 rounded-bottom m-0 position-absolute profile-dropdown">
+
+        <div class="dropdown-menu dropdown-menu-end bg-light border-0 rounded-0 rounded-bottom m-0 position-absolute profile-dropdown"
+             ref="dropdownMenu">
           <a href="#" class="dropdown-item d-block d-lg-none" id="notifications-text" :style="{ color: isDarkMode ? '#ffffff' : '#50adc9' }">
             {{ userName }} ({{ userRole }})
           </a>
@@ -47,6 +52,11 @@
             <i class="fa fa-cogs me-2"></i> Beállítások
           </a>
 
+          <div class="dropdown-divider"></div>
+          <a href="#" class="dropdown-item text-warning" @click.prevent="clearStoredToken">
+            <i class="fa fa-trash-alt me-2"></i> Token törlése
+          </a>
+
           <a href="#" class="dropdown-item text-danger" @click="logout">
             <i class="fa fa-sign-out-alt me-2"></i> Kijelentkezés
           </a>
@@ -54,75 +64,86 @@
       </div>
     </div>
   </nav>
+
 </template>
 
 <script>
+import { Dropdown } from 'bootstrap';
+import auth from '../services/auth';
+
 export default {
   props: {
     isDarkMode: Boolean
   },
   data() {
     return {
-      userName: '',
-      userRole: ''
+      userName: 'Vendég',
+      userRole: null,
+      dropdownInstance: null
     };
   },
-  created() {
-    const token = localStorage.getItem('authToken');
-    if (token) {
-      try {
-        const payload = JSON.parse(this.decodeBase64(token.split('.')[1]));
-        this.userName = payload.name || 'Ismeretlen felhasználó';
-        this.userRole = payload.role || 'Nincs szerepkör';
-      } catch (error) {
-        console.error('Hiba a token dekódolásakor:', error);
-        this.userName = 'Ismeretlen felhasználó';
-        this.userRole = 'Nincs szerepkör';
-      }
+  async mounted() {
+    const user = await auth.ensureAuthUser();
+    if (user) {
+      this.userName = user.full_name || user.email || 'Vendég';
+      this.userRole = user.role || null;
     } else {
-      this.userName = 'Ismeretlen felhasználó';
-      this.userRole = 'Nincs szerepkör';
+      this.userName = 'Vendég';
+      this.userRole = null;
     }
+    // init Bootstrap Dropdown a ref alapján
+    if (this.$refs.dropdownToggle) {
+      this.dropdownInstance = new Dropdown(this.$refs.dropdownToggle, { popperConfig: { modifiers: [{ name: 'offset', options: { offset: [0, 6] } }] } });
+    }
+    // kattintás a body-n bezáráshoz, ha nyitva van
+    document.addEventListener('click', this.onDocumentClick);
+  },
+  beforeUnmount() {
+    if (this.dropdownInstance && typeof this.dropdownInstance.dispose === 'function') {
+      this.dropdownInstance.dispose();
+      this.dropdownInstance = null;
+    }
+    document.removeEventListener('click', this.onDocumentClick);
   },
   methods: {
-    decodeBase64(base64) {
-      try {
-        return decodeURIComponent(
-          atob(base64)
-            .split('')
-            .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-            .join('')
-        );
-      } catch (error) {
-        console.error('Hiba az UTF-8 dekódolásakor:', error);
-        return '';
+    onToggleClick() {
+      if (!this.dropdownInstance) return;
+      this.dropdownInstance.toggle();
+    },
+
+    onDocumentClick(e) {
+      // ha a kattintás nem a dropdown root vagy gyereke, zárjuk
+      const root = this.$refs.profileRoot;
+      if (!root) return;
+      if (!root.contains(e.target)) {
+        if (this.dropdownInstance && this.dropdownInstance._element && this.$refs.dropdownMenu?.classList.contains('show')) {
+          this.dropdownInstance.hide();
+        }
       }
     },
-    
-    // Új metódusok a dropdown menü gombjaihoz
+
     showNotifications() {
       alert('Értesítések funkció hamarosan elérhető!');
     },
-    
+
     navigateToProfile() {
-      // Átirányítás a profil oldalra
-      // Ha létezik a profil oldal, használd a következő sort:
-      // this.$router.push('/profile');
       alert('Saját profil oldal hamarosan elérhető!');
     },
-    
+
     navigateToSettings() {
-      // Átirányítás a beállítások oldalra
-      // Ha létezik a beállítások oldal, használd a következő sort:
-      // this.$router.push('/settings');
       alert('Beállítások oldal hamarosan elérhető!');
     },
-    
+
     logout() {
-      // Token törlése a localStorage-ból
-      localStorage.removeItem('authToken');
-      // Átirányítás a bejelentkező oldalra
+      auth.logout();
       this.$router.push('/login');
+    },
+
+    clearStoredToken() {
+      auth.logout();
+      this.userName = 'Vendég';
+      this.userRole = null;
+      this.$emit('token-cleared');
     }
   }
 };
@@ -131,6 +152,6 @@ export default {
 <style scoped>
 .navbar {
     position: relative;
-    z-index: 1000; /* Alacsonyabb érték */
+    z-index: 1000;
 }
 </style>

@@ -9,6 +9,17 @@ CREATE DATABASE "RendezvenyApp"
     CONNECTION LIMIT = -1
     IS_TEMPLATE = False;
 
+CREATE TABLE IF NOT EXISTS public.users (
+  id SERIAL PRIMARY KEY,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  full_name VARCHAR(255),
+  role VARCHAR(50) DEFAULT 'user',
+  neptune_code VARCHAR(10) UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS public.statusz
 (
     id integer,
@@ -25,7 +36,7 @@ INSERT INTO public.statusz (id, statusz) VALUES
 (0, 'Feldolgozás alatt'), -- Új státusz hozzáadása
 (1, 'Elfogadásra vár'),
 (2, 'Elfogadva'),
-(3, 'Elutasítva')
+(3, 'Elutasítva'),
 (4, 'Archivált')
 ON CONFLICT (id) DO NOTHING; -- Elkerüli a duplikált beszúrást, ha már léteznek az értékek
 

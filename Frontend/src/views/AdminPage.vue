@@ -29,6 +29,7 @@ import Sidebar from '../components/Sidebar.vue';
 import Navbar_AdminPage from '../components/Navbar_AdminPage.vue';
 import Table from '../components/Table.vue';
 import FilterButtons from '../components/FilterButtons.vue';
+import auth from '../services/auth'; // token feldolgozásához
 
 export default {
   name: 'AdminPage',
@@ -37,6 +38,12 @@ export default {
     Navbar_AdminPage,
     Table,
     FilterButtons
+  },
+  props: {
+    token: {
+      type: String,
+      default: null
+    }
   },
   data() {
     return {
@@ -49,23 +56,15 @@ export default {
   mounted() {
     this.applyTheme();
 
-    // Ellenőrizd a token érvényességét
-    const token = localStorage.getItem('authToken');
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        console.log('Felhasználói adatok:', payload);
+    // Token kezelés: először a prop, ha nincs akkor localStorage
+    const token = this.token || localStorage.getItem('authToken');
+    this.handleToken(token);
 
-        // Ellenőrizd, hogy a token tartalmazza a szükséges adatokat
-        if (!payload.name || !payload.role) {
-          throw new Error('Érvénytelen token');
-        }
-      } catch (error) {
-        console.error('Hiba a token dekódolásakor:', error);
-        this.$router.push('/login'); // Átirányítás a bejelentkezési oldalra
-      }
-    } else {
-      this.$router.push('/login'); // Átirányítás, ha nincs token
+    // figyeljük a prop változását (ha a szülő új token-t ad)
+    if (this.$options.props && this.$options.props.token) {
+      this.$watch('token', (newToken) => {
+        this.handleToken(newToken);
+      });
     }
 
     // Dynamically import the external JavaScript file
@@ -75,6 +74,41 @@ export default {
 
   },
   methods: {
+    handleToken(token) {
+      if (!token) {
+        this.$router.push('/login');
+        return;
+      }
+      try {
+        const payload = auth._safeDecodeJWT ? auth._safeDecodeJWT(token) : null;
+        const p = payload || (function(t) {
+          try {
+            const part = t.split('.')[1] || '';
+            const b = part.replace(/-/g, '+').replace(/_/g, '/');
+            const pad = b.length % 4;
+            const padded = b + (pad ? '='.repeat(4 - pad) : '');
+            return JSON.parse(atob(padded));
+          } catch { return null; }
+        })(token);
+
+        if (!p) throw new Error('Nem dekódolható token');
+
+        // A név a backend/DB mezőjéből: full_name legyen elsődleges
+        const first = p.first_name || p.given_name || '';
+        const last = p.last_name || p.family_name || '';
+        const built = (first || last) ? (first + (first && last ? ' ' : '') + last) : null;
+        // preferáljuk a full_name mezőt (adatbázisból), majd fullName/name, végül az összerakott értéket
+        const full = p.full_name || p.fullName || p.name || built || null;
+        this.userName = full || p.email || 'Vendég';
+         this.userRole = p.role || null;
+         this.userImage = p.avatar || p.picture || null;
+         console.log('Felhasználói adatok (AdminPage):', { name: this.userName, role: this.userRole });
+      } catch (err) {
+        console.error('Hiba a token feldolgozásakor:', err);
+        this.$router.push('/login');
+      }
+    },
+
     toggleDarkMode() {
       this.isDarkMode = !this.isDarkMode;
       localStorage.setItem('darkMode', this.isDarkMode);
@@ -94,272 +128,52 @@ export default {
 };
 </script>
 
-<style>
-/* Main dark mode variables */
-:root {
+<style scoped>
+:root{
   --dark-bg-primary: #1c1c1c;
   --dark-bg-secondary: #242424;
-  --dark-bg-tertiary: #2a2a2a;
   --dark-text-primary: #f0f0f0;
   --dark-text-secondary: #cccccc;
-  --dark-border: rgba(255, 255, 255, 0.1);
+  --dark-border: rgba(255,255,255,0.08);
   --dark-accent: #50adc9;
-  --dark-input-bg: #333333;
 }
 
-/* Base dark mode styles */
-.dark-mode, 
-.dark-mode body, 
-.dark-mode main {
-  background-color: var(--dark-bg-primary) !important;
-  color: var(--dark-text-primary) !important;
-}
+/* alap layout */
+.container-fluid { width:100%; }
+.content { flex:1; min-height:100vh; }
 
-/* Sidebar styling */
-.dark-mode .sidebar,
-.dark-mode [class*="sidebar"],
-.dark-mode nav.sidebar,
-.dark-mode .nav-sidebar {
-  background-color: #171717 !important;
-  color: var(--dark-text-primary) !important;
-  border-color: var(--dark-border) !important;
-}
+/* header */
+.header { margin-bottom:14px; padding:6px 0; display:flex; justify-content:space-between; align-items:center; }
+.title { margin:0; font-size:28px; font-weight:800; color:#0b3a66; }
+.controls { display:flex; gap:8px; align-items:center; }
 
-.dark-mode .sidebar a,
-.dark-mode [class*="sidebar"] a,
-.dark-mode .sidebar .nav-link,
-.dark-mode [class*="sidebar"] .nav-link {
-  color: var(--dark-text-primary) !important;
-}
+/* egyszerű gomb-stílusok */
+.btn { border:0; padding:8px 10px; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; font-weight:600; }
+.btn:disabled { opacity:.6; cursor:not-allowed; }
 
-.dark-mode .sidebar a:hover,
-.dark-mode [class*="sidebar"] a:hover,
-.dark-mode .sidebar .nav-link:hover,
-.dark-mode [class*="sidebar"] .nav-link:hover {
-  background-color: rgba(255, 255, 255, 0.05) !important;
+/* dark mode egyszerűsítve: csak a legfontosabb változtatások */
+.dark-mode {
+  background-color: var(--dark-bg-primary);
+  color: var(--dark-text-primary);
 }
-
-.dark-mode .sidebar .active,
-.dark-mode [class*="sidebar"] .active,
-.dark-mode .sidebar .selected,
-.dark-mode [class*="sidebar"] .selected {
-  background-color: rgba(80, 173, 201, 0.2) !important;
-  color: var(--dark-accent) !important;
-}
-
-/* Navbar styling */
-.dark-mode .navbar,
-.dark-mode [class*="navbar"],
-.dark-mode header,
-.dark-mode .header {
-  background-color: #171717 !important;
-  color: var(--dark-text-primary) !important;
-  border-color: var(--dark-border) !important;
-}
-
-.dark-mode .navbar a,
-.dark-mode [class*="navbar"] a,
-.dark-mode .navbar .nav-link,
-.dark-mode [class*="navbar"] .nav-link {
-  color: var(--dark-text-primary) !important;
-}
-
-.dark-mode .navbar-brand,
-.dark-mode .brand,
-.dark-mode .logo {
-  color: var(--dark-text-primary) !important;
-}
-
-/* Content cards, panels, and containers */
 .dark-mode .card,
-.dark-mode .accordion-item,
-.dark-mode [class*="panel"],
-.dark-mode [class*="content-box"],
-.dark-mode [class*="card-body"],
-.dark-mode .container-white,
-.dark-mode [style*="background-color: #ffffff"],
-.dark-mode [style*="background-color: white"] {
-  background-color: var(--dark-bg-secondary) !important;
-  color: var(--dark-text-primary) !important;
-  border-color: var(--dark-border) !important;
+.dark-mode .navbar,
+.dark-mode .sidebar {
+  background-color: var(--dark-bg-secondary);
+  color: var(--dark-text-primary);
+  border-color: var(--dark-border);
 }
 
-.dark-mode .card-header,
-.dark-mode .panel-header,
-.dark-mode [class*="header"] {
-  background-color: var(--dark-bg-primary) !important;
-  color: var(--dark-text-primary) !important;
-  border-color: var(--dark-border) !important;
-}
+/* táblázatok és űrlapok - alaphelyzetben öröklik a színeket */
+.dark-mode table, .dark-mode .form-control { color:var(--dark-text-primary); }
 
-/* Dropdown Menu Styling */
-.dark-mode .dropdown-menu {
-  background-color: var(--dark-bg-secondary) !important;
-  border: 1px solid var(--dark-border) !important;
-}
+/* scrollbar finomítás (opcionális) */
+.dark-mode ::-webkit-scrollbar { width:8px; height:8px; }
+.dark-mode ::-webkit-scrollbar-thumb { background:var(--dark-border); border-radius:4px; }
 
-.dark-mode .dropdown-menu.bg-light,
-.dark-mode .dropdown-menu.bg-transparent {
-  background-color: var(--dark-bg-secondary) !important;
-}
-
-.dark-mode .dropdown-item {
-  color: var(--dark-text-primary) !important;
-}
-
-.dark-mode .dropdown-item:hover {
-  background-color: var(--dark-bg-tertiary) !important;
-  color: var(--dark-accent) !important;
-}
-
-.dark-mode .dropdown-menu h6,
-.dark-mode .dropdown-menu small {
-  color: var(--dark-text-primary) !important;
-}
-
-/* Table Styling */
-.dark-mode table,
-.dark-mode .table {
-  color: var(--dark-text-primary) !important;
-  background-color: var(--dark-bg-secondary) !important;
-}
-
-.dark-mode .table th,
-.dark-mode .table td {
-  border-color: var(--dark-border) !important;
-  color: var(--dark-text-primary) !important;
-}
-
-.dark-mode .table thead th {
-  background-color: var(--dark-bg-tertiary) !important;
-  border-bottom: 2px solid var(--dark-border) !important;
-}
-
-.dark-mode .table tbody tr:hover {
-  background-color: var(--dark-bg-tertiary) !important;
-}
-
-.dark-mode .table-striped tbody tr:nth-of-type(odd) {
-  background-color: rgba(255, 255, 255, 0.05) !important;
-}
-
-/* Fix for specific dropdown issues */
-.dark-mode .profile-dropdown,
-.dark-mode .notifications-dropdown {
-  background-color: var(--dark-bg-secondary) !important;
-  border: 1px solid var(--dark-border) !important;
-  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.5) !important;
-}
-
-/* Ensure text-muted is visible in dark mode */
-.dark-mode .text-muted {
-  color: var(--dark-text-secondary) !important;
-}
-
-/* Fix for dropdown dividers if present */
-.dark-mode .dropdown-divider {
-  border-color: var(--dark-border) !important;
-}
-
-/* Card Styling */
-.dark-mode .card {
-  background-color: var(--dark-bg-secondary) !important;
-  color: var(--dark-text-primary) !important;
-  border: 1px solid var(--dark-border) !important;
-}
-
-.dark-mode .card-header {
-  background-color: var(--dark-bg-tertiary) !important;
-  color: var(--dark-text-primary) !important;
-  border-bottom: 1px solid var(--dark-border) !important;
-}
-
-/* Form Styling */
-.dark-mode .form-control {
-  background-color: var(--dark-input-bg) !important;
-  color: var (--dark-text-primary) !important;
-  border: 1px solid var(--dark-border) !important;
-}
-
-.dark-mode .form-control::placeholder {
-  color: var(--dark-text-secondary) !important;
-}
-
-/* Button Styling */
-.dark-mode .btn {
-  background-color: var(--dark-bg-tertiary) !important;
-  color: var(--dark-text-primary) !important;
-  border: 1px solid var(--dark-border) !important;
-}
-
-.dark-mode .btn:hover {
-  background-color: var(--dark-accent) !important;
-  color: #ffffff !important;
-}
-
-/* Fix for text-muted */
-.dark-mode .text-muted {
-  color: var(--dark-text-secondary) !important;
-}
-
-/* Scrollbar Styling */
-.dark-mode ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.dark-mode ::-webkit-scrollbar-track {
-  background: var(--dark-bg-secondary);
-}
-
-.dark-mode ::-webkit-scrollbar-thumb {
-  background: var(--dark-bg-tertiary);
-  border-radius: 4px;
-}
-
-.dark-mode ::-webkit-scrollbar-thumb:hover {
-  background: var(--dark-accent);
-}
-
-/* Dropdown Menu Styling for Dark Mode */
-.dark-mode .dropdown-menu {
-  background-color: var(--dark-bg-secondary) !important; /* Dark background */
-  border: 1px solid var(--dark-border) !important; /* Subtle border */
-  color: var(--dark-text-primary) !important; /* Text color */
-  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.5) !important; /* Add shadow for better visibility */
-}
-
-.dark-mode .dropdown-item {
-  color: var(--dark-text-primary) !important; /* Text color for items */
-  transition: background-color 0.3s ease, color 0.3s ease; /* Smooth hover transition */
-}
-
-.dark-mode .dropdown-item:hover {
-  background-color: var(--dark-bg-tertiary) !important; /* Highlighted background */
-  color: var(--dark-accent) !important; /* Accent color for hover */
-}
-
-.dark-mode .dropdown-divider {
-  border-color: var(--dark-border) !important; /* Divider color */
-}
-
-.dark-mode .dropdown-menu h6,
-.dark-mode .dropdown-menu small {
-  color: var(--dark-text-secondary) !important; /* Muted text for headers or small text */
-}
-
-/* Fix for the notification icon */
-.dark-mode .dropdown-menu .fa-bell {
-  color: var(--dark-text-primary) !important; /* Ensure the bell icon is visible */
-}
-
-.dark-mode .dropdown-menu .dropdown-header {
-  background-color: var(--dark-bg-tertiary) !important; /* Header background */
-  color: var(--dark-text-primary) !important; /* Header text color */
-}
-
-.navbar {
-  position: relative;
-  z-index: 1000; /* Alacsonyabb, mint a táblázaté */
+/* responsive egyszerűsítve */
+@media (max-width:900px){
+  .title { font-size:20px; }
+  .controls { gap:6px; }
 }
 </style>

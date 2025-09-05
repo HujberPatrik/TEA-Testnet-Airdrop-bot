@@ -22,6 +22,9 @@
         <router-link to="/price-list" class="nav-item nav-link">
           <i class="fa fa-table me-2"></i>Árak
         </router-link>
+        <router-link to="/admin/users" class="nav-item nav-link" :class="{ active: isActivePath('/admin/users') }">
+          <i class="fa fa-users me-2"></i>Felhasználók
+        </router-link>
         <div class="nav-item dropdown">
           <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown"><i class="far fa-file-alt me-2"></i>Egyéb</a>
           <div class="dropdown-menu bg-transparent border-0">

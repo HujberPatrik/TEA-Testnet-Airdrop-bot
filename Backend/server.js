@@ -3,7 +3,13 @@ const cors = require('cors');
 const pool = require('./config/db');
 const rendezvenyRoutes = require('./routes/rendezveny.route');
 const statuszRoutes = require('./routes/statusz.route');
+const adminRoutes = require('./routes/admin.route');
 const documentRoutes = require('./routes/document.route');
+const usersRouter = require('./routes/users');
+const authRouter = require('./src/routes/auth');
+require('dotenv').config(); // npm install dotenv --save ha még nincs
+const { JWT_SECRET } = require('./src/config/jwt');
+console.log('[startup] JWT_SECRET from config present?:', !!JWT_SECRET, 'value preview:', JWT_SECRET ? JWT_SECRET.slice(0,6) + '...' : null);
 
 const app = express();
 
@@ -18,9 +24,12 @@ app.use((req, res, next) => {
 });
 
 // api route-ok
-app.use('/api', rendezvenyRoutes);
-app.use('/api', statuszRoutes);
+app.use('/api/', rendezvenyRoutes);
+app.use('/api/', statuszRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/document', documentRoutes);
+app.use('/api/users', usersRouter);
+app.use('/api/auth', authRouter);
 
 // prices route betöltése hibakezeléssel
 let pricesRoute;
@@ -57,7 +66,29 @@ pool.query('SELECT NOW()', (err, result) => {
   }
 });
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`Server is running at http://localhost:${port}`);
-});
+app.listen(process.env.PORT || 3000, () => console.log('Server listening on', process.env.PORT || 3000));
+
+// Indítsa el a seedelést ha kéri: állítsd RUN_SEED=1 környezeti változót vagy indítsd node server.js --seed
+if (process.env.RUN_SEED === '1' || process.argv.includes('--seed')) {
+  console.log('RUN_SEED detected — starting seed script');
+  try {
+    require('./scripts/seed-users'); // a script jelenlegi formájában azonnal lefut, ha szükséges, exportáld és hívd inkább
+  } catch (err) {
+    console.error('Seed script failed:', err);
+  }
+}
+
+// Indítsa el a login.js szolgáltatást is (login.js saját Express példányt indít)
+try {
+  const login = require('./login');
+  const loginPort = process.env.LOGIN_PORT || 3003;
+  if (login && typeof login.start === 'function') {
+    login.start(loginPort)
+      .then(() => console.log('Login service started on', loginPort))
+      .catch(err => console.warn('Login service failed to start:', err && err.message ? err.message : err));
+  } else {
+    console.log('Login module loaded but no .start() export found — ensure login.js exports start(app) or call require directly if it self-starts.');
+  }
+} catch (err) {
+  console.warn('Failed to start login service (login.js):', err.message);
+}

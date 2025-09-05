@@ -5,51 +5,57 @@ import Login from "../views/Login.vue";
 import Event from "../views/event.vue";
 import Test from "../views/test.vue";
 import Archived from "../views/Archived.vue";
-import PriceListPage from '../views/Prices.vue'
-
+import PriceListPage from '../views/Prices.vue';
+import NeptunRoleAssign from '../views/NeptunRoleAssign.vue';
+ 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
-  routes: [
-    {
-      path: "/",
-      name: "home",
-      component: HomeView,
+   history: createWebHistory(import.meta.env.BASE_URL),
+   routes: [
+     {
+       path: "/",
+       name: "home",
+       component: HomeView,
+     },
+     {
+       path: "/admin",
+       name: "admin",
+       component: AdminPage,
+     },
+     {
+       path: "/login",
+       name: "login",
+       component: Login,
+     },
+     {
+       path: "/event",
+       name: "event",
+       component: Event,
+     },
+     {
+       path: "/test",
+       name: "test",
+       component: Test,
+     },
+     {
+       path: "/admin/archived",
+       name: "ArchivedEvents",
+       component: Archived,
+       meta: {
+         requiresAuth: true,
+       },
+     },
+     {
+       path: '/price-list',
+       name: 'PriceList',
+       component: PriceListPage,
+       meta: { requiresAuth: true }  // Ha csak bejelentkezett felhasználóknak szeretnéd mutatni
+     },
+     {
+      path: '/admin/users',
+      name: 'NeptunRoleAssign',
+      component: NeptunRoleAssign
     },
-    {
-      path: "/admin",
-      name: "admin",
-      component: AdminPage,
-    },
-    {
-      path: "/login",
-      name: "login",
-      component: Login,
-    },
-    {
-      path: "/event",
-      name: "event",
-      component: Event,
-    },
-    {
-      path: "/test",
-      name: "test",
-      component: Test,
-    },
-    {
-      path: "/admin/archived",
-      name: "ArchivedEvents",
-      component: Archived,
-      meta: {
-        requiresAuth: true,
-      },
-    },
-    {
-      path: '/price-list',
-      name: 'PriceList',
-      component: PriceListPage,
-      meta: { requiresAuth: true }  // Ha csak bejelentkezett felhasználóknak szeretnéd mutatni
-    },
-  ],
-});
-
-export default router;
+   ],
+ });
+ 
+ export default router;
