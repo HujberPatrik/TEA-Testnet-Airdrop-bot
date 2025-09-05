@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS public.users (
   role VARCHAR(50) DEFAULT 'user',
   neptune_code VARCHAR(10) UNIQUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  avatar_url VARCHAR(255) NULL
 );
 
 CREATE TABLE IF NOT EXISTS public.statusz

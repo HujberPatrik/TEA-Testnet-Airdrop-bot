@@ -55,6 +55,11 @@ const router = createRouter({
       name: 'NeptunRoleAssign',
       component: NeptunRoleAssign
     },
+    {
+      path: '/profile',
+      name: 'ProfileEdit',
+      component: () => import('@/views/ProfileEdit.vue')
+    },
    ],
  });
  

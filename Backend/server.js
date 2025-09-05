@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const pool = require('./config/db');
+const path = require('path');
 const rendezvenyRoutes = require('./routes/rendezveny.route');
 const statuszRoutes = require('./routes/statusz.route');
 const adminRoutes = require('./routes/admin.route');
@@ -16,6 +17,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// statikus kiszolgálás az uploads mappához (így elérhető lesz a /uploads/* URL)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // egyszerű kérés-logger (konzolba)
 app.use((req, res, next) => {

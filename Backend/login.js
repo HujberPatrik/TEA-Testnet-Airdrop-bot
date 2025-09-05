@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const pool = require('./config/db'); // csatlakozás a projekt DB configjához
+const path = require('path');
 
 const { JWT_SECRET, JWT_EXPIRES_IN, JWT_ALGORITHM } = require('./src/config/jwt');
 
@@ -18,6 +19,9 @@ const corsOptions = {
   credentials: true
 };
 app.use(cors(corsOptions));
+
+// statikus fájlok szolgáltatása: /uploads/* -> Backend/uploads/*
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 if (!process.env.JWT_SECRET) {
   console.warn('Warning: JWT_SECRET not set, using default insecure secret. Set JWT_SECRET in env for production.');
@@ -87,8 +91,11 @@ async function handleLogin(req, res) {
       email: user.email,
       neptun: user.neptun_code,
       full_name: user.full_name,
-      role: user.role
+      role: user.role,
+      avatar_url: user.avatar_url || null
     };
+
+    console.log('[login] responding with user:', safeUser);
 
     return res.json({ token, user: safeUser });
   } catch (err) {
@@ -121,7 +128,7 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
   const client = await pool.connect();
   try {
     const q = `
-      SELECT id, email, neptun_code, full_name, role
+      SELECT id, email, neptun_code, full_name, role ,avatar_url
       FROM users
       WHERE id = $1
       LIMIT 1
@@ -134,7 +141,8 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
       email: user.email,
       neptun_code: user.neptun_code,
       full_name: user.full_name,
-      role: user.role
+      role: user.role,
+      avatar_url: user.avatar_url
     });
   } catch (err) {
     console.error('[login /me] error', err);

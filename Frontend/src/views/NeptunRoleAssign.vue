@@ -120,9 +120,17 @@
               </div>
 
               <div class="d-flex gap-2">
-                <button class="btn btn-primary" @click="assignRole" :disabled="loadingAssign || !hasTarget">
-                  <span v-if="loadingAssign" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                  {{ loadingAssign ? 'Kiosztás...' : 'Kioszt / Frissít' }}
+                <button
+                  type="button"
+                  class="btn-search"
+                  @click="assignRole"
+                  :disabled="loadingAssign || !hasTarget"
+                  :aria-busy="loadingAssign ? 'true' : 'false'"
+                  aria-live="polite"
+                >
+                  <span class="search-icon" aria-hidden="true"><i class="fa fa-user-plus"></i></span>
+                  <span class="search-label">{{ loadingAssign ? 'Kiosztás...' : 'Kioszt / Frissít' }}</span>
+                  <span v-if="loadingAssign" class="search-spinner" aria-hidden="true"></span>
                 </button>
 
                 <button class="btn btn-outline-secondary" type="button" @click="useFormAsTarget" :disabled="!form.email && !form.neptun_code">Használja létrehozottat</button>
@@ -242,12 +250,16 @@ const createOrUpdate = async () => {
 
   loadingCreate.value = true;
   try {
+    // build payload without forcing password=null; only include password when user provided one
     const payload = {
       email: form.email.trim(),
       full_name: form.full_name.trim(),
-      neptun_code: form.neptun_code.trim().toUpperCase(),
-      password: form.password || null
+      neptun_code: form.neptun_code.trim().toUpperCase()
     };
+    if (form.password && form.password.length > 0) {
+      payload.password = form.password;
+    }
+
     const res = await fetch('/api/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeader() },
@@ -507,5 +519,16 @@ onBeforeUnmount(() => {
 @media (max-width: 576px) {
   .btn-search { padding: 7px 10px; gap:8px; font-size:14px; }
   .sze-logo-image { width: 160px; }
+}
+
+/* --- ÚJ: minden gomb kerekítése --- */
+.btn,
+.btn-primary,
+.btn-success,
+.btn-outline-secondary,
+.btn-outline-dark,
+.btn-search,
+.btn-back {
+  border-radius: 999px !important;
 }
 </style>

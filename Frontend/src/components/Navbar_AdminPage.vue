@@ -27,7 +27,7 @@
         <!-- ref és @click.prevent hozzáadva, aria attribútum kezelve -->
         <a href="#" ref="dropdownToggle" class="nav-link dropdown-toggle" role="button"
            aria-expanded="false" @click.prevent="onToggleClick">
-          <img class="rounded-circle me-lg-2" src="../img/user.jpg" alt="" style="width: 40px; height: 40px;">
+          <img class="rounded-circle me-lg-2" :src="avatarSrc" alt="" style="width: 40px; height: 40px;">
           <span class="d-none d-lg-inline-flex" :style="{ color: isDarkMode ? '#ffffff' : '#50adc9' }">{{ userName }}</span>
           <span class="d-none d-lg-inline-flex ms-1 text-muted" style="font-size: 0.8rem;">({{ userRole }})</span>
         </a>
@@ -53,9 +53,6 @@
           </a>
 
           <div class="dropdown-divider"></div>
-          <a href="#" class="dropdown-item text-warning" @click.prevent="clearStoredToken">
-            <i class="fa fa-trash-alt me-2"></i> Token törlése
-          </a>
 
           <a href="#" class="dropdown-item text-danger" @click="logout">
             <i class="fa fa-sign-out-alt me-2"></i> Kijelentkezés
@@ -70,6 +67,7 @@
 <script>
 import { Dropdown } from 'bootstrap';
 import auth from '../services/auth';
+import defaultAvatar from '@/assets/img/user.jpg';
 
 export default {
   props: {
@@ -79,18 +77,30 @@ export default {
     return {
       userName: 'Vendég',
       userRole: null,
-      dropdownInstance: null
+      dropdownInstance: null,
+      userAvatar: null
     };
+  },
+  computed: {
+    avatarSrc() {
+      if (!this.userAvatar) return defaultAvatar;
+      // ha teljes URL (http/https) -> használjuk
+      if (/^https?:\/\//.test(this.userAvatar)) return this.userAvatar;
+      // ha kezdő / -> ugyanarról a hostról (Vite proxy átirányítja a backendre)
+      if (this.userAvatar.startsWith('/')) return this.userAvatar;
+      // egyébként visszaesésként default
+      return defaultAvatar;
+    }
   },
   async mounted() {
     const user = await auth.ensureAuthUser();
     if (user) {
       this.userName = user.full_name || user.email || 'Vendég';
       this.userRole = user.role || null;
-    } else {
-      this.userName = 'Vendég';
-      this.userRole = null;
+      this.userAvatar = user.avatar_url || null;
     }
+    // hallgató avatar frissítésre
+    window.addEventListener('avatar-updated', this.onAvatarUpdated);
     // init Bootstrap Dropdown a ref alapján
     if (this.$refs.dropdownToggle) {
       this.dropdownInstance = new Dropdown(this.$refs.dropdownToggle, { popperConfig: { modifiers: [{ name: 'offset', options: { offset: [0, 6] } }] } });
@@ -99,6 +109,7 @@ export default {
     document.addEventListener('click', this.onDocumentClick);
   },
   beforeUnmount() {
+    window.removeEventListener('avatar-updated', this.onAvatarUpdated);
     if (this.dropdownInstance && typeof this.dropdownInstance.dispose === 'function') {
       this.dropdownInstance.dispose();
       this.dropdownInstance = null;
@@ -127,7 +138,7 @@ export default {
     },
 
     navigateToProfile() {
-      alert('Saját profil oldal hamarosan elérhető!');
+      this.$router.push('/profile');
     },
 
     navigateToSettings() {
@@ -135,15 +146,20 @@ export default {
     },
 
     logout() {
-      auth.logout();
-      this.$router.push('/login');
-    },
-
-    clearStoredToken() {
+      // töröljük a tokent, reseteljük a felhasználó státuszt és bezárjuk a menüt, majd átirányítjuk
       auth.logout();
       this.userName = 'Vendég';
       this.userRole = null;
+      this.userAvatar = null;
       this.$emit('token-cleared');
+      if (this.dropdownInstance && typeof this.dropdownInstance.hide === 'function') {
+        this.dropdownInstance.hide();
+      }
+      this.$router.push('/login');
+    },
+
+    onAvatarUpdated(e) {
+      this.userAvatar = e?.detail?.avatar_url || null;
     }
   }
 };
@@ -153,5 +169,30 @@ export default {
 .navbar {
     position: relative;
     z-index: 1000;
+}
+
+/* --- ÚJ: a dropdown a navbar aljához kapcsolódjon és legyen lekerekítve --- */
+.profile-dropdown {
+  position: absolute !important;
+  top: 100% !important;        /* közvetlenül a toggle alatt (navbar alja felé) */
+  right: 0 !important;         /* jobbra igazítva ahogy eddig is */
+  left: auto !important;
+  margin-top: 6px !important;  /* kis távolság, hogy ne érjen rá teljesen, állítható */
+  border-radius: 8px !important; /* enyhe lekerekítés */
+  overflow: hidden;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+  transform: none !important;
+  min-width: 200px;
+}
+
+/* Opció: ha a navbar sötét, a dropdown is harmonizáljon vele */
+.navbar-dark .profile-dropdown {
+  background-color: #2b2b2b;
+  color: #fff;
+}
+
+/* Dropdown elemeknél ne legyenek éles sarkak belül */
+.profile-dropdown .dropdown-item {
+  border-radius: 0;
 }
 </style>
