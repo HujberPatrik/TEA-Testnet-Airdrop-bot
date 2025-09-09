@@ -27,21 +27,25 @@
               </div>
 
               <div v-for="(row, idx) in rows" :key="row.id" class="d-flex gap-2 align-items-center mb-2 row-with-trash">
-                <select class="form-select form-select-sm" style="min-width:240px;"
+                <select class="form-select form-select-sm service-select" style="min-width:260px;"
                         v-model="row.serviceId" @change="onServiceChange(row)">
                   <option :value="null">-- válassz szolgáltatást --</option>
                   <option v-for="p in prices" :key="p.id" :value="p.id">{{ p.name }} — {{ p.category }}</option>
                 </select>
 
-                <select class="form-select form-select-sm" v-model="row.rateKey" style="width:170px;">
+                <select class="form-select form-select-sm rate-select" v-model="row.rateKey">
                   <option value="priceUniversity">Egyetemi — Normál</option>
                   <option value="priceUniversityWeekend">Egyetemi — Hétvége/Éjszaka</option>
                   <option value="priceExternal">Külső — Normál</option>
                   <option value="priceExternalWeekend">Külső — Hétvége/Éjszaka</option>
                 </select>
 
-                <input type="number" min="0" step="0.25" class="form-control form-control-sm" style="width:110px;"
-                       v-model.number="row.hours" />
+                <input type="number" min="0" step="0.25" class="form-control form-control-sm hours-input"
+                       style="width:110px;" v-model="row.hours" placeholder="óra" title="Órák" />
+
+                <!-- ÚJ: létszám -->
+                <input type="number" min="0" step="1" class="form-control form-control-sm persons-input"
+                       style="width:90px;" v-model="row.persons" placeholder="fő" title="Fő (létszám)" />
 
                 <div style="min-width:140px; text-align:right;">
                   <div class="fw-bold">{{ formatMoney(getRowUnitPrice(row)) }}</div>
@@ -134,7 +138,8 @@ export default {
         id: Date.now() + Math.random(),
         serviceId: null,
         rateKey: 'priceUniversity',
-        hours: 1
+        hours: '',      // üres => placeholder látszik
+        persons: ''     // üres => placeholder látszik
       });
     };
 
@@ -172,7 +177,10 @@ export default {
     };
 
     const getRowTotal = (row) => {
-      return getRowUnitPrice(row) * (Number(row.hours) || 0);
+      // Üres vagy nem szám -> 0
+      const h = row.hours === '' ? 0 : (Number(row.hours) || 0);
+      const pe = row.persons === '' ? 0 : (Number(row.persons) || 0);
+      return getRowUnitPrice(row) * h * pe;
     };
 
     const total = computed(() => {
@@ -188,12 +196,17 @@ export default {
       try {
         const key = storageKey(eventId);
         const payload = {
-          rows: rows.map(r => ({ id: r.id, serviceId: r.serviceId, rateKey: r.rateKey, hours: r.hours })),
+          rows: rows.map(r => ({
+            id: r.id,
+            serviceId: r.serviceId,
+            rateKey: r.rateKey,
+            hours: r.hours === '' ? null : r.hours,
+            persons: r.persons === '' ? null : r.persons
+          })),
           savedAt: Date.now()
         };
         localStorage.setItem(key, JSON.stringify(payload));
       } catch (e) {
-        // silently ignore
         console.error('saveState error', e);
       }
     };
@@ -205,14 +218,14 @@ export default {
         if (!raw) return false;
         const parsed = JSON.parse(raw);
         if (!parsed || !Array.isArray(parsed.rows)) return false;
-        // replace rows contents
         rows.splice(0, rows.length);
         parsed.rows.forEach(r => {
           rows.push({
             id: r.id ?? (Date.now() + Math.random()),
             serviceId: r.serviceId ?? null,
             rateKey: r.rateKey ?? 'priceUniversity',
-            hours: r.hours ?? 1
+            hours: (r.hours === null || r.hours === undefined) ? '' : r.hours,
+            persons: (r.persons === null || r.persons === undefined) ? '' : r.persons
           });
         });
         return true;
@@ -273,18 +286,18 @@ export default {
     };
 
     const apply = () => {
-      // készítsünk részletes breakdown-ot
       const breakdown = rows.map(r => {
         const p = findPriceById(r.serviceId);
         return {
-          serviceId: r.serviceId,
-          serviceName: p ? p.name : null,
-          hours: Number(r.hours) || 0,
-          unitPrice: getRowUnitPrice(r),
-          lineTotal: getRowTotal(r),
-          unit: p ? p.unit : null,
-          rateKey: r.rateKey
-        };
+           serviceId: r.serviceId,
+           serviceName: p ? p.name : null,
+           hours: (r.hours === '' ? 0 : (Number(r.hours) || 0)),
+           persons: (r.persons === '' ? 0 : (Number(r.persons) || 0)),
+           unitPrice: getRowUnitPrice(r),
+           lineTotal: getRowTotal(r),
+           unit: p ? p.unit : null,
+           rateKey: r.rateKey
+         };
       });
       // save before emitting
       if (props.event && props.event.id != null) saveState(props.event.id);
@@ -307,6 +320,9 @@ export default {
 </script>
 
 <style scoped>
+/* opcionális kis kiegészítés: a két szám mező közelebb kerülhet */
+.row-with-trash input[type=number] { text-align: right; }
+
 /* egyszerű stílusok a modál sorokhoz */
 
 /* megnövelt modal szélesség finomhangolása */
@@ -338,4 +354,28 @@ export default {
 }
 
 /* igény szerint további finomítások */
+
+/* Szélesebb selectek, hogy kiférjen a szöveg */
+.service-select { max-width: 340px; }
+.rate-select { width: 230px; }
+
+/* Placeholder szín (böngésző alap általában szürke, de egységesítjük) */
+.hours-input::placeholder,
+.persons-input::placeholder {
+  color: #9aa0a6;
+  opacity: 1;
+  font-size: 0.75rem;
+}
+
+/* Üres (placeholder) állapotnál dönthetünk halvány háttérről */
+.hours-input:placeholder-shown,
+.persons-input:placeholder-shown {
+  background: #f8f9fa;
+}
+
+/* Kisebb kijelzőn a szélességek igazítása */
+@media (max-width: 768px) {
+  .service-select { min-width: 200px; }
+  .rate-select { width: 200px; }
+}
 </style>

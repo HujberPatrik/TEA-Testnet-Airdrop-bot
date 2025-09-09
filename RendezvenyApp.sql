@@ -10,15 +10,19 @@ CREATE DATABASE "RendezvenyApp"
     IS_TEMPLATE = False;
 
 CREATE TABLE IF NOT EXISTS public.users (
-  id SERIAL PRIMARY KEY,
-  email VARCHAR(255) NOT NULL UNIQUE,
-  password_hash VARCHAR(255) NOT NULL,
-  full_name VARCHAR(255),
-  role VARCHAR(50) DEFAULT 'user',
-  neptune_code VARCHAR(10) UNIQUE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  avatar_url VARCHAR(255) NULL
+  id            BIGSERIAL PRIMARY KEY,
+  email         VARCHAR(255) NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  full_name     VARCHAR(255),
+  neptun_code   VARCHAR(6) UNIQUE,
+  role          VARCHAR(30) NOT NULL DEFAULT 'user',
+  role_assigned_at TIMESTAMPTZ,
+  is_active     BOOLEAN NOT NULL DEFAULT TRUE,
+  last_login    TIMESTAMPTZ,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  avatar_url    VARCHAR(255),
+  CONSTRAINT users_email_chk CHECK (position('@' in email) > 1)
 );
 
 CREATE TABLE IF NOT EXISTS public.statusz
@@ -119,14 +123,7 @@ CREATE TABLE IF NOT EXISTS public.kerveny
         ON DELETE NO ACTION
 )
 TABLESPACE pg_default;
-CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100),
-    email VARCHAR(100) UNIQUE,
-    password_hash VARCHAR(255),
-    role VARCHAR(50) CHECK (role IN ('szervező', 'admin', 'főadmin')),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+
 CREATE TABLE IF NOT EXISTS public.prices (
   id BIGSERIAL PRIMARY KEY,
   megnevezes VARCHAR(255) NOT NULL,
@@ -137,6 +134,19 @@ CREATE TABLE IF NOT EXISTS public.prices (
   ar_kulso NUMERIC(12,2) NOT NULL DEFAULT 0,
   ar_kulso_hetvege NUMERIC(12,2) NOT NULL DEFAULT 0,
   megjegyzes TEXT
+);
+
+CREATE TABLE IF NOT EXISTS public.role_audit (
+  id          BIGSERIAL PRIMARY KEY,
+  user_id     BIGINT NOT NULL,
+  neptun_code VARCHAR(12),
+  old_role    VARCHAR(60),
+  new_role    VARCHAR(60),
+  changed_by  VARCHAR(200) NOT NULL DEFAULT current_user,
+  reason      TEXT,
+  changed_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT role_change_log_user_fk
+    FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
 );
 
 ALTER TABLE IF EXISTS public."kerveny"

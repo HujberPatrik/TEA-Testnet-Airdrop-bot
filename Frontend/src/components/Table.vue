@@ -5,6 +5,13 @@
         <h6 class="mb-0">Rendezvények</h6>
       </div>
 
+      <!-- ÚJ: kategória státusz szűrő gombok -->
+      <FilterButtons
+        :events="events"
+        @filter-status="handleStatusCodes"
+        class="mb-3"
+      />
+
       <div v-if="loading" class="text-center my-5">
         <div class="spinner-border text-primary" role="status">
           <span class="visually-hidden">Betöltés...</span>
@@ -94,13 +101,18 @@
               <tr
                 v-for="event in sortedAndFilteredEvents"
                 :key="event.id"
-                :class="getStatusClass(getStatusText(event.statusz))"
+                :class="'phase-' + (getStatusPhase(event.statusz).toLowerCase())"
                 @click="showEventDetails(event)"
-                style="cursor: pointer;"
+                style="cursor:pointer;"
               >
-                <td style="width: 50px; text-align: center;">
-                  <span class="status-icon" :title="getStatusText(event.statusz)">
-                    <i :class="getStatusIcon(getStatusText(event.statusz))"></i>
+                <td>
+                  <span
+                    class="status-badge"
+                    :class="getStatusClassFromCode(event.statusz)"
+                    :title="getStatusLabel(event.statusz)"
+                  >
+                    <i :class="getStatusIcon(event.statusz)"></i>
+                    {{ getStatusLabel(event.statusz) }}
                   </span>
                 </td>
                 <td>{{ event.nev }}</td>
@@ -171,126 +183,147 @@
 import axios from 'axios';
 import ModificationPopup from './ModificationPopup.vue';
 import ServiceCostCalculator from './ServiceCostCalculator.vue';
+import FilterButtons from './FilterButtons.vue'; // <<< ÚJ
+import { STATUSES, TERMINAL_STATUS_CODES } from '@/constants/statuses.js';
+
+
+const STATUS_MAP = STATUSES.reduce((a,s)=>{a[s.code]=s;return a;}, {});
+// Régi numerikus -> új kód (ha backend még nem frissült)
+const LEGACY_NUMERIC_MAP = {
+  0: 'ARAJANLAT_KESZITES_FOLYAMATBAN',
+  1: 'UF_ARAJANLAT_ELFOGADASARA_VAR',
+  2: 'SZERZODES_ALAIRVA',
+  3: 'ELUTASITVA',
+  4: 'LEZARVA'
+};
 
 export default {
-  components: {
-    ModificationPopup,
-    ServiceCostCalculator
-  },
+  components: { ModificationPopup, ServiceCostCalculator, FilterButtons }, // <<< BŐVÍTVE
   props: {
-    isDarkMode: {
-      type: Boolean,
-      default: false
-    },
-    statusFilter: {
-      type: Number,
-      default: null
-    }
+    isDarkMode: { type: Boolean, default: false },
+    hideTerminal: { type: Boolean, default: true } // statusFilter prop törölhető
   },
   data() {
     return {
       events: [],
       loading: true,
       error: null,
-      filters: {
-        name: '',
-        startDate: '',
-        location: '',
-        type: ''
-      },
+      filters: { name: '', startDate: '', location: '', type: '' },
       sortColumn: 'kezdo_datum',
       sortDirection: 'asc',
       selectedEvent: null,
-      exportStatus: {
-        isLoading: false,
-        error: null
-      },
+      exportStatus: { isLoading: false, error: null },
       showCostModal: false,
-      costEvent: null
+      costEvent: null,
+      statusFilterCodes: [] // <<< ÚJ (kategória szűrés)
     };
   },
   computed: {
     uniqueLocations() {
-      return [...new Set(this.events.map(event => event.helyszin).filter(Boolean))];
+      return [...new Set(this.events.map(e => e.helyszin).filter(Boolean))];
     },
     uniqueTypes() {
-      return [...new Set(this.events.map(event => event.tipus).filter(Boolean))];
+      return [...new Set(this.events.map(e => e.tipus).filter(Boolean))];
     },
     sortedAndFilteredEvents() {
-      let filteredEvents = [...this.events];
-      
-      // Archivált elemek kiszűrése (statusz = 4)
-      filteredEvents = filteredEvents.filter(event => event.statusz !== 4);
-      
-      // Státusz szűrés
-      if (this.statusFilter !== null) {
-        filteredEvents = filteredEvents.filter(event => {
-          return event.statusz === this.statusFilter;
-        });
+      let filteredEvents = this.events.map(e => ({
+        ...e,
+        statusz: this.normalizeStatusCode(e.statusz)
+      }));
+
+      // Terminális elrejtése csak ha nincs aktív státusz szűrés
+      if (this.hideTerminal && this.statusFilterCodes.length === 0) {
+        filteredEvents = filteredEvents.filter(e => !this.isTerminal(e.statusz));
       }
-      
-      // Név/leírás szűrés
+
+      // Több státuszkódra szűrés (kategória gombok)
+      if (this.statusFilterCodes.length > 0) {
+        const set = new Set(this.statusFilterCodes.map(c => c.toUpperCase()));
+        filteredEvents = filteredEvents.filter(e => e.statusz && set.has(e.statusz.toUpperCase()));
+      }
+
+      // Szöveges keresés
       if (this.filters.name) {
-        const searchTerm = this.filters.name.toLowerCase();
-        filteredEvents = filteredEvents.filter(event => {
-          return (
-            (event.nev && event.nev.toLowerCase().includes(searchTerm)) ||
-            (event.leiras && event.leiras.toLowerCase().includes(searchTerm)) ||
-            (event.helyszin && event.helyszin.toLowerCase().includes(searchTerm)) ||
-            (event.tipus && event.tipus.toLowerCase().includes(searchTerm))
-          );
-        });
+        const q = this.filters.name.toLowerCase();
+        filteredEvents = filteredEvents.filter(e =>
+          [e.nev, e.leiras, e.helyszin, e.tipus]
+            .filter(Boolean)
+            .some(v => v.toLowerCase().includes(q))
+        );
       }
-      
-      // Kezdő dátum szűrés
+
+      // Kezdő dátum
       if (this.filters.startDate) {
-        const filterDate = new Date(this.filters.startDate);
-        filteredEvents = filteredEvents.filter(event => {
-          if (!event.kezdo_datum) return false;
-          const eventStartDate = new Date(event.kezdo_datum);
-          return eventStartDate >= filterDate;
-        });
+        const fd = new Date(this.filters.startDate);
+        filteredEvents = filteredEvents.filter(e => e.kezdo_datum && new Date(e.kezdo_datum) >= fd);
       }
-      
-      // Helyszín szűrés
+
       if (this.filters.location) {
-        filteredEvents = filteredEvents.filter(event => {
-          return event.helyszin === this.filters.location;
-        });
+        filteredEvents = filteredEvents.filter(e => e.helyszin === this.filters.location);
       }
-      
-      // Típus szűrő
+
       if (this.filters.type) {
-        filteredEvents = filteredEvents.filter(event => {
-          return event.tipus === this.filters.type;
-        });
+        filteredEvents = filteredEvents.filter(e => e.tipus === this.filters.type);
       }
-      
-      // Rendezés
-      return filteredEvents.sort((a, b) => {
-        let aValue = a[this.sortColumn];
-        let bValue = b[this.sortColumn];
-        
-        // Dátum mezők kezelése
-        if (this.sortColumn === 'kezdo_datum' || this.sortColumn === 'veg_datum') {
-          aValue = aValue ? new Date(aValue) : new Date(0);
-          bValue = bValue ? new Date(bValue) : new Date(0);
-        }
-        
-        // Szöveges mezők kezelése
-        if (typeof aValue === 'string') aValue = aValue.toLowerCase();
-        if (typeof bValue === 'string') bValue = bValue.toLowerCase();
-        
-        // Rendezési irány figyelembevétele
-        if (this.sortDirection === 'asc') {
-          return aValue > bValue ? 1 : -1;
+
+      return filteredEvents.sort((a,b) => {
+        let av = a[this.sortColumn];
+        let bv = b[this.sortColumn];
+        if (this.sortColumn === 'statusz') {
+          av = (STATUS_MAP[a.statusz]?.sort_order) ?? 99999;
+          bv = (STATUS_MAP[b.statusz]?.sort_order) ?? 99999;
+        } else if (['kezdo_datum','veg_datum'].includes(this.sortColumn)) {
+          av = av ? new Date(av) : new Date(0);
+          bv = bv ? new Date(bv) : new Date(0);
         } else {
-          return aValue < bValue ? 1 : -1;
+          if (typeof av === 'string') av = av.toLowerCase();
+          if (typeof bv === 'string') bv = bv.toLowerCase();
         }
+        const res = av > bv ? 1 : (av < bv ? -1 : 0);
+        return this.sortDirection === 'asc' ? res : -res;
       });
     }
   },
   methods: {
+    normalizeStatusCode(raw) {
+      if (!raw && raw !== 0) return null;
+      if (typeof raw === 'number') return LEGACY_NUMERIC_MAP[raw] || null;
+      return raw;
+    },
+    isTerminal(code) {
+      return TERMINAL_STATUS_CODES.includes(code);
+    },
+    getStatusObj(code) {
+      return STATUS_MAP[code] || null;
+    },
+    getStatusLabel(code) {
+      return this.getStatusObj(code)?.label || code || 'Ismeretlen';
+    },
+    getStatusPhase(code) {
+      return this.getStatusObj(code)?.phase || '';
+    },
+    getStatusIcon(code) {
+      const phase = this.getStatusPhase(code);
+      const terminal = this.isTerminal(code);
+      if (terminal) return 'fas fa-flag-checkered';
+      const iconMap = {
+        BEERKEZETT: 'fas fa-inbox',
+        SZERZODES: 'fas fa-file-signature',
+        MEGVALOSITAS: 'fas fa-tasks',
+        ELSZAMOLAS: 'fas fa-calculator',
+        LEZART: 'fas fa-lock'
+      };
+      return iconMap[phase] || 'fas fa-tag';
+    },
+    getStatusClassFromCode(code) {
+      const s = this.getStatusObj(code);
+      if (!s) return 'status-badge status-unknown';
+      return [
+        'status-badge',
+        'phase-' + s.phase.toLowerCase(),
+        s.terminal ? 'terminal' : ''
+      ].join(' ');
+    },
     async fetchEvents() {
       try {
         this.loading = true;
@@ -298,190 +331,100 @@ export default {
         const response = await axios.get('http://localhost:3000/api/kerveny');
         this.events = response.data;
       } catch (err) {
-        console.error('Hiba az adatok lekérdezése során:', err);
-        this.error = 'Nem sikerült betölteni az adatokat. Kérjük, próbálja újra később!';
+        console.error(err);
+        this.error = 'Nem sikerült betölteni az adatokat.';
       } finally {
         this.loading = false;
       }
     },
-    
-    sortBy(column) {
-      if (this.sortColumn === column) {
-        // Már eszerint a mező szerint rendez, váltás a rendezési irányban
+    sortBy(col) {
+      if (this.sortColumn === col) {
         this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
       } else {
-        // Új mező szerint rendez, alapértelmezett irány: növekvő
-        this.sortColumn = column;
+        this.sortColumn = col;
         this.sortDirection = 'asc';
       }
     },
-    
     getSortIconClass() {
       return this.sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down';
     },
-    
-    showEventDetails(event) {
-      this.selectedEvent = { ...event };
+    showEventDetails(e) {
+      this.selectedEvent = { ...e, statusz: this.normalizeStatusCode(e.statusz) };
       document.body.style.overflow = 'hidden';
-      // ha a gyerek komponens bootstrap modalt használ, kérjük meg, hogy mutassa meg magát
-      this.$nextTick(() => {
+      this.$nextTick(()=> {
         const mp = this.$refs.modPopup;
-        if (!mp) return;
-        if (typeof mp.show === 'function') mp.show();
-        else if (typeof mp.open === 'function') mp.open();
+        if (mp?.show) mp.show();
       });
     },
-    
     closeEventDetails() {
-      // próbáljuk meg elrejteni a gyerek modalt is, ha van ilyen metódus
       const mp = this.$refs.modPopup;
-      if (mp && typeof mp.hide === 'function') mp.hide();
+      if (mp?.hide) mp.hide();
       this.selectedEvent = null;
       document.body.style.overflow = '';
     },
-    
     handleStatusUpdated(updatedEvent) {
-      // Frissítjük a kiválasztott eseményt
       this.selectedEvent = updatedEvent;
-      // Frissítjük az eseménylistát is
       this.fetchEvents();
     },
-    
     handleEventUpdated(updatedEvent) {
-      // Frissítjük a kiválasztott eseményt
       this.selectedEvent = updatedEvent;
-      // Frissítjük az eseménylistát is
       this.fetchEvents();
     },
-    
-    handleArchived(eventId) {
-      // Frissítsük az események listáját
+    handleArchived() {
       this.fetchEvents();
-      
-      // Vagy közvetlenül frissíthetjük az adatot a táblázatban
-      // const index = this.events.findIndex(event => event.id === eventId);
-      // if (index !== -1) {
-      //   this.events[index].statusz = 4;
-      // }
     },
-    
     formatDateTime(date, time) {
       if (!date) return 'Nincs megadva';
-      
-      // Számszerű dátum formátum ÉÉÉÉ.HH.NN
-      const dateObj = new Date(date);
-      const year = dateObj.getFullYear();
-      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-      const day = String(dateObj.getDate()).padStart(2, '0');
-      
-      const formattedDate = `${year}.${month}.${day}`;
-      
-      if (time) {
-        // Időpont hozzáadása (feltételezzük, hogy a time formátuma 'HH:MM:SS')
-        return `${formattedDate}, ${time.substring(0, 5)}`;
-      }
-      
-      return formattedDate;
+      const d = new Date(date);
+      const year = d.getFullYear();
+      const month = String(d.getMonth()+1).padStart(2,'0');
+      const day = String(d.getDate()).padStart(2,'0');
+      const base = `${year}.${month}.${day}`;
+      return time ? `${base}, ${time.substring(0,5)}` : base;
     },
-    
-    getStatusText(statusId) {
-      const statusMap = {
-        0: 'Feldolgozás alatt',
-        1: 'Elfogadásra vár',
-        2: 'Elfogadva',
-        3: 'Elutasítva',
-        4: 'Archivált'
-      };
-      
-      return statusMap[statusId] || 'Ismeretlen';
+    formatDateForInput(ds) {
+      if (!ds) return '';
+      return new Date(ds).toISOString().slice(0,10);
     },
-    
-    getStatusClass(statusText) {
-      const classMap = {
-        'Feldolgozás alatt': 'status-processing',
-        'Elfogadásra vár': 'status-pending',
-        'Elfogadva': 'status-approved',
-        'Elutasítva': 'status-rejected',
-        'Archivált': 'status-archived'
-      };
-      
-      return classMap[statusText] || '';
-    },
-    
-    getStatusIcon(statusText) {
-      const iconMap = {
-        'Feldolgozás alatt': 'fas fa-spinner fa-pulse',
-        'Elfogadásra vár': 'fas fa-clock',
-        'Elfogadva': 'fas fa-check-circle',
-        'Elutasítva': 'fas fa-times-circle',
-        'Archivált': 'fas fa-archive'
-      };
-      return iconMap[statusText] || 'fas fa-question-circle';
-    },
-    
-    formatDateForInput(dateString) {
-      if (!dateString) return '';
-      const date = new Date(dateString);
-      return date.toISOString().slice(0, 10);
-    },
-
     async exportDocument(event) {
       try {
         this.exportStatus.isLoading = true;
         this.exportStatus.error = null;
-        
         const response = await fetch('http://localhost:3000/api/document/generate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            data: event, // Az esemény adatai
-          }),
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ data: event })
         });
-    
-        if (!response.ok) {
-          throw new Error('Dokumentum generálás sikertelen');
-        }
-    
+        if (!response.ok) throw new Error('Dokumentum generálás sikertelen');
         const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
+        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `${event.nev || 'dokumentum'}.docx`;
         document.body.appendChild(a);
         a.click();
-        window.URL.revokeObjectURL(url);
-      } catch (err) {
-        console.error('Hiba a dokumentum generálása során:', err);
-        this.exportStatus.error = 'Hiba történt a dokumentum generálása során.';
-        alert('Hiba történt a dokumentum generálása során.');
+        URL.revokeObjectURL(url);
+      } catch(e) {
+        console.error(e);
+        alert('Hiba a dokumentum generálásakor.');
       } finally {
         this.exportStatus.isLoading = false;
       }
     },
-
     openCostCalculator(event) {
-      // megnyitjuk a komponens modálját
       this.costEvent = event;
-      // referenciaként a gyerek komponens show() metódusát hívjuk
-      this.$nextTick(() => {
+      this.$nextTick(()=> {
         const comp = this.$refs.serviceCost;
-        if (comp && comp.show) comp.show();
+        if (comp?.show) comp.show();
       });
     },
-
     handleCostCalculated(payload) {
-      // payload: { event, breakdown, total }
-      // itt eldöntheted, hogy elmented az eredményt az eseményhez, vagy csak megjeleníted
-      console.log('Kalkuláció eredmény:', payload);
-      // például figyelmeztetésként mutatjuk az összeget
       alert(`Kalkulált összeg: ${Number(payload.total).toLocaleString('hu-HU')} Ft`);
-      // opcionálisan hozzárendeljük az eseményhez a kalkulációt:
-      const idx = this.events.findIndex(e => e.id === payload.event.id);
-      if (idx !== -1) {
-        this.events[idx].calculation = payload;
-      }
+      const idx = this.events.findIndex(e=>e.id===payload.event.id);
+      if (idx!==-1) this.events[idx].calculation = payload;
+    },
+    handleStatusCodes(codes) {          // <<< ÚJ (kategória gomb esemény)
+      this.statusFilterCodes = Array.isArray(codes) ? codes : [];
     }
   },
   mounted() {
@@ -574,4 +517,41 @@ export default {
 .status-archived .status-icon {
   color: #6c757d; /* Szürke */
 }
+
+/* Új státusz badge stílusok */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .25rem .55rem;
+  border-radius: 12px;
+  font-size: .75rem;
+  font-weight: 600;
+  letter-spacing: .3px;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.status-badge i { font-size: .8rem; }
+
+/* Fázis színek */
+.phase-beerkezett { background:#fde8cc; color:#a65f00; }
+.phase-szerzodes { background:#ffe0e3; color:#9d1d30; }
+.phase-megvalositas { background:#d8eefc; color:#05537a; }
+.phase-elszamolas { background:#e1f5e8; color:#1f6d3f; }
+.phase-lezart { background:#e0e0e0; color:#555; }
+
+.status-badge.terminal {
+  border:1px solid rgba(0,0,0,.1);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.2);
+}
+
+.status-unknown { background:#ddd; color:#444; }
+
+/* Sor kiemelés (opcionális fázis szerint) */
+tr.phase-beerkezett:hover td { background:#fff8f2; }
+tr.phase-szerzodes:hover td { background:#fff5f6; }
+tr.phase-megvalositas:hover td { background:#f4fbff; }
+tr.phase-elszamolas:hover td { background:#f4fff8; }
+tr.phase-lezart:hover td { background:#f7f7f7; }
 </style>

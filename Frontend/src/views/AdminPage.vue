@@ -11,13 +11,7 @@
       <!-- Navbar End -->
 
       <!-- Státusz szűrő gombok -->
-      <FilterButtons 
-        @filter-status="filterByStatus"
-      />
-
-      <!-- Táblázat komponens -->
       <Table 
-        :status-filter="statusFilter" 
         :is-dark-mode="isDarkMode"
       />
     </div>
@@ -28,7 +22,6 @@
 import Sidebar from '../components/Sidebar.vue';
 import Navbar_AdminPage from '../components/Navbar_AdminPage.vue';
 import Table from '../components/Table.vue';
-import FilterButtons from '../components/FilterButtons.vue';
 import auth from '../services/auth'; // token feldolgozásához
 
 export default {
@@ -36,8 +29,7 @@ export default {
   components: {
     Sidebar,
     Navbar_AdminPage,
-    Table,
-    FilterButtons
+    Table
   },
   props: {
     token: {
@@ -48,7 +40,6 @@ export default {
   data() {
     return {
       isDarkMode: localStorage.getItem('darkMode') === 'true' || false,
-      statusFilter: null,
       userImage: null,
       userName: null
     };
@@ -120,9 +111,6 @@ export default {
       } else {
         document.body.classList.remove('dark-mode');
       }
-    },
-    filterByStatus(status) {
-      this.statusFilter = status;
     }
   }
 };

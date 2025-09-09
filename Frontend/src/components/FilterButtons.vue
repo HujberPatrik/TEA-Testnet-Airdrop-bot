@@ -1,60 +1,18 @@
 <template>
   <div class="filter-buttons-container">
     <div class="btn-group" role="group" aria-label="Státusz szűrés">
-      <button 
-        class="btn status-filter-btn" 
-        :class="[
-          'status-processing-btn', 
-          { active: activeStatus === 0 }
-        ]"
-        @click="toggleStatusFilter(0)"
-        title="Feldolgozás alatt"
+      <!-- RÉGI 4 GOMB HELYETT -->
+      <button
+        v-for="cat in categories"
+        :key="cat.key"
+        class="btn status-filter-btn"
+        :class="[cat.class, { active: activeCategory === cat.key }]"
+        @click="toggleCategory(cat)"
+        :title="cat.label"
       >
-        <i class="fas fa-spinner fa-spin me-2"></i>
-        <span class="btn-text">Feldolgozás alatt</span>
-        <span class="count-badge">{{ statusCounts[0] }}</span>
-      </button>
-      
-      <button 
-        class="btn status-filter-btn" 
-        :class="[
-          'status-pending-btn', 
-          { active: activeStatus === 1 }
-        ]"
-        @click="toggleStatusFilter(1)"
-        title="Elfogadásra vár"
-      >
-        <i class="fas fa-clock me-2"></i>
-        <span class="btn-text">Elfogadásra vár</span>
-        <span class="count-badge">{{ statusCounts[1] }}</span>
-      </button>
-      
-      <button 
-        class="btn status-filter-btn" 
-        :class="[
-          'status-approved-btn', 
-          { active: activeStatus === 2 }
-        ]"
-        @click="toggleStatusFilter(2)"
-        title="Elfogadva"
-      >
-        <i class="fas fa-check-circle me-2"></i>
-        <span class="btn-text">Elfogadva</span>
-        <span class="count-badge">{{ statusCounts[2] }}</span>
-      </button>
-      
-      <button 
-        class="btn status-filter-btn" 
-        :class="[
-          'status-rejected-btn', 
-          { active: activeStatus === 3 }
-        ]"
-        @click="toggleStatusFilter(3)"
-        title="Elutasítva"
-      >
-        <i class="fas fa-times-circle me-2"></i>
-        <span class="btn-text">Elutasítva</span>
-        <span class="count-badge">{{ statusCounts[3] }}</span>
+        <i :class="cat.icon + ' me-2'"></i>
+        <span class="btn-text">{{ cat.label }}</span>
+        <span class="count-badge">{{ categoryCounts[cat.key] || 0 }}</span>
       </button>
     </div>
   </div>
@@ -65,6 +23,7 @@ import axios from 'axios';
 
 export default {
   name: 'FilterButtons',
+  emits: ['filter-status','filterStatus'],   // <<< HOZZÁADVA
   props: {
     events: {
       type: Array,
@@ -73,12 +32,81 @@ export default {
   },
   data() {
     return {
-      activeStatus: null,
-      statusCounts: {
-        0: 0, // Feldolgozás alatt
-        1: 0, // Elfogadásra vár
-        2: 0, // Elfogadva
-        3: 0  // Elutasítva
+      activeCategory: null,
+      categories: [                          // <<< ÁTRENDEZETT + ÚJ SZÍN KIOSZTÁS
+        {
+          key: 'beerkezett',
+          label: 'Beérkezett',
+          class: 'status-processing-btn',
+          icon: 'fas fa-inbox',
+          codes: [
+            'ARAJANLAT_KESZITES_FOLYAMATBAN',
+            'UF_ARAJANLATRA_VAR',
+            'UF_ARAJANLAT_ELFOGADASARA_VAR',
+            'ARAJANLAT_KESZITESERE_VAR',
+            'ARAJANLAT_ELFOGADASRA_VAR'
+          ]
+        },
+        {
+          key: 'megvalositas',
+          label: 'Megvalósítás',
+          class: 'status-contract-btn',          // kék
+          icon: 'fas fa-play-circle',
+          codes: [
+            'MEGVALOSITASRA_VAR',
+            'MEGVALOSULT_UF_IGAZOLASRA_VAR'
+          ]
+        },
+        {
+          key: 'elszamolas',
+          label: 'Elszámolás',
+          class: 'status-approved-btn',          // zöld
+          icon: 'fas fa-file-invoice-dollar',
+          codes: [
+            'UF_TIG_JOVAHAGYASRA_VAR',
+            'ADATKOZLO_GENERALASRA_VAR',
+            'ADATKOZLO_FELKULDVE'
+          ]
+        },
+        {
+          key: 'szerzodes',
+          label: 'Szerződés',
+          class: 'status-rejected-btn',          // piros
+          icon: 'fas fa-file-signature',
+          codes: [
+            'SZERZODES_ADATOKRA_VAR',
+            'SZERZODES_ATNEZESRE_VAR',
+            'SZERZODES_KIKULDESRE_VAR',
+            'SZERZODES_PARTNERI_ALAIRASRA_VAR',
+            'SZERZODES_EGYETEMI_ALAIRASRA_VAR',
+            'SZERZODES_ALAIRVA'
+          ]
+        },
+        {
+          key: 'lezart',
+          label: 'Lezárt',
+          class: 'status-pending-btn',           // szürke
+          icon: 'fas fa-archive',
+          codes: [
+            'LEZARVA',
+            'ELUTASITVA',
+            'LEMONDVA'
+          ]
+        }
+      ],
+      categoryCounts: {                         // <<< SZINKRONIZÁLT KULCSOK
+        beerkezett:0,
+        megvalositas:0,
+        elszamolas:0,
+        szerzodes:0,
+        lezart:0
+      },
+      legacyIntMap: {              // ha még érkezik régi integer
+        0: 'ARAJANLAT_KESZITES_FOLYAMATBAN',
+        1: 'UF_ARAJANLAT_ELFOGADASARA_VAR',
+        2: 'SZERZODES_ALAIRVA',
+        3: 'ELUTASITVA',
+        4: 'LEZARVA'
       }
     };
   },
@@ -86,8 +114,9 @@ export default {
     // Figyeljük az events prop változásait
     events: {
       immediate: true,
-      handler(newEvents) {
-        this.updateStatusCounts(newEvents);
+      deep: true,
+      handler(newVal) {
+        this.updateCategoryCounts(newVal);
       }
     }
   },
@@ -98,43 +127,55 @@ export default {
     }
   },
   methods: {
-    toggleStatusFilter(status) {
-      // Ha ugyanazt a gombot nyomjuk meg, akkor töröljük a szűrést
-      if (this.activeStatus === status) {
-        this.activeStatus = null;
-        this.$emit('filter-status', null);
+    toggleCategory(cat) {                       // <<< MÓDOSÍTVA (mindig tömb emit)
+      if (this.activeCategory === cat.key) {
+        this.activeCategory = null;
+        this.emitFilter([]);
       } else {
-        // Egyébként beállítjuk az új szűrési feltételt
-        this.activeStatus = status;
-        this.$emit('filter-status', status);
+        this.activeCategory = cat.key;
+        this.emitFilter(cat.codes);
       }
     },
-    updateStatusCounts(events) {
-      // Reseteljük a számlálót
-      this.statusCounts = {
-        0: 0,
-        1: 0,
-        2: 0,
-        3: 0
+    emitFilter(codes) {                         // <<< ÚJ
+      const arr = Array.isArray(codes) ? [...codes] : [];
+      this.$emit('filter-status', arr);
+      this.$emit('filterStatus', arr);
+    },
+    normalizeCode(raw) {                        // <<< BŐVÍTVE
+      if (raw === null || raw === undefined) return null;
+      if (typeof raw === 'number') return this.legacyIntMap[raw] || null;
+      return String(raw).trim().toUpperCase();
+    },
+    updateCategoryCounts(events) {              // <<< KULCSRÉSZ RENDEZVE
+      const counts = {
+        beerkezett:0,
+        megvalositas:0,
+        elszamolas:0,
+        szerzodes:0,
+        lezart:0
       };
-      
-      // Számoljuk meg az egyes státuszokat
-      if (events && Array.isArray(events)) {
-        events.forEach(event => {
-          if (event && typeof event.statusz === 'number' && event.statusz >= 0 && event.statusz <= 3) {
-            this.statusCounts[event.statusz]++;
-          }
+      if (Array.isArray(events)) {
+        events.forEach(ev => {
+          const code = this.normalizeCode(
+            ev.statusz ??
+            ev.status ??
+            ev.status_code ??
+            ev.statusz_code ??
+            ev.statusCode ??
+            (ev.statusz_meta && ev.statusz_meta.code)
+          );
+          if (!code) return;
+            const cat = this.categories.find(c => c.codes.includes(code));
+            if (cat) counts[cat.key] += 1;
         });
       }
+      this.categoryCounts = counts;
     },
     async fetchStatusCounts() {
       try {
-        // Lekérjük az összes eseményt egy API hívással
         const response = await axios.get('http://localhost:3000/api/kerveny');
         const events = response.data;
-        
-        // Frissítjük a számlálókat
-        this.updateStatusCounts(events);
+        this.updateCategoryCounts(events);   // <<< NÉV JAVÍTVA
       } catch (error) {
         console.error('Error fetching status counts:', error);
       }
@@ -242,6 +283,15 @@ export default {
 .status-rejected-btn:hover {
   background-color: #c9302c;
   border-color: #c9302c;
+}
+
+.status-contract-btn {
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+}
+.status-contract-btn:hover {
+  background-color: #0b5ed7;
+  border-color: #0b5ed7;
 }
 
 /* Reszponzív igazítások */

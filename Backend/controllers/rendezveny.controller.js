@@ -2,6 +2,37 @@ const pool = require('../config/db');
 const { sendSuccessEmail } = require('../emailService');
 require('dotenv').config();
 
+// ÚJ: támogatott státuszkódok + legacy numerikus mapping
+const ALLOWED_STATUS_CODES = [
+  'ARAJANLAT_KESZITES_FOLYAMATBAN',
+  'UF_ARAJANLATRA_VAR',
+  'UF_ARAJANLAT_ELFOGADASARA_VAR',
+  'ARAJANLAT_KESZITESERE_VAR',
+  'ARAJANLAT_ELFOGADASRA_VAR',
+  'SZERZODES_ADATOKRA_VAR',
+  'SZERZODES_ATNEZESRE_VAR',
+  'SZERZODES_KIKULDESRE_VAR',
+  'SZERZODES_PARTNERI_ALAIRASRA_VAR',
+  'SZERZODES_EGYETEMI_ALAIRASRA_VAR',
+  'SZERZODES_ALAIRVA',
+  'MEGVALOSITASRA_VAR',
+  'MEGVALOSULT_UF_IGAZOLASRA_VAR',
+  'UF_TIG_JOVAHAGYASRA_VAR',
+  'ADATKOZLO_GENERALASRA_VAR',
+  'ADATKOZLO_FELKULDVE',
+  'LEZARVA',
+  'ELUTASITVA',
+  'LEMONDVA'
+];
+
+const LEGACY_NUMERIC_MAP = {
+  0: 'ARAJANLAT_KESZITES_FOLYAMATBAN',
+  1: 'UF_ARAJANLAT_ELFOGADASARA_VAR',
+  2: 'SZERZODES_ALAIRVA',
+  3: 'ELUTASITVA',
+  4: 'LEZARVA'
+};
+
 // Összes kérvény lekérdezése
 const getAllKerveny = async (req, res) => {
   const sql = 'SELECT * FROM kerveny';
@@ -162,27 +193,145 @@ const updateKerveny = async (req, res) => {
   }
 };
 
-// Csak a kérvény státuszának frissítése
+// Helper: státusz rekord lekérése kódból vagy id-ból
+async function resolveStatusRecord(input) {
+  // input lehet: { code: 'ARAJANLAT_KESZITES_FOLYAMATBAN' } vagy { id: 3 }
+  if (!input) return null;
+  if (input.id) {
+    const { rows } = await pool.query(
+      'SELECT id, code, label, phase, terminal FROM statusz WHERE id = $1 AND active = TRUE',
+      [input.id]
+    );
+    return rows[0] || null;
+  }
+  if (input.code) {
+    const code = String(input.code).trim().toUpperCase();
+    const { rows } = await pool.query(
+      'SELECT id, code, label, phase, terminal FROM statusz WHERE code = $1 AND active = TRUE',
+      [code]
+    );
+    return rows[0] || null;
+  }
+  return null;
+}
+
+// Csak státusz frissítése (ÚJ / FELÜLÍR)
 const updateKervenyStatus = async (req, res) => {
   const { id } = req.params;
-  const { statusz } = req.body;
+  let { statusz, statusz_code, statusz_id } = req.body;
 
-  if (statusz === undefined) {
-    return res.status(400).json({ message: 'A státusz mező kötelező' });
+  if (
+    statusz === undefined &&
+    statusz_code === undefined &&
+    statusz_id === undefined
+  ) {
+    return res.status(400).json({ message: 'Adj meg statusz (kód) vagy statusz_id mezőt.' });
   }
 
-  const sql = `UPDATE kerveny SET statusz = $1 WHERE id = $2 RETURNING *`;
-
   try {
-    const result = await pool.query(sql, [statusz, id]);
-    if (result.rowCount === 0) {
-      res.status(404).json({ message: 'Nem található kérvény ilyen ID-val' });
-    } else {
-      res.status(200).json(result.rows[0]);
+    // Oszlopok + típusok felderítése
+    const colQuery = await pool.query(
+      `SELECT column_name, data_type
+       FROM information_schema.columns
+       WHERE table_name = 'kerveny'
+         AND column_name IN ('statusz_id','statusz');`
+    );
+    const cols = colQuery.rows;
+    const hasStatuszId = cols.some(c => c.column_name === 'statusz_id');
+    const hasStatuszText = cols.some(c => c.column_name === 'statusz');
+
+    // 1. Bemenet normalizálása -> kód lesz (upper)
+    let codeCandidate = statusz_code ?? statusz;
+    if (statusz_id != null) {
+      // Ha direkt id-t küldtek, megpróbáljuk kikeresni a kódját (opcionális)
+      const r = await pool.query(
+        'SELECT id, code FROM statusz WHERE id = $1 LIMIT 1',
+        [statusz_id]
+      );
+      if (!r.rowCount) {
+        return res.status(400).json({ message: 'Ismeretlen statusz_id.' });
+      }
+      codeCandidate = r.rows[0].code;
     }
+
+    if (!codeCandidate || String(codeCandidate).trim() === '') {
+      return res.status(400).json({ message: 'Üres státuszkód.' });
+    }
+    const statusCode = String(codeCandidate).trim().toUpperCase();
+
+    // 2. Lekérjük a statusz táblából (ha létezik)
+    let statusRecord = null;
+    try {
+      const sr = await pool.query(
+        `SELECT id, code, label, phase, terminal
+         FROM statusz
+         WHERE (code = $1 OR UPPER(code) = $1)
+           AND (active = TRUE OR active IS NULL)
+         LIMIT 1`,
+        [statusCode]
+      );
+      if (sr.rowCount) statusRecord = sr.rows[0];
+    } catch (e) {
+      // Ha nincs statusz tábla, egyszerűen haladunk tovább statusRecord nélkül
+      console.warn('[updateKervenyStatus] statusz tábla nem érhető el vagy lekérdezési hiba (nem kritikus átmenetileg).');
+    }
+
+    if (!statusRecord && !hasStatuszText && hasStatuszId) {
+      return res.status(400).json({ message: 'Ismeretlen státuszkód (és nincs text statusz mező fallback).' });
+    }
+
+    // 3. Döntés: melyik mezőt frissítjük
+    //    a) Ha van statusz_id integer mező és VAN numeric id (statusRecord.id számszerű)
+    //    b) Egyébként ha van text statusz mező -> azt frissítjük
+    //    c) Ha csak statusz_id van, de statusRecord nincs vagy id nem számszerű -> hiba
+    let updated;
+    if (hasStatuszId) {
+      // Ellenőrizzük hogy statusRecord.id használható-e integerként
+      const needsNumeric = cols.find(c => c.column_name === 'statusz_id')?.data_type.includes('int');
+      const numericId = statusRecord ? parseInt(statusRecord.id, 10) : NaN;
+
+      if (statusRecord && (!needsNumeric || !Number.isNaN(numericId))) {
+        // Normál FK update
+        const upd = await pool.query(
+          'UPDATE kerveny SET statusz_id = $1 WHERE id = $2 RETURNING *',
+          [numericId, id]
+        );
+        if (!upd.rowCount) return res.status(404).json({ message: 'Nem található kérvény.' });
+        updated = upd.rows[0];
+      } else if (hasStatuszText) {
+        // Fallback: text mező frissítése (átmeneti állapot)
+        const upd = await pool.query(
+          'UPDATE kerveny SET statusz = $1 WHERE id = $2 RETURNING *',
+          [statusCode, id]
+        );
+        if (!upd.rowCount) return res.status(404).json({ message: 'Nem található kérvény.' });
+        updated = upd.rows[0];
+      } else {
+        return res.status(500).json({
+          message: 'statusz_id integer mező van, de a statusz táblában nincs megfelelő numerikus id ehhez a kódhoz.'
+        });
+      }
+    } else if (hasStatuszText) {
+      // Csak text oszlop
+      const upd = await pool.query(
+        'UPDATE kerveny SET statusz = $1 WHERE id = $2 RETURNING *',
+        [statusCode, id]
+      );
+      if (!upd.rowCount) return res.status(404).json({ message: 'Nem található kérvény.' });
+      updated = upd.rows[0];
+    } else {
+      return res.status(500).json({ message: 'Nincs statusz/statusz_id oszlop a kerveny táblában.' });
+    }
+
+    // 4. Válasz (mindig adunk statusz kódot)
+    return res.status(200).json({
+      ...updated,
+      statusz: statusRecord ? statusRecord.code : statusCode,
+      statusz_meta: statusRecord || null
+    });
   } catch (error) {
-    console.error('Hiba a státusz frissítése során:', error);
-    res.status(500).json({ message: error.message });
+    console.error('updateKervenyStatus hiba:', error);
+    return res.status(500).json({ message: 'Belső hiba státusz frissítés közben.' });
   }
 };
 

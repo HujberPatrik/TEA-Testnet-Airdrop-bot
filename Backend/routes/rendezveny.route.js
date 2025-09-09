@@ -7,7 +7,7 @@ router.get('/kerveny', getAllKerveny);
 router.get('/kerveny/:id', getKervenyById);
 router.post('/kerveny', insertKerveny);
 router.put('/kerveny/:id', updateKerveny);
-router.patch('/kerveny/:id/status', updateKervenyStatus); // Új végpont csak a státusz frissítéséhez
+router.patch('/kerveny/:id/status', updateKervenyStatus);
 
 module.exports = router;
 

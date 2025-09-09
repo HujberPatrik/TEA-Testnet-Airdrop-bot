@@ -182,7 +182,9 @@ export default {
       exportStatus: {
         isLoading: false,
         error: null
-      }
+      },
+      archivedStatusCodes: ['LEZARVA','ELUTASITVA','LEMONDVA'],          // ÚJ
+      legacyNumericToCode: { 3: 'ELUTASITVA', 4: 'LEZARVA' }             // ÚJ
     };
   },
   computed: {
@@ -195,8 +197,18 @@ export default {
     sortedAndFilteredEvents() {
       let filteredEvents = [...this.events];
       
-      // Csak archivált elemek megjelenítése (statusz = 4)
-      filteredEvents = filteredEvents.filter(event => event.statusz === 4);
+      // Csak a LEZÁRT kategóriába tartozó státuszok
+      filteredEvents = filteredEvents.filter(event => {
+        const v = event.statusz;
+        if (typeof v === 'string') {
+          return this.archivedStatusCodes.includes(v.toUpperCase());
+        }
+        if (typeof v === 'number') {
+          const code = this.legacyNumericToCode[v];
+            return code ? this.archivedStatusCodes.includes(code) : false;
+        }
+        return false;
+      });
       
       // Név/leírás szűrés
       if (this.filters.name) {

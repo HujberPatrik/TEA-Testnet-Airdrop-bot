@@ -6,8 +6,14 @@
         <h3>{{ event.nev }}</h3>
         <div class="header-controls">
           <div class="status-controls">
-            <div class="event-status" :class="getStatusClass(getStatusText(event.statusz))">
-              {{ getStatusText(event.statusz) }}
+            <!-- ÚJ státusz megjelenítés -->
+            <div
+              class="event-status"
+              :class="getStatusClassFromCode(normalizedStatus)"
+              :title="getStatusLabel(normalizedStatus)"
+            >
+              <i :class="getStatusIcon(normalizedStatus)"></i>
+              {{ getStatusLabel(normalizedStatus) }}
             </div>
             <button class="status-change-button" @click="openStatusModal" title="Státusz módosítása">
               <i class="fas fa-pen"></i>
@@ -426,20 +432,31 @@
   </div>
 
   <!-- Státusz módosító popup -->
-  <div class="status-modal" v-if="statusModalVisible" @click.self="statusModalVisible = false">
+  <div class="status-modal" v-if="statusModalVisible" @click.self="closeStatusModal">
     <div class="status-modal-content">
       <h3>Státusz módosítása</h3>
-      <div class="status-options">
-        <div class="status-option" v-for="status in [0, 1, 2, 3, 4]" :key="status">
-          <input
-            type="radio"
-            :id="'status-' + status"
-            :value="status"
-            v-model="selectedStatus"
-          />
-          <label :for="'status-' + status" class="status-label" :class="getStatusClass(getStatusText(status))">
-            {{ getStatusText(status) }}
-          </label>
+      <div class="status-options status-options--wide">
+        <div
+          class="status-phase-group"
+          v-for="grp in groupedStatuses"
+          :key="grp.phase"
+        >
+          <h5>{{ phaseLabel(grp.phase) }}</h5>
+          <div class="status-option" v-for="s in grp.items" :key="s.code">
+            <input
+              type="radio"
+              :id="'status-' + s.code"
+              :value="s.code"
+              v-model="selectedStatus"
+            />
+            <label
+              :for="'status-' + s.code"
+              class="status-label"
+              :class="['phase-' + s.phase.toLowerCase(), s.terminal ? 'terminal':'']"
+            >
+              {{ s.label }}
+            </label>
+          </div>
         </div>
       </div>
       <div class="status-buttons">
@@ -452,18 +469,31 @@
 
 <script>
 import axios from 'axios';
+import { STATUSES, TERMINAL_STATUS_CODES } from '@/constants/statuses.js';
+
+const STATUS_MAP = STATUSES.reduce((a,s)=>{a[s.code]=s;return a;}, {});
+const PHASE_LABELS = {
+  BEERKEZETT: 'Beérkezett',
+  SZERZODES: 'Szerződés',
+  MEGVALOSITAS: 'Megvalósítás',
+  ELSZAMOLAS: 'Elszámolás',
+  LEZART: 'Lezárt'
+};
+
+// Régi numerikus -> új kód fallback (ha a backend még számot küld)
+const LEGACY_NUMERIC_MAP = {
+  0: 'ARAJANLAT_KESZITES_FOLYAMATBAN',
+  1: 'UF_ARAJANLAT_ELFOGADASARA_VAR',
+  2: 'SZERZODES_ALAIRVA',
+  3: 'ELUTASITVA',
+  4: 'LEZARVA'
+};
 
 export default {
   name: 'ModificationPopup',
   props: {
-    isDarkMode: {
-      type: Boolean,
-      default: false
-    },
-    event: {
-      type: Object,
-      default: null
-    }
+    isDarkMode: { type: Boolean, default: false },
+    event: { type: Object, default: null }
   },
   data() {
     return {
@@ -476,11 +506,33 @@ export default {
       saveError: null
     };
   },
+  computed: {
+    // Normalizált státusz kód (szám -> kód)
+    normalizedStatus() {
+      if (!this.event) return null;
+      const raw = this.event.statusz;
+      if (typeof raw === 'number') return LEGACY_NUMERIC_MAP[raw] || null;
+      return raw;
+    },
+    groupedStatuses() {
+      const groups = {};
+      STATUSES.forEach(s => {
+        if (!groups[s.phase]) groups[s.phase] = [];
+        groups[s.phase].push(s);
+      });
+      return Object.keys(groups)
+        .sort((a,b)=>a.localeCompare(b))
+        .map(phase => ({
+          phase,
+          items: groups[phase].sort((a,b)=>a.sort_order - b.sort_order)
+        }));
+    }
+  },
   watch: {
     event: {
-      handler(newEvent) {
-        if (newEvent) {
-          this.editedEvent = JSON.parse(JSON.stringify(newEvent));
+      handler(ne) {
+        if (ne) {
+          this.editedEvent = JSON.parse(JSON.stringify(ne));
           this.prepareEditedEventData();
           this.activeTab = 'basic';
           this.editMode = false;
@@ -491,224 +543,151 @@ export default {
     }
   },
   methods: {
+    // ===== ÚJ státusz helper függvények =====
+    getStatusLabel(code) {
+      return STATUS_MAP[code]?.label || code || 'Ismeretlen';
+    },
+    getStatusPhase(code) {
+      return STATUS_MAP[code]?.phase || '';
+    },
+    isTerminal(code) {
+      return TERMINAL_STATUS_CODES.includes(code);
+    },
+    getStatusClassFromCode(code) {
+      const s = STATUS_MAP[code];
+      if (!s) return 'status-unknown';
+      return [
+        'phase-' + s.phase.toLowerCase(),
+        s.terminal ? 'terminal' : ''
+      ].join(' ');
+    },
+    getStatusIcon(code) {
+      const phase = this.getStatusPhase(code);
+      if (this.isTerminal(code)) return 'fas fa-flag-checkered';
+      const iconMap = {
+        BEERKEZETT:'fas fa-inbox',
+        SZERZODES:'fas fa-file-signature',
+        MEGVALOSITAS:'fas fa-tasks',
+        ELSZAMOLAS:'fas fa-calculator',
+        LEZART:'fas fa-lock'
+      };
+      return iconMap[phase] || 'fas fa-tag';
+    },
+    phaseLabel(phase) {
+      return PHASE_LABELS[phase] || phase;
+    },
+    // ========================================
+
     prepareEditedEventData() {
       if (!this.editedEvent) return;
-      
-      // Boolean konverzió radio button értékekké
-      const booleanFields = ['sajto', 'szallasigeny', 'parkolo', 'internet', 'hulladek', 
-          'oktatastechnika', 'korlatozott_mozgas', 'foto', 'cater', 'epites',
-          'takaritas', 'takaritas_alatt', 'vegyi_anyag', 'tuzveszelyes_tevekenyseg', 
-          'dekoracio', 'portaszolgalat', 'tovabbi_szervezo'];
-          
-      booleanFields.forEach(field => {
-          if (typeof this.editedEvent[field] === 'boolean') {
-              this.editedEvent[field] = this.editedEvent[field] ? 'igen' : 'nem';
-          }
+      const booleanFields = ['sajto','szallasigeny','parkolo','internet','hulladek',
+        'oktatastechnika','korlatozott_mozgas','foto','cater','epites',
+        'takaritas','takaritas_alatt','vegyi_anyag','tuzveszelyes_tevekenyseg',
+        'dekoracio','portaszolgalat','tovabbi_szervezo'];
+      booleanFields.forEach(f=>{
+        if (typeof this.editedEvent[f] === 'boolean')
+          this.editedEvent[f] = this.editedEvent[f] ? 'igen':'nem';
       });
-
-      // Formázd a dátum mezőket a megfelelő formátumra
-      if (this.editedEvent.kezdo_datum) {
-          this.editedEvent.kezdo_datum = this.formatDateForInput(this.editedEvent.kezdo_datum);
-      }
-      if (this.editedEvent.veg_datum) {
-          this.editedEvent.veg_datum = this.formatDateForInput(this.editedEvent.veg_datum);
-      }
-      if (this.editedEvent.epites_kezdet) {
-          this.editedEvent.epites_kezdet = this.formatDateForInput(this.editedEvent.epites_kezdet);
-      }
-      if (this.editedEvent.epites_veg) {
-          this.editedEvent.epites_veg = this.formatDateForInput(this.editedEvent.epites_veg);
-      }
-
-      // Formázd vissza a catering_tipus mezőt tömbbé
+      ['kezdo_datum','veg_datum','epites_kezdet','epites_veg'].forEach(f=>{
+        if (this.editedEvent[f]) this.editedEvent[f] = this.formatDateForInput(this.editedEvent[f]);
+      });
       if (this.editedEvent.catering_tipus) {
-          try {
-              this.editedEvent.catering_tipus = JSON.parse(this.editedEvent.catering_tipus);
-          } catch (e) {
-              console.error('Hiba a catering_tipus formázása során:', e);
-              this.editedEvent.catering_tipus = [];
-          }
+        try { this.editedEvent.catering_tipus = JSON.parse(this.editedEvent.catering_tipus); }
+        catch { this.editedEvent.catering_tipus = []; }
       }
     },
-    
-    closeEventDetails() {
-      this.$emit('close');
-      document.body.style.overflow = '';
-    },
-    
-    toggleEditMode() {
-      if (!this.editMode) {
-        this.editedEvent = JSON.parse(JSON.stringify(this.event));
-        this.prepareEditedEventData();
-        this.activeTab = 'basic';
-      }
-      this.editMode = !this.editMode;
-    },
-    
-    cancelEdit() {
-      this.editMode = false;
-      this.editedEvent = JSON.parse(JSON.stringify(this.event));
-      this.prepareEditedEventData();
-    },
-    
     openStatusModal() {
-      this.selectedStatus = this.event.statusz;
+      this.selectedStatus = this.normalizedStatus;
       this.statusModalVisible = true;
     },
-    
+    closeStatusModal() {
+      this.statusModalVisible = false;
+    },
     async changeStatus(newStatus) {
-      if (!this.event) return;
-
-      // Megerősítés kérése archiválás előtt
-      if (newStatus === 4) {
-        if (!confirm('Biztosan archiválni szeretné ezt az eseményt? Az archivált események nem fognak megjelenni a táblázatban.')) {
-          return;
-        }
-      }
-
+      if (!this.event || !newStatus) return;
       try {
-        // Csak a státuszt módosítjuk, más adatot nem érintünk
-        const response = await axios.patch(
+        const resp = await axios.patch(
           `http://localhost:3000/api/kerveny/${this.event.id}/status`,
           { statusz: newStatus }
         );
-
-        if (response.status === 200) {
+        if (resp.status === 200) {
           this.statusModalVisible = false;
           this.$emit('status-updated', { ...this.event, statusz: newStatus });
-          
-          // Archiválás esetén külön üzenet
-          if (newStatus === 4) {
-            this.$emit('close'); // Bezárjuk a részletezőt
-            this.$emit('archived', this.event.id); // Értesítjük a szülő komponenst az archiválásról
+          if (this.isTerminal(newStatus)) {
+            this.$emit('close');
+            this.$emit('archived', this.event.id);
           }
         }
-      } catch (error) {
-        console.error('Hiba a státusz módosítása során:', error);
-        alert('Nem sikerült módosítani a státuszt. Próbálja újra később!');
+      } catch (e) {
+        console.error(e);
+        alert('Státusz módosítás sikertelen.');
       }
-    },
-    
+    }, // ===== A RÉGI getStatusText / getStatusClass ELTÁVOLÍTVA =====
     formatDateTime(date, time) {
       if (!date) return 'Nincs megadva';
-      
-      const formattedDate = new Date(date).toLocaleDateString('hu-HU', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-      
-      if (time) {
-        return `${formattedDate}, ${time.substring(0, 5)}`;
-      }
-      
+      const d = new Date(date);
+      const formattedDate = d.toLocaleDateString('hu-HU', { year:'numeric', month:'long', day:'numeric' });
+      if (time) return `${formattedDate}, ${time.substring(0,5)}`;
       return formattedDate;
     },
-    
     formatCateringType(cateringType) {
       if (!cateringType) return 'Nincs megadva';
-      
       try {
-        const types = JSON.parse(cateringType);
+        const types = typeof cateringType === 'string' ? JSON.parse(cateringType) : cateringType;
         return Array.isArray(types) ? types.join(', ') : cateringType;
-      } catch (e) {
+      } catch {
         return cateringType;
       }
     },
-    
-    getStatusText(statusId) {
-      const statusMap = {
-        0: 'Feldolgozás alatt',
-        1: 'Elfogadásra vár',
-        2: 'Elfogadva',
-        3: 'Elutasítva',
-        4: 'Archivált'
-      };
-      
-      return statusMap[statusId] || 'Ismeretlen';
-    },
-
-    getStatusClass(statusText) {
-      const classMap = {
-        'Feldolgozás alatt': 'status-processing',
-        'Elfogadásra vár': 'status-pending',
-        'Elfogadva': 'status-approved',
-        'Elutasítva': 'status-rejected',
-        'Archivált': 'status-archived'
-      };
-      
-      return classMap[statusText] || '';
-    },
-    
     async saveChanges() {
       try {
         this.isSaving = true;
         this.saveError = null;
-
-        // Készíts másolatot az API híváshoz
         const eventToSave = { ...this.editedEvent };
 
-        // Ellenőrizd a catering_tipus hosszát és formázd JSON stringgé
         if (eventToSave.catering_tipus && Array.isArray(eventToSave.catering_tipus)) {
           const jsonString = JSON.stringify(eventToSave.catering_tipus);
-          if (jsonString.length > 300) {
-            throw new Error('A catering_tipus mező hossza meghaladja a 300 karaktert.');
-          }
-          eventToSave.catering_tipus = jsonString; // Formázás JSON stringgé
+            if (jsonString.length > 300) {
+              throw new Error('A catering_tipus mező hossza meghaladja a 300 karaktert.');
+            }
+          eventToSave.catering_tipus = jsonString;
         }
 
-        // Boolean konverziók visszafelé
-        const booleanFields = ['sajto', 'szallasigeny', 'parkolo', 'internet', 'hulladek', 
-          'oktatastechnika', 'korlatozott_mozgas', 'foto', 'cater', 'epites',
-          'takaritas', 'takaritas_alatt', 'vegyi_anyag', 'tuzveszelyes_tevekenyseg', 
-          'dekoracio', 'portaszolgalat', 'tovabbi_szervezo'];
-          
-        booleanFields.forEach(field => {
-          if (eventToSave[field] === 'igen') {
-            eventToSave[field] = true;
-          } else if (eventToSave[field] === 'nem') {
-            eventToSave[field] = false;
-          }
+        const booleanFields = ['sajto','szallasigeny','parkolo','internet','hulladek',
+          'oktatastechnika','korlatozott_mozgas','foto','cater','epites',
+          'takaritas','takaritas_alatt','vegyi_anyag','tuzveszelyes_tevekenyseg',
+          'dekoracio','portaszolgalat','tovabbi_szervezo'];
+        booleanFields.forEach(f=>{
+          if (eventToSave[f] === 'igen') eventToSave[f] = true;
+          else if (eventToSave[f] === 'nem') eventToSave[f] = false;
         });
 
-        // Alakítsd vissza a dátumokat ISO 8601 formátumra
-        if (eventToSave.kezdo_datum) {
-          eventToSave.kezdo_datum = new Date(eventToSave.kezdo_datum).toISOString();
-        }
-        if (eventToSave.veg_datum) {
-          eventToSave.veg_datum = new Date(eventToSave.veg_datum).toISOString();
-        }
-        if (eventToSave.epites_kezdet) {
-          eventToSave.epites_kezdet = new Date(eventToSave.epites_kezdet).toISOString();
-        }
-        if (eventToSave.epites_veg) {
-          eventToSave.epites_veg = new Date(eventToSave.epites_veg).toISOString();
-        }
+        ['kezdo_datum','veg_datum','epites_kezdet','epites_veg'].forEach(f=>{
+          if (eventToSave[f]) eventToSave[f] = new Date(eventToSave[f]).toISOString();
+        });
 
-        // API hívás a módosításhoz
         const response = await axios.put(
           `http://localhost:3000/api/kerveny/${eventToSave.id}`,
           eventToSave
         );
-
-        console.log('Sikeres frissítés:', response.data);
-
-        // A szülő komponens értesítése a sikeres mentésről
         this.$emit('event-updated', response.data);
-        
-        this.editMode = false; // Kilépés a szerkesztési módból
-      } catch (error) {
-        console.error('Hiba a mentés során:', error);
-        this.saveError = error.message || 'Nem sikerült menteni a módosításokat.';
+        this.editMode = false;
+      } catch (e) {
+        console.error(e);
+        this.saveError = e.message || 'Nem sikerült menteni a módosításokat.';
       } finally {
         this.isSaving = false;
       }
     },
-    
-    formatDateForInput(dateString) {
-      if (!dateString) return '';
-      const date = new Date(dateString);
-      return date.toISOString().slice(0, 10);
+    formatDateForInput(ds) {
+      if (!ds) return '';
+      return new Date(ds).toISOString().slice(0,10);
+    },
+    toggleEditMode() { this.editMode = !this.editMode; },
+    cancelEdit() { this.editMode = false; this.prepareEditedEventData(); },
+    closeEventDetails() {
+      this.$emit('close');
+      document.body.style.overflow = '';
     }
   }
 };
@@ -925,6 +904,18 @@ export default {
 
 .status-options {
   margin-bottom: 20px;
+}
+
+.status-phase-group {
+  margin-bottom: 1rem;
+}
+
+.status-phase-group h5 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 0.4rem;
+  opacity: 0.8;
 }
 
 .status-option {
@@ -1183,6 +1174,83 @@ export default {
   color: #e4e6eb;
 }
 
+/* Új státusz stílusok (átveszi a Table.vue logikát) */
+.event-status {
+  display:inline-flex;
+  align-items:center;
+  gap:.35rem;
+  padding:4px 10px;
+  border-radius:4px;
+  font-size:.8rem;
+  font-weight:600;
+}
+
+.event-status i { font-size:.75rem; }
+
+.phase-beerkezett { background:#fde8cc; color:#a65f00; }
+.phase-szerzodes { background:#ffe0e3; color:#9d1d30; }
+.phase-megvalositas { background:#d8eefc; color:#05537a; }
+.phase-elszamolas { background:#e1f5e8; color:#1f6d3f; }
+.phase-lezart { background:#e0e0e0; color:#555; }
+.event-status.terminal {
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.08);
+}
+
+.status-unknown { background:#ccc; color:#333; }
+
+/* Státusz modal csoportosítás */
+.status-phase-group + .status-phase-group {
+  margin-top:1rem;
+  padding-top:.75rem;
+  border-top:1px solid #e5e5e5;
+}
+.status-phase-group h5 {
+  font-size:.85rem;
+  text-transform:uppercase;
+  letter-spacing:.5px;
+  margin:0 0 .4rem;
+  opacity:.8;
+}
+
+.status-option {
+  display:flex;
+  align-items:center;
+  gap:.5rem;
+  margin-bottom:.4rem;
+  flex-wrap:wrap;
+}
+
+.status-label {
+  cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  gap:.4rem;
+  border-radius:12px;
+  padding:.3rem .65rem;
+  font-size:.7rem;
+  font-weight:600;
+  border:1px solid transparent;
+  background:#f5f5f5;
+  color:#333;
+  transition:.15s;
+}
+
+.status-option input[type="radio"]:checked + .status-label {
+  border-color:#50adc9;
+  box-shadow:0 0 0 2px rgba(80,173,201,.25);
+}
+
+.status-label.phase-beerkezett { background:#fde8cc; color:#a65f00; }
+.status-label.phase-szerzodes { background:#ffe0e3; color:#9d1d30; }
+.status-label.phase-megvalositas { background:#d8eefc; color:#05537a; }
+.status-label.phase-elszamolas { background:#e1f5e8; color:#1f6d3f; }
+.status-label.phase-lezart { background:#e0e0e0; color:#555; }
+.status-label.terminal { filter:brightness(.95); }
+
+.status-label:hover {
+  transform:translateY(-2px);
+}
+
 /* Reszponzivitás kiegészítések */
 @media (max-width: 576px) {
   .edit-tab-content .col-md-6 {
@@ -1206,6 +1274,62 @@ export default {
   .nav-tabs .nav-link {
     padding: 0.4rem 0.75rem;
     font-size: 0.9rem;
+  }
+}
+
+/* === Wide (16:9) elrendezés: ugyanaz a dizájn, csak több hasáb === */
+.status-modal-content {
+  max-width: 960px; /* szélesebb, hogy kiférjen vízszintesen */
+  width: 92%;
+}
+
+.status-options.status-options--wide {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 28px 48px; /* sor / oszloptávolság */
+  margin-bottom: 20px;
+}
+
+/* 5 csoport: próbáljuk 3 + 2 elosztásban (rugalmas) */
+.status-options.status-options--wide .status-phase-group {
+  flex: 1 1 260px;
+  max-width: 300px;
+  margin: 0;
+  padding: 0;
+}
+
+/* Eltávolítjuk a vertikális stack-hez tartozó felső szeparátort */
+.status-options.status-options--wide .status-phase-group + .status-phase-group {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+  border-top: none !important;
+}
+
+/* A belső elemek közti eredeti térköz megmarad, csak finom igazítás */
+.status-options.status-options--wide .status-option {
+  margin-bottom: 6px;
+}
+
+/* Nagyobb kijelzőn kicsit szűkebb badge-ek hogy több kiférjen */
+@media (min-width: 1100px) {
+  .status-options.status-options--wide .status-label {
+    font-size: 0.68rem;
+    padding: .28rem .6rem;
+  }
+}
+
+/* Kisebb kijelzőn visszaáll az eredeti (egyoszlopos) elrendezés */
+@media (max-width: 820px) {
+  .status-options.status-options--wide {
+    display: block;
+  }
+  .status-options.status-options--wide .status-phase-group {
+    margin-bottom: 1.25rem;
+  }
+  .status-options.status-options--wide .status-phase-group + .status-phase-group {
+    border-top: 1px solid #e5e5e5 !important;
+    padding-top: .75rem
   }
 }
 </style>
