@@ -84,7 +84,7 @@ export default {
           neptune_code: (this.neptunKod || '').trim().toUpperCase(),
           password: this.password
         }, { timeout: 10000 });
-
+        localStorage.setItem('auth_user', JSON.stringify(response.data.user));
         console.log('[login] response received', response.status, response.data);
         const { token } = response.data || {};
         if (!token) {

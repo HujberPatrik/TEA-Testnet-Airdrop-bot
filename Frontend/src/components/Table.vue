@@ -145,16 +145,16 @@
   </div>
 
   <!-- A ModificationPopup komponens használata az esemény részletes megjelenítéséhez -->
-  <ModificationPopup 
-    ref="modPopup"
+  <ModificationPopup
     v-if="selectedEvent"
-    :event="selectedEvent" 
+    :event="selectedEvent"
     :is-dark-mode="isDarkMode"
-    @close="closeEventDetails"
-    @status-updated="handleStatusUpdated"
-    @event-updated="handleEventUpdated"
-    @archived="handleArchived"
-  />
+    :userRole="effectiveUserRole"
+    @close="selectedEvent = null"
+    @status-updated="onStatusUpdated"
+    @event-updated="onEventUpdated"
+    @refresh-events="fetchEvents"
+  ></ModificationPopup>
 
   <!-- Opcionális - Exportálási állapot jelző -->
   <div v-if="exportStatus.isLoading" class="position-fixed bottom-0 end-0 p-3">
@@ -181,11 +181,11 @@
 
 <script>
 import axios from 'axios';
-import ModificationPopup from './ModificationPopup.vue';
 import ServiceCostCalculator from './ServiceCostCalculator.vue';
 import FilterButtons from './FilterButtons.vue'; // <<< ÚJ
 import { STATUSES, TERMINAL_STATUS_CODES } from '@/constants/statuses.js';
-
+import ModificationPopup from '@/components/ModificationPopup.vue';
+import auth from '../services/auth';
 
 const STATUS_MAP = STATUSES.reduce((a,s)=>{a[s.code]=s;return a;}, {});
 // Régi numerikus -> új kód (ha backend még nem frissült)
@@ -198,7 +198,7 @@ const LEGACY_NUMERIC_MAP = {
 };
 
 export default {
-  components: { ModificationPopup, ServiceCostCalculator, FilterButtons }, // <<< BŐVÍTVE
+  components: { ServiceCostCalculator, FilterButtons, ModificationPopup }, // <<< BŐVÍTVE
   props: {
     isDarkMode: { type: Boolean, default: false },
     hideTerminal: { type: Boolean, default: true } // statusFilter prop törölhető
@@ -215,7 +215,8 @@ export default {
       exportStatus: { isLoading: false, error: null },
       showCostModal: false,
       costEvent: null,
-      statusFilterCodes: [] // <<< ÚJ (kategória szűrés)
+      statusFilterCodes: [], // <<< ÚJ (kategória szűrés)
+      currentUser: null                    // <<< HOZZÁADVA
     };
   },
   computed: {
@@ -282,7 +283,14 @@ export default {
         const res = av > bv ? 1 : (av < bv ? -1 : 0);
         return this.sortDirection === 'asc' ? res : -res;
       });
+    },
+    effectiveUserRole() {                  // <<< HOZZÁADVA
+      return JSON.parse(localStorage.getItem('auth_user'));
     }
+  },
+  created() {
+    this.fetchEvents();
+    this.fetchCurrentUser();               // <<< HOZZÁADVA
   },
   methods: {
     normalizeStatusCode(raw) {
@@ -337,6 +345,15 @@ export default {
         this.loading = false;
       }
     },
+    async fetchCurrentUser() {             // <<< HOZZÁADVA
+      try {
+        const r = await axios.get('http://localhost:3000/api/auth/me', { withCredentials: true });
+        this.currentUser = r.data;
+        localStorage.setItem('user', JSON.stringify(r.data));
+      } catch {
+        this.currentUser = null;
+      }
+    },
     sortBy(col) {
       if (this.sortColumn === col) {
         this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
@@ -362,12 +379,12 @@ export default {
       this.selectedEvent = null;
       document.body.style.overflow = '';
     },
-    handleStatusUpdated(updatedEvent) {
-      this.selectedEvent = updatedEvent;
+    onStatusUpdated(updated) {             // (ha még nincs, csak példa – lehet hogy már létezik)
+      this.selectedEvent = updated;
       this.fetchEvents();
     },
-    handleEventUpdated(updatedEvent) {
-      this.selectedEvent = updatedEvent;
+    onEventUpdated(updated) {
+      this.selectedEvent = updated;
       this.fetchEvents();
     },
     handleArchived() {

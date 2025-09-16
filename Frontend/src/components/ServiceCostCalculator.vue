@@ -106,6 +106,7 @@ export default {
     const error = ref('');
     const prices = ref([]);
     const rows = reactive([]);
+    const saving = ref(false);
 
     const storageKey = (eventId) => `serviceCalc:${eventId ?? 'global'}`;
 
@@ -285,21 +286,45 @@ export default {
       if (modalInstance) modalInstance.hide();
     };
 
-    const apply = () => {
+    const saveAndAdvanceStatus = async (payload) => {
+      if (!props.event || props.event.id == null) return;
+      saving.value = true;
+      try {
+        const res = await fetch(`/api/kerveny/${props.event.id}/costs/commit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error('Mentés hiba');
+        return await res.json();
+      } finally {
+        saving.value = false;
+      }
+    };
+
+    const apply = async () => {
       const breakdown = rows.map(r => {
         const p = findPriceById(r.serviceId);
         return {
-           serviceId: r.serviceId,
-           serviceName: p ? p.name : null,
-           hours: (r.hours === '' ? 0 : (Number(r.hours) || 0)),
-           persons: (r.persons === '' ? 0 : (Number(r.persons) || 0)),
-           unitPrice: getRowUnitPrice(r),
-           lineTotal: getRowTotal(r),
-           unit: p ? p.unit : null,
-           rateKey: r.rateKey
-         };
+          serviceId: r.serviceId,
+          serviceName: p ? p.name : null,
+          hours: (r.hours === '' ? 0 : (Number(r.hours) || 0)),
+          persons: (r.persons === '' ? 0 : (Number(r.persons) || 0)),
+          unitPrice: getRowUnitPrice(r),
+          lineTotal: getRowTotal(r),
+          unit: p ? p.unit : null,
+          rateKey: r.rateKey
+        };
       });
-      // save before emitting
+
+      const payload = { breakdown, total: total.value };
+      try {
+        await saveAndAdvanceStatus(payload);
+      } catch (e) {
+        error.value = e.message || 'Mentési hiba';
+        return;
+      }
+
       if (props.event && props.event.id != null) saveState(props.event.id);
       emit('calculated', { event: props.event, breakdown, total: total.value });
       hide();
@@ -313,7 +338,7 @@ export default {
       modal, loading, prices, rows, addRow, removeRow,
       getRowUnitPrice, getRowTotal, total, formatMoney,
       show, hide, apply, error, onServiceChange, getRowUnitText,
-      clearState
+      clearState, saving
     };
   }
 };

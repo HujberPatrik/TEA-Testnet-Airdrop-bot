@@ -1,4 +1,11 @@
 export const STATUSES = [
+  {
+    code: 'BEERKEZETT',          // <<< ÚJ
+    label: 'Beérkezett',
+    phase: 'BEERKEZETT',
+    terminal: false,
+    sort_order: 1
+  },
   { code: 'ARAJANLAT_KESZITES_FOLYAMATBAN', label: 'Árajánlat készítés folyamatban', phase: 'BEERKEZETT', sort_order: 10 },
   { code: 'UF_ARAJANLATRA_VAR',            label: 'UF Árajánlatra vár',              phase: 'BEERKEZETT', sort_order: 20 },
   { code: 'UF_ARAJANLAT_ELFOGADASARA_VAR', label: 'UF Árajánlat elfogadására vár',   phase: 'BEERKEZETT', sort_order: 30 },

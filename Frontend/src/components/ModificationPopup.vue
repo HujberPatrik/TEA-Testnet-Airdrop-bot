@@ -414,15 +414,31 @@
         </div>
       </div>
       <div class="event-details-footer">
-        <button v-if="editMode" class="btn btn-secondary" @click="cancelEdit">Mégsem</button>
-        <button v-if="editMode" class="btn btn-primary" @click="saveChanges" :disabled="isSaving">
-          <span v-if="isSaving">
-            <i class="fas fa-spinner fa-spin me-1"></i> Mentés...
-          </span>
-          <span v-else>Mentés</span>
-        </button>
-        <button v-if="!editMode" class="btn btn-secondary" @click="closeEventDetails">Bezárás</button>
-        <button v-if="!editMode" class="btn btn-primary" @click="toggleEditMode">Szerkesztés</button>
+        <div class="footer-left">
+          <!-- Admin / Főadmin / Uni-Famulus -->
+          <button
+            v-if="userRole.role == 'Admin' || userRole.role == 'Főadmin'"
+            class="btn btn-success admin-accept-btn"
+            @click="acceptUfQuote"
+            :disabled="statusChanging"
+            title="Státusz váltás: UF Árajánlatra vár"
+          >
+            <i v-if="!statusChanging" class="fas fa-check-circle me-1"></i>
+            <i v-else class="fas fa-spinner fa-spin me-1"></i>
+            Elfogadás
+          </button>
+        </div>
+        <div class="footer-right">
+          <button v-if="editMode" class="btn btn-secondary" @click="cancelEdit">Mégsem</button>
+          <button v-if="editMode" class="btn btn-primary" @click="saveChanges" :disabled="isSaving">
+            <span v-if="isSaving">
+              <i class="fas fa-spinner fa-spin me-1"></i> Mentés...
+            </span>
+            <span v-else>Mentés</span>
+          </button>
+          <button v-if="!editMode" class="btn btn-secondary" @click="closeEventDetails">Bezárás</button>
+          <button v-if="!editMode" class="btn btn-primary" @click="toggleEditMode">Szerkesztés</button>
+        </div>
       </div>
       
       <div v-if="saveError" class="alert alert-danger mt-3">
@@ -470,6 +486,7 @@
 <script>
 import axios from 'axios';
 import { STATUSES, TERMINAL_STATUS_CODES } from '@/constants/statuses.js';
+import { isAdminRole } from '@/constants/roles.js'; // <<< ÚJ
 
 const STATUS_MAP = STATUSES.reduce((a,s)=>{a[s.code]=s;return a;}, {});
 const PHASE_LABELS = {
@@ -480,9 +497,10 @@ const PHASE_LABELS = {
   LEZART: 'Lezárt'
 };
 
-// Régi numerikus -> új kód fallback (ha a backend még számot küld)
+const PHASE_ORDER = ['BEERKEZETT','SZERZODES','MEGVALOSITAS','ELSZAMOLAS','LEZART']; // <<< ÚJ
+
 const LEGACY_NUMERIC_MAP = {
-  0: 'ARAJANLAT_KESZITES_FOLYAMATBAN',
+  0: 'BEERKEZETT',              // <<< MÓDOSÍTVA
   1: 'UF_ARAJANLAT_ELFOGADASARA_VAR',
   2: 'SZERZODES_ALAIRVA',
   3: 'ELUTASITVA',
@@ -493,7 +511,8 @@ export default {
   name: 'ModificationPopup',
   props: {
     isDarkMode: { type: Boolean, default: false },
-    event: { type: Object, default: null }
+    event: { type: Object, default: null },
+    userRole: { type: String, default: '' } // a parent adja át; ha nem, fallback lesz
   },
   data() {
     return {
@@ -503,16 +522,18 @@ export default {
       editMode: false,
       editedEvent: {},
       isSaving: false,
-      saveError: null
+      saveError: null,
+      statusChanging: false // <<< ÚJ
     };
   },
   computed: {
     // Normalizált státusz kód (szám -> kód)
     normalizedStatus() {
       if (!this.event) return null;
-      const raw = this.event.statusz;
-      if (typeof raw === 'number') return LEGACY_NUMERIC_MAP[raw] || null;
-      return raw;
+      const raw = this.event.statusz ?? this.event.status;
+      if (typeof raw === 'number') return LEGACY_NUMERIC_MAP[raw] || 'BEERKEZETT'; // <<< ALAP
+      if (!raw) return 'BEERKEZETT';                                             // <<< ALAP
+      return String(raw).trim().toUpperCase();
     },
     groupedStatuses() {
       const groups = {};
@@ -520,12 +541,23 @@ export default {
         if (!groups[s.phase]) groups[s.phase] = [];
         groups[s.phase].push(s);
       });
-      return Object.keys(groups)
-        .sort((a,b)=>a.localeCompare(b))
+      return PHASE_ORDER
+        .filter(p => groups[p])
         .map(phase => ({
           phase,
           items: groups[phase].sort((a,b)=>a.sort_order - b.sort_order)
         }));
+    },
+    effectiveUserRole() {
+      // Fallback sorrend – állítsd a projekted szerint:
+      return this.userRole
+        || (this.$store && this.$store.state?.user?.role)
+        || (this.$root?.currentUser && this.$root.currentUser.role)
+        || (this.event && this.event.userRole)
+        || '';
+    },
+    canAcceptQuote() {
+      return isAdminRole(this.effectiveUserRole);
     }
   },
   watch: {
@@ -540,6 +572,10 @@ export default {
         }
       },
       immediate: true
+    },
+    effectiveUserRole(r) {
+      // Ideiglenes debug – ha nem kell, töröld.
+      // console.log('[ModificationPopup] role =', r);
     }
   },
   methods: {
@@ -604,7 +640,7 @@ export default {
       this.statusModalVisible = false;
     },
     async changeStatus(newStatus) {
-      if (!this.event || !newStatus) return;
+      if (!newStatus) return;
       try {
         const resp = await axios.patch(
           `http://localhost:3000/api/kerveny/${this.event.id}/status`,
@@ -688,6 +724,28 @@ export default {
     closeEventDetails() {
       this.$emit('close');
       document.body.style.overflow = '';
+    },
+    async acceptUfQuote() {
+      // Gomb feltételein NEM változtatunk – csak státusz váltás logika
+      if (this.statusChanging || !this.event?.id) return;
+      this.statusChanging = true;
+      try {
+        const resp = await axios.patch(
+          `http://localhost:3000/api/kerveny/${this.event.id}/status`,
+          { statusz: 'UF_ARAJANLATRA_VAR' }
+        );
+        if (resp.status === 200) {
+          // Lokális frissítés emit
+          this.$emit('status-updated', { ...this.event, statusz: 'UF_ARAJANLATRA_VAR' });
+          // Lista újratöltése (szülő komponensben kezeld @refresh-events)
+          this.$emit('refresh-events');
+        }
+      } catch (e) {
+        console.error('Elfogadás státusz váltás hiba:', e);
+        alert('Nem sikerült átállítani a státuszt.');
+      } finally {
+        this.statusChanging = false;
+      }
     }
   }
 };
@@ -841,12 +899,31 @@ export default {
 }
 
 .event-details-footer {
-  padding: 15px 20px;
-  border-top: 1px solid #dee2e6;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between; /* <<< módosítva */
+  align-items: center;
   gap: 10px;
-  background-color: #f8f9fa;
+}
+
+.footer-left, .footer-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Admin Elfogadás gomb */
+.btn-success {
+  background-color: #1f6d3f;
+  border-color: #1f6d3f;
+  color:#fff;
+}
+.btn-success:hover {
+  background-color: #185330;
+  border-color: #185330;
+}
+
+.admin-accept-btn {
+  min-width: 140px;
 }
 
 /* Széchenyi színek a gomboknak */
