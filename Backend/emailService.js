@@ -14,6 +14,7 @@ const nodemailer = require("nodemailer");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const axios = require("axios");
+const jwt = require('jsonwebtoken'); // <<< ÚJ
 
 const siteKey = process.env.RECAPTCHA_SITE_KEY;
 const secretKey = process.env.RECAPTCHA_SECRET_KEY;
@@ -21,6 +22,31 @@ const secretKey = process.env.RECAPTCHA_SECRET_KEY;
 const app = express();
 app.use(bodyParser.json());
 
+// <<< ÚJ: bejelentkezett felhasználó hozzácsatolása (JWT vagy session)
+function attachUserFromToken(req, _res, next) {
+  const auth = req.headers.authorization || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  if (token) {
+    try {
+      const payload = jwt.verify(token, process.env.JWT_SECRET || 'dev_secret');
+      req.user = payload;
+    } catch { /* csendben tovább */ }
+  }
+  next();
+}
+app.use(attachUserFromToken);
+
+// Segédfüggvény a bejelentkezett emailhez
+function getLoggedInEmail(req) {
+  return (
+    req.user?.email ||            // JWT payload: { email, ... }
+    req.user?.sub ||              // néha email a sub-ban
+    req.session?.user?.email ||   // ha express-sessiont használtok
+    null
+  );
+}
+
+// CORS beállítások
 app.use(cors({
   origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
   credentials: true,
@@ -165,7 +191,7 @@ app.post('/verify-captcha', async (req, res) => {
   }
 });
 
-const sendSuccessEmail = async (email, nev) => {
+const sendSuccessEmail = async (email, felelos) => {
   const mailOptions = {
     from: 'souris20013@gmail.com',
     to: email,
@@ -176,7 +202,7 @@ const sendSuccessEmail = async (email, nev) => {
           <img src="cid:logo" alt="Széchenyi Egyetem" style="max-width: 250px; margin-bottom: 10px;">
         </header>
         <main style="padding: 20px;">
-          <p style="font-size: 16px; color: #333;">Kedves ${nev}!</p>
+          <p style="font-size: 16px; color: #333;">Kedves ${felelos}!</p>
           <p style="font-size: 16px; color: #333;">A kérvényed sikeresen leadásra került a Széchenyi István Egyetem rendszerében.</p>
           <p style="font-size: 16px; color: #333;">Kérjük, hogy a további információkért lépj kapcsolatba az illetékes szervezőkkel.</p>
           <p style="font-size: 16px; color: #333;">Üdvözlettel,</p>
@@ -209,14 +235,14 @@ const sendSuccessEmail = async (email, nev) => {
 };
 
 app.post('/send-success-email', async (req, res) => {
-  const { email, nev } = req.body;
+  const { email, felelos } = req.body;
 
   if (!email || !verifiedEmails[email]) {
     return res.status(400).json({ success: false, message: 'Az e-mail cím nincs verifikálva.' });
   }
 
   try {
-    await sendSuccessEmail(email, nev);
+    await sendSuccessEmail(email, felelos);
     delete verifiedEmails[email]; // Töröld az e-mail címet a verifikált listából
     res.status(200).json({ success: true, message: 'Sikeres e-mail küldés.' });
   } catch (error) {
@@ -225,8 +251,67 @@ app.post('/send-success-email', async (req, res) => {
   }
 });
 
+const sendRejectionEmail = async (email, felelos, reason = '') => {
+  const mailOptions = {
+    from: 'souris20013@gmail.com',
+    to: email,
+    subject: 'Széchenyi Egyetem - Kérvény elutasítva',
+    html: `
+      <div style="font-family: 'Montserrat', sans-serif; font-weight: 300; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+        <header style="text-align: center; padding: 20px 0; background-color: #1c2442; color: #fff; border-radius: 8px 8px 0 0;">
+          <img src="cid:logo" alt="Széchenyi Egyetem" style="max-width: 250px; margin-bottom: 10px;">
+        </header>
+        <main style="padding: 20px;">
+          <p style="font-size: 16px; color: #333;">Kedves ${felelos || 'Felhasználó'}!</p>
+          <p style="font-size: 16px; color: #333;">Tájékoztatjuk, hogy a benyújtott rendezvény-kérvényed elbírálása megtörtént, és <strong>elutasításra került</strong>.</p>
+          ${reason ? `<p style="font-size: 16px; color: #333;"><strong.>Indoklás:</strong> ${reason}</p>` : ''}
+          <p style="font-size: 16px; color: #333;">Ha további információra van szükséged, kérjük, vedd fel a kapcsolatot az illetékes szervezővel.</p>
+          <p style="font-size: 16px; color: #333;">Üdvözlettel,</p>
+          <p style="font-size: 16px; color: #333; font-weight: bold;">Széchenyi István Egyetem Csapata</p>
+        </main>
+        <footer style="text-align: center; padding: 10px 0; background-color: #f4f4f4; color: #666; font-size: 12px; border-radius: 0 0 8px 8px;">
+          <p style="margin: 0;">Széchenyi István Egyetem</p>
+          <p style="margin: 0;">9026 Győr, Egyetem tér 1.</p>
+          <p style="margin: 0;">Telefon: +36 96 503 400</p>
+          <p style="margin: 0;">Email: info@sze.hu</p>
+        </footer>
+      </div>
+    `,
+    attachments: [
+      { filename: 'logo.png', path: __dirname + '/assets/logo.png', cid: 'logo' }
+    ]
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log('Elutasítás értesítő email elküldve:', email);
+  } catch (error) {
+    console.error('Elutasítás email küldési hiba:', error);
+    throw new Error('Hiba történt az elutasítás email küldése során.');
+  }
+};
+
+app.post('/send-rejection-email', async (req, res) => {
+  const { felelos, reason } = req.body;
+
+  // <<< MÓDOSÍTÁS: címzett a bejelentkezett felhasználó
+  const toEmail = getLoggedInEmail(req);
+  if (!toEmail) {
+    return res.status(401).json({ success: false, message: 'Nincs bejelentkezett felhasználó, vagy hiányzik az email a tokenből.' });
+  }
+
+  try {
+    await sendRejectionEmail(toEmail, felelos, reason);
+    res.status(200).json({ success: true, message: 'Elutasító e-mail sikeresen elküldve.' });
+  } catch (error) {
+    console.error('Hiba az elutasító e-mail küldése során:', error);
+    res.status(500).json({ success: false, message: 'Hiba történt az elutasító e-mail küldése során.' });
+  }
+});
+
 module.exports = {
   sendSuccessEmail,
+  sendRejectionEmail
 };
 
 // Backend indítása

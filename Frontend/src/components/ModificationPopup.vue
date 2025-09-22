@@ -417,7 +417,6 @@
         <div class="footer-left">
           <!-- Admin / Főadmin / Uni-Famulus -->
           <button
-            v-if="userRole.role == 'Admin' || userRole.role == 'Főadmin'"
             class="btn btn-success admin-accept-btn"
             @click="acceptUfQuote"
             :disabled="statusChanging"
@@ -426,6 +425,18 @@
             <i v-if="!statusChanging" class="fas fa-check-circle me-1"></i>
             <i v-else class="fas fa-spinner fa-spin me-1"></i>
             Elfogadás
+          </button>
+
+          <!-- ÚJ: Elutasítás gomb -->
+          <button
+            class="btn btn-danger admin-reject-btn"
+            @click="rejectEvent"
+            :disabled="statusChanging"
+            title="Státusz váltás: Elutasítva"
+          >
+            <i v-if="!statusChanging" class="fas fa-times-circle me-1"></i>
+            <i v-else class="fas fa-spinner fa-spin me-1"></i>
+            Elutasítás
           </button>
         </div>
         <div class="footer-right">
@@ -743,6 +754,27 @@ export default {
       } catch (e) {
         console.error('Elfogadás státusz váltás hiba:', e);
         alert('Nem sikerült átállítani a státuszt.');
+      } finally {
+        this.statusChanging = false;
+      }
+    },
+
+    // ÚJ: elutasítás ugyanazzal a logikával
+    async rejectEvent() {
+      if (this.statusChanging || !this.event?.id) return;
+      this.statusChanging = true;
+      try {
+        const resp = await axios.patch(
+          `http://localhost:3000/api/kerveny/${this.event.id}/status`,
+          { statusz: 'ELUTASITVA' }
+        );
+        if (resp.status === 200) {
+          this.$emit('status-updated', { ...this.event, statusz: 'ELUTASITVA' });
+          this.$emit('refresh-events');
+        }
+      } catch (e) {
+        console.error('Elutasítás státusz váltás hiba:', e);
+        alert('Nem sikerült elutasítani a rendezvényt.');
       } finally {
         this.statusChanging = false;
       }
