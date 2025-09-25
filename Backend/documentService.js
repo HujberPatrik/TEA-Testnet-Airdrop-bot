@@ -4,6 +4,7 @@ const PizZip = require('pizzip');
 const Docxtemplater = require('docxtemplater');
 const { promisify } = require('util');
 const readFile = promisify(fs.readFile);
+const pool = require('./config/db'); // DB kapcsolat a költség sorokhoz
 
 // Sablon tárolására szolgáló mappa
 const templatesDir = path.join(__dirname, '../templates');
@@ -71,7 +72,66 @@ async function generateDocument(templatePath, data) {
   }
 }
 
+/**
+ * UF Árajánlat DOCX generálása a kerveny_koltseg táblából.
+ * A sablon: <project-root>/templates/UF_arajanlat_sablon.docx
+ * Visszatér: Buffer (DOCX)
+ */
+async function generateUfOfferFromCosts(kervenyId) {
+  if (!kervenyId) throw new Error('Hiányzó kervenyId');
+  
+  // Költség sorok lekérése
+  const { rows } = await pool.query(`
+    SELECT id, kerveny_id, service_id, service_name, rate_key, unit,
+           hours, persons, unit_price, line_total, created_at
+    FROM kerveny_koltseg
+    WHERE kerveny_id = $1
+    ORDER BY id
+  `, [kervenyId]);
+  
+  if (!rows.length) {
+    throw new Error('Nincs mentett költség ehhez a kérvényhez.');
+  }
+  
+  // Formázók
+  const fmt2  = n => new Intl.NumberFormat('hu-HU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0);
+  const fmtHuf = n => new Intl.NumberFormat('hu-HU', { style: 'currency', currency: 'HUF', maximumFractionDigits: 0 }).format(Number(n) || 0);
+  
+  // Összesítők
+  const totals = rows.reduce((acc, r) => {
+    acc.hours   += Number(r.hours)      || 0;
+    acc.persons += Number(r.persons)    || 0;
+    acc.total   += Number(r.line_total) || 0;
+    return acc;
+  }, { hours: 0, persons: 0, total: 0 });
+  
+  // Sorok + formázott mezők a sablonnak
+  const costs = rows.map(r => ({
+    ...r,
+    hours_fmt: fmt2(r.hours),
+    persons_fmt: fmt2(r.persons),
+    unit_price_fmt: fmtHuf(r.unit_price),
+    line_total_fmt: fmtHuf(r.line_total)
+  }));
+  
+  // A sablon által használt adatok
+  const data = {
+    costs,                                  // {#costs}{service_name}{unit}{hours_fmt}...{/costs}
+    sum_hours: totals.hours,
+    sum_persons: totals.persons,
+    sum_total: totals.total,
+    sum_hours_fmt: fmt2(totals.hours),
+    sum_persons_fmt: fmt2(totals.persons),
+    sum_total_fmt: fmtHuf(totals.total),
+    today: new Date().toLocaleDateString('hu-HU')
+  };
+  
+  const templatePath = path.join(templatesDir, 'UF_arajanlat_sablon.docx');
+  return await generateDocument(templatePath, data);
+}
+
 module.exports = {
   generateDocument,
-  templatesDir
+  templatesDir,
+  generateUfOfferFromCosts
 };

@@ -98,8 +98,9 @@ export default {
   props: {
     event: { type: Object, default: null }
   },
-  emits: ['calculated'],
+  emits: ['calculated','status-updated','refresh-events'],
   setup(props, { emit }) {
+    const TARGET_STATUS = 'UF_ARAJANLAT_ELFOGADASARA_VAR';
     const modal = ref(null);
     let modalInstance = null;
     const loading = ref(false);
@@ -286,6 +287,20 @@ export default {
       if (modalInstance) modalInstance.hide();
     };
 
+    // státusz váltás: UF Árajánlat elfogadására vár
+    const setStatusUFOfferPending = async () => {
+      if (!props.event || props.event.id == null) return;
+      const res = await fetch(`/api/kerveny/${props.event.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ statusz: TARGET_STATUS })
+      });
+      if (!res.ok) {
+        const t = await res.text().catch(()=> '');
+        throw new Error(`Státusz váltás hiba: ${res.status} ${t}`);
+      }
+    };
+
     const saveAndAdvanceStatus = async (payload) => {
       if (!props.event || props.event.id == null) return;
       saving.value = true;
@@ -319,13 +334,16 @@ export default {
 
       const payload = { breakdown, total: total.value };
       try {
-        await saveAndAdvanceStatus(payload);
+        await saveAndAdvanceStatus(payload);         // költségek mentése
+        await setStatusUFOfferPending();            // státusz átállítás UF_ARAJANLAT_ELFOGADASARA_VAR-ra
       } catch (e) {
         error.value = e.message || 'Mentési hiba';
         return;
       }
 
       if (props.event && props.event.id != null) saveState(props.event.id);
+      emit('status-updated', { id: props.event.id, statusz: TARGET_STATUS });
+      emit('refresh-events');                       // szülő komponens frissítse a listát
       emit('calculated', { event: props.event, breakdown, total: total.value });
       hide();
     };

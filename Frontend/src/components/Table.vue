@@ -134,6 +134,14 @@
                     >
                       <i class="fas fa-calculator"></i>
                     </button>
+                    <!-- ÚJ: UF Árajánlat DOCX generálás -->
+                    <button
+                      class="btn btn-sm btn-outline-success"
+                      @click.stop="exportUfOffer(event)"
+                      title="UF Árajánlat (DOCX)"
+                    >
+                      <i class="fas fa-file-word"></i>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -176,6 +184,7 @@
     ref="serviceCost"
     :event="costEvent"
     @calculated="handleCostCalculated"
+    @refresh-events="fetchEvents"
   />
 </template>
 
@@ -442,6 +451,25 @@ export default {
     },
     handleStatusCodes(codes) {          // <<< ÚJ (kategória gomb esemény)
       this.statusFilterCodes = Array.isArray(codes) ? codes : [];
+    },
+    async exportUfOffer(ev) {
+      try {
+        this.exportStatus.isLoading = true;
+        this.exportStatus.error = null;
+
+        await axios.patch(
+          `http://localhost:3000/api/kerveny/${ev.id}/status`,
+          { statusz: 'UF_ARAJANLAT_ELFOGADASARA_VAR' }
+        );
+
+        // lista frissítése
+        await this.fetchEvents();
+      } catch (e) {
+        console.error(e);
+        alert('Státusz váltás sikertelen.');
+      } finally {
+        this.exportStatus.isLoading = false;
+      }
     }
   },
   mounted() {
