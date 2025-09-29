@@ -8,6 +8,7 @@ const adminRoutes = require('./routes/admin.route');
 const documentRoutes = require('./routes/document.route');
 const usersRouter = require('./routes/users');
 const authRouter = require('./src/routes/auth');
+const pricesRouter = require('./routes/prices')
 require('dotenv').config(); // npm install dotenv --save ha még nincs
 const { JWT_SECRET } = require('./src/config/jwt');
 console.log('[startup] JWT_SECRET from config present?:', !!JWT_SECRET, 'value preview:', JWT_SECRET ? JWT_SECRET.slice(0,6) + '...' : null);
@@ -34,22 +35,23 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/document', documentRoutes);
 app.use('/api/users', usersRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/prices',pricesRouter);
 
 // prices route betöltése hibakezeléssel
-let pricesRoute;
-try {
-  pricesRoute = require('./routes/prices');
-  app.use('/api/prices', pricesRoute);
-  console.log('Loaded route: /api/prices');
-} catch (err) {
-  console.error('Could not load ./routes/prices:', err.message);
-  // ha nincs fájl, regisztrálunk egy "helyettesítő" route-ot, ami informatív JSON-t ad
-  const fallback = express.Router();
-  fallback.get('/', (req, res) => {
-    res.status(500).json({ error: 'prices route missing on server. Check Backend/routes/prices.js' });
-  });
-  app.use('/api/prices', fallback);
-}
+// let pricesRoute;
+// try {
+//   pricesRoute = require('./routes/prices');
+//   app.use('/api/prices', pricesRoute);
+//   console.log('Loaded route: /api/prices');
+// } catch (err) {
+//   console.error('Could not load ./routes/prices:', err.message);
+//   // ha nincs fájl, regisztrálunk egy "helyettesítő" route-ot, ami informatív JSON-t ad
+//   const fallback = express.Router();
+//   fallback.get('/', (req, res) => {
+//     res.status(500).json({ error: 'prices route missing on server. Check Backend/routes/prices.js' });
+//   });
+//   app.use('/api/prices', fallback);
+// }
 
 // health check
 app.get('/', (req, res) => {

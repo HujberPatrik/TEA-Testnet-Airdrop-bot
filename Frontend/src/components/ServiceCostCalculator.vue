@@ -115,7 +115,7 @@ export default {
       loading.value = true;
       error.value = '';
       try {
-        const res = await fetch('/api/prices');
+        const res = await fetch('/api/prices/famulus');
         if (!res.ok) throw new Error('Árak betöltése sikertelen');
         const data = await res.json();
         prices.value = Array.isArray(data) ? data.map(p => ({

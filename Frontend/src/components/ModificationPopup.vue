@@ -43,6 +43,9 @@
           <li class="nav-item">
             <a class="nav-link" :class="{ active: activeTab === 'client' }" @click.prevent="activeTab = 'client'" href="#">Megrendelő</a>
           </li>
+          <li class="nav-item">
+            <a class="nav-link" :class="{ active: activeTab === 'famulus' }" @click.prevent="activeTab = 'famulus'" href="#">Uni-Famulus</a>
+          </li>
         </ul>
 
         <!-- Csak olvasható mód -->
@@ -165,6 +168,29 @@
             </div>
           </div>
         </div>
+        <div v-if="activeTab === 'famulus'" class="tab-content">
+            <div class="row">
+              <div class="col-md-6">
+                <p><span class="label-text">Rendezvény neve:</span> {{ event.nev }}</p>
+                <p><span class="label-text">Helyszín:</span> {{ event.helyszin }}</p>
+                <p><span class="label-text">Cím:</span> {{ event.cim || 'Nincs megadva' }}</p>
+                <p><span class="label-text">Kezdés:</span> {{ formatDateTime(event.kezdo_datum, event.kezdo_idopont) }}</p>
+                <p><span class="label-text">Befejezés:</span> {{ formatDateTime(event.veg_datum, event.veg_idopont) }}</p>
+              </div>
+              <div class="col-md-6">
+                <p><span class="label-text">Típus:</span> {{ event.tipus || 'Nincs megadva' }}</p>
+                <p><span class="label-text">Minősítés:</span> {{ event.minosites || 'Nincs megadva' }}</p>
+                <p><span class="label-text">Sajtónyilvános:</span> {{ event.sajto ? 'Igen' : 'Nem' }}</p>
+                <p><span class="label-text">Várható létszám:</span> {{ event.letszam || 'Nincs megadva' }} fő</p>
+              </div>
+            </div>
+            <div class="row mt-3">
+              <div class="col-12">
+                <p><span class="label-text">Leírás:</span></p>
+                <p>{{ event.leiras || 'Nincs megadva' }}</p>
+              </div>
+            </div>
+          </div>
 
         <!-- Szerkesztési mód - minden fülhöz a megfelelő mezőkkel -->
         <div v-if="editMode" class="edit-mode">
@@ -387,7 +413,7 @@
           </div>
 
           <!-- Megrendelő fül tartalma -->
-          <div v-if="activeTab === 'client'" class="edit-tab-content">
+          <div v-if="activeTab === 'famulus'" class="edit-tab-content">
             <div class="row">
               <div class="col-md-6 mb-3">
                 <label for="edit-client-name">Megrendelő neve/cégneve</label>
@@ -408,6 +434,63 @@
               <div class="col-md-6 mb-3">
                 <label for="edit-client-email">Email</label>
                 <input type="email" id="edit-client-email" class="form-control" v-model="editedEvent.megrendelo_email">
+              </div>
+            </div>
+          </div>
+          <div v-if="activeTab === 'basic'" class="edit-tab-content">
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label for="edit-name">Rendezvény neve</label>
+                <input type="text" id="edit-name" class="form-control" v-model="editedEvent.nev">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label for="edit-type">Rendezvény típusa</label>
+                <select id="edit-type" class="form-control" v-model="editedEvent.tipus">
+                  <option value="Egyetemi szervezésű rendezvény">Egyetemi szervezésű rendezvény</option>
+                  <option value="Egyetemi szervezésű hallgatói rendezvény">Egyetemi szervezésű hallgatói rendezvény</option>
+                  <option value="Egyetemi szervezésű sportrendezvény">Egyetemi szervezésű sportrendezvény</option>
+                  <option value="Külső szervezésű sportrendezvény">Külső szervezésű sportrendezvény</option>
+                  <option value="Külső szervezésű rendezvény">Külső szervezésű rendezvény</option>
+                </select>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label for="edit-qualification">Rendezvény minősítése</label>
+                <select id="edit-qualification" class="form-control" v-model="editedEvent.minosites">
+                  <option value="Nyilvános">Nyilvános</option>
+                  <option value="Zártkörű">Zártkörű</option>
+                </select>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label for="edit-participants">Létszám</label>
+                <input type="number" id="edit-participants" class="form-control" v-model="editedEvent.letszam">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label for="edit-location">Helyszín</label>
+                <input type="text" id="edit-location" class="form-control" v-model="editedEvent.helyszin">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label for="edit-address">Cím</label>
+                <input type="text" id="edit-address" class="form-control" v-model="editedEvent.cim">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label for="edit-start-date">Kezdő dátum</label>
+                <input type="date" id="edit-start-date" class="form-control" v-model="editedEvent.kezdo_datum">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label for="edit-start-time">Kezdő időpont</label>
+                <input type="time" id="edit-start-time" class="form-control" v-model="editedEvent.kezdo_idopont">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label for="edit-end-date">Befejező dátum</label>
+                <input type="date" id="edit-end-date" class="form-control" v-model="editedEvent.veg_datum">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label for="edit-end-time">Befejező időpont</label>
+                <input type="time" id="edit-end-time" class="form-control" v-model="editedEvent.veg_idopont">
+              </div>
+              <div class="col-md-12 mb-3">
+                <label for="edit-description">Leírás</label>
+                <textarea id="edit-description" class="form-control" v-model="editedEvent.leiras" rows="3"></textarea>
               </div>
             </div>
           </div>
@@ -608,6 +691,7 @@ export default {
         s.terminal ? 'terminal' : ''
       ].join(' ');
     },
+
     getStatusIcon(code) {
       const phase = this.getStatusPhase(code);
       if (this.isTerminal(code)) return 'fas fa-flag-checkered';
@@ -803,9 +887,9 @@ export default {
 .event-details-content {
   background-color: #fff;
   border-radius: 8px;
-  max-width: 900px;
-  width: 100%;
-  max-height: 90vh;
+  max-width: 2000px;
+  width: 95%;
+  height: 95%;
   overflow-y: auto;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
   display: flex;
@@ -935,6 +1019,7 @@ export default {
   justify-content: space-between; /* <<< módosítva */
   align-items: center;
   gap: 10px;
+  margin: 10px;
 }
 
 .footer-left, .footer-right {

@@ -31,6 +31,21 @@ function normalizeBody(body = {}) {
   };
 }
 
+router.get('/famulus', async (req, res) => {
+  try {
+    const q = `SELECT * FROM prices WHERE kategoria LIKE 'Általános'`
+    const { rows } = await pool.query(q);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+
+
+
 // GET /api/prices
 router.get('/', async (req, res) => {
   try {

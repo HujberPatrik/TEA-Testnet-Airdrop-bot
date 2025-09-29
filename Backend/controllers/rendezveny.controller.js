@@ -325,11 +325,29 @@ async function saveCostsAndAdvance(req, res) {
   }
 }
 
+const getFamulusPricesByKervenyId = async (req, res) => {
+  const { id } = req.params;
+  const sql = 'SELECT * FROM kerveny_koltseg WHERE kerveny_id = $1';
+
+  pool.query(sql, [id], (error, results) => {
+    if (error) {
+      res.status(500).json({ message: error.message });
+    } else if (results.rows.length === 0) {
+      res.status(404).json({ message: 'Nem található rekord ilyen ID-val' });
+    } else {
+      res.status(200).json(results.rows);
+    }
+  });
+};
+
+
+
 module.exports = {
   getAllKerveny,
   getKervenyById,
   insertKerveny,
   updateKerveny,
   updateKervenyStatus,
-  saveCostsAndAdvance
+  saveCostsAndAdvance,
+  getFamulusPricesByKervenyId
 };
