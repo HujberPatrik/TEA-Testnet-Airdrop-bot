@@ -18,8 +18,11 @@
               <div v-if="prices.length === 0" class="alert alert-warning">Nincsenek elérhető szolgáltatások.</div>
 
               <div class="mb-3">
-                <button class="btn btn-sm btn-outline-primary" @click="addRow">
-                  <i class="fas fa-plus me-1"></i> Szolgáltatás hozzáadása
+                <button type="button" class="btn btn-sm btn-outline-primary" @click="addRowWithType('famulus')">
+                  <i class="fas fa-plus me-1"></i> Hozzáadás (Uni‑Famulus)
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-primary ms-2" @click="addRowWithType('uni')">
+                  <i class="fas fa-plus me-1"></i> Hozzáadás (Egyetemi)
                 </button>
                 <button class="btn btn-sm btn-outline-secondary ms-2" @click="clearState" title="Súgó: törli a mentett kalkulációt">
                   <i class="fas fa-trash-alt"></i> LocalStorage törlése
@@ -30,10 +33,10 @@
                 <select class="form-select form-select-sm service-select" style="min-width:260px;"
                         v-model="row.serviceId" @change="onServiceChange(row)">
                   <option :value="null">-- válassz szolgáltatást --</option>
-                  <option v-for="p in prices" :key="p.id" :value="p.id">{{ p.name }} — {{ p.category }}</option>
+                  <option v-for="p in filteredPricesFor(row)" :key="p.id" :value="p.id">{{ p.name }} — {{ p.category }}</option>
                 </select>
 
-                <select class="form-select form-select-sm rate-select" v-model="row.rateKey">
+                <select v-if="row.pricingType !== 'uni'" class="form-select form-select-sm rate-select" v-model="row.rateKey">
                   <option value="priceUniversity">Egyetemi — Normál</option>
                   <option value="priceUniversityWeekend">Egyetemi — Hétvége/Éjszaka</option>
                   <option value="priceExternal">Külső — Normál</option>
@@ -115,6 +118,60 @@ export default {
       loading.value = true;
       error.value = '';
       try {
+        // 1) próbáljuk az összes árat
+        let res = await fetch('/api/prices');
+        // ha nincs ilyen endpoint, essünk vissza a famulus listára
+        if (!res.ok) {
+          res = await fetch('/api/prices/famulus');
+          if (!res.ok) throw new Error('Árak betöltése sikertelen');
+        }
+        if (!res.ok) throw new Error('Árak betöltése sikertelen');
+        const data = await res.json();
+        prices.value = Array.isArray(data) ? data.map(p => ({
+          id: p.id,
+          name: p.megnevezes ?? p.name ?? '',
+          category: p.kategoria ?? p.category ?? '',
+          priceUniversity: Number(p.ar_egyetem ?? p.priceUniversity ?? 0) || 0,
+          priceUniversityWeekend: Number(p.ar_egyetem_hetvege ?? p.priceUniversityWeekend ?? 0) || 0,
+          priceExternal: Number(p.ar_kulso ?? p.priceExternal ?? 0) || 0,
+          priceExternalWeekend: Number(p.ar_kulso_hetvege ?? p.priceExternalWeekend ?? 0) || 0,
+          unit: p.mertekegyseg ?? p.unit ?? ''
+        })) : [];
+      } catch (e) {
+        error.value = e.message || String(e);
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    const fetchUniversityPrices = async () => {
+      loading.value = true;
+      error.value = '';
+      try {
+        const res = await fetch('/api/prices/university');
+        if (!res.ok) throw new Error('Árak betöltése sikertelen');
+        const data = await res.json();
+        prices.value = Array.isArray(data) ? data.map(p => ({
+          id: p.id,
+          name: p.megnevezes ?? p.name ?? '',
+          category: p.kategoria ?? p.category ?? '',
+          priceUniversity: Number(p.ar_egyetem ?? p.priceUniversity ?? 0) || 0,
+          priceUniversityWeekend: Number(p.ar_egyetem_hetvege ?? p.priceUniversityWeekend ?? 0) || 0,
+          priceExternal: Number(p.ar_kulso ?? p.priceExternal ?? 0) || 0,
+          priceExternalWeekend: Number(p.ar_kulso_hetvege ?? p.priceExternalWeekend ?? 0) || 0,
+          unit: p.mertekegyseg ?? p.unit ?? ''
+        })) : [];
+      } catch (e) {
+        error.value = e.message || String(e);
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    const fetchFamulusPrices = async () => {
+      loading.value = true;
+      error.value = '';
+      try {
         const res = await fetch('/api/prices/famulus');
         if (!res.ok) throw new Error('Árak betöltése sikertelen');
         const data = await res.json();
@@ -135,26 +192,69 @@ export default {
       }
     };
 
-    const addRow = () => {
-      rows.push({
+    // biztosítja, hogy a kért típushoz megfelelő árlista legyen betöltve
+    const ensurePricesLoadedFor = async (type) => {
+      const hasUni = () => prices.value.some(p => isUniCategory(p.category));
+      if (type === 'uni') {
+        if (hasUni()) return;
+        try { await fetchUniversityPrices(); } catch {}
+        if (hasUni()) return;
+        try { await fetchPrices(); } catch {}
+      } else {
+        if (prices.value.length === 0) {
+          try { await fetchPrices(); } catch {}
+        }
+      }
+    };
+
+    const addRowWithType = async (type /* 'famulus' | 'uni' */) => {
+      await ensurePricesLoadedFor(type);
+      const row = {
         id: Date.now() + Math.random(),
+        pricingType: type,
         serviceId: null,
         rateKey: 'priceUniversity',
-        hours: '',      // üres => placeholder látszik
-        persons: ''     // üres => placeholder látszik
-      });
+        hours: '',
+        persons: ''
+      };
+      if (type === 'uni') {
+        const uniList = prices.value.filter(p => isUniCategory(p.category));
+        if (uniList.length === 0) {
+          alert('Nincs Egyetemi kategóriájú szolgáltatás az árlistában.');
+        }
+        // opcionális: előválasztás
+        // row.serviceId = uniList[0]?.id ?? null;
+      }
+      rows.push(row);
     };
+    // visszafelé kompatibilitás: ha valahol még az addRow hívódna
+    const addRow = () => addRowWithType('famulus');
 
     const removeRow = (idx) => rows.splice(idx, 1);
 
     const findPriceById = (id) => prices.value.find(p => p.id === id) || null;
+
+    const isUniCategory = (cat) => (cat ?? '').trim().toLowerCase() === 'egyetemi';
+    const isUfCategory  = (cat) => {
+      const c = (cat ?? '').trim().toLowerCase();
+      return c === 'uf' || c === 'uni-famulus' || c === 'uni famulus' || c.includes('famulus');
+    };
+
+     // Egyetemi soroknál csak az "Egyetemi" kategóriájú tételek jelenjenek meg.
+     const filteredPricesFor = (row) => {
+      if (!row?.pricingType) return prices.value;
+      if (row.pricingType === 'uni') {
+        return prices.value.filter(p => isUniCategory(p.category));     // csak Egyetemi
+      }
+      return prices.value.filter(p => isUfCategory(p.category));        // csak UF/Uni‑Famulus
+     };
 
     const getRowUnitPrice = (row) => {
       const p = findPriceById(row.serviceId);
       if (!p) return 0;
       const base = Number(p[row.rateKey] ?? 0) || 0;
       // ha a választott tarifa külső (a táblázatban +Áfa), akkor hozzáadjuk a 27% ÁFÁ-t
-      if (row.rateKey === 'priceExternal' || row.rateKey === 'priceExternalWeekend') {
+      if (row.pricingType !== 'uni' && (row.rateKey === 'priceExternal' || row.rateKey === 'priceExternalWeekend')) {
         return Math.round(base * 1.27 * 100) / 100;
       }
       return base;
@@ -162,17 +262,14 @@ export default {
 
     const getRowUnitText = (row) => {
       const p = findPriceById(row.serviceId);
-      // Ha nincs szolgáltatás kiválasztva, nincs szöveg
       if (!p) return '';
-      // Ha van mértékegység, a megszokott formátumot adjuk vissza
       if (p.unit) {
-        if (row.rateKey === 'priceExternal' || row.rateKey === 'priceExternalWeekend') {
+        if (row.pricingType !== 'uni' && (row.rateKey === 'priceExternal' || row.rateKey === 'priceExternalWeekend')) {
           return `+Áfa / ${p.unit}`;
         }
         return `/ ${p.unit}`;
       }
-      // Ha nincs mértékegység, de külső tarifa van választva, mutassuk a "+Áfa" jelzést
-      if (row.rateKey === 'priceExternal' || row.rateKey === 'priceExternalWeekend') {
+      if (row.pricingType !== 'uni' && (row.rateKey === 'priceExternal' || row.rateKey === 'priceExternalWeekend')) {
         return '+Áfa';
       }
       return '';
@@ -200,6 +297,7 @@ export default {
         const payload = {
           rows: rows.map(r => ({
             id: r.id,
+            pricingType: r.pricingType || 'famulus',
             serviceId: r.serviceId,
             rateKey: r.rateKey,
             hours: r.hours === '' ? null : r.hours,
@@ -224,8 +322,9 @@ export default {
         parsed.rows.forEach(r => {
           rows.push({
             id: r.id ?? (Date.now() + Math.random()),
+            pricingType: r.pricingType || 'famulus',
             serviceId: r.serviceId ?? null,
-            rateKey: r.rateKey ?? 'priceUniversity',
+            rateKey: r.rateKey ?? (r.pricingType === 'uni' ? 'priceUniversity' : 'priceUniversity'),
             hours: (r.hours === null || r.hours === undefined) ? '' : r.hours,
             persons: (r.persons === null || r.persons === undefined) ? '' : r.persons
           });
@@ -349,14 +448,22 @@ export default {
     };
 
     const onServiceChange = (row) => {
-      // ha szeretnél automatikusan beállítani valamit a sorban, ide
+      if (row?.serviceId == null) return;
+      const p = findPriceById(row.serviceId);
+      if (row?.pricingType === 'uni') {
+        if (!p || !isUniCategory(p.category)) row.serviceId = null;
+        return;
+      }
+      if (row?.pricingType === 'famulus') {
+        if (!p || !isUfCategory(p.category)) row.serviceId = null;
+      }
     };
 
     return {
       modal, loading, prices, rows, addRow, removeRow,
       getRowUnitPrice, getRowTotal, total, formatMoney,
       show, hide, apply, error, onServiceChange, getRowUnitText,
-      clearState, saving
+      clearState, saving, addRowWithType, filteredPricesFor
     };
   }
 };

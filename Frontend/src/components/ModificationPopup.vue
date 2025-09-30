@@ -46,6 +46,9 @@
           <li class="nav-item">
             <a class="nav-link" :class="{ active: activeTab === 'famulus' }" @click.prevent="activeTab = 'famulus'" href="#">Uni-Famulus</a>
           </li>
+          <li class="nav-item">
+            <a class="nav-link" :class="{ active: activeTab === 'uni' }" @click.prevent="activeTab = 'uni'" href="#">Egyetem</a>
+          </li>
         </ul>
 
         <!-- Csak olvasható mód -->
@@ -188,8 +191,6 @@
                     <th>Személyek száma</th>
                     <th>Egység ár</th>
                     <th>Teljes Szolgáltatás ára</th>
-                    <th>Dátum</th>
-                    <th>Törlés</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -202,20 +203,87 @@
                     <td>{{ item.persons }} Fő </td>
                     <td>{{ item.unit_price }} Ft </td>
                     <td>{{ item.line_total }} Ft </td> -->
-                    <td>
-                      <button class="btn btn-danger btn-sm" @click="deleteFamulusItem(item.id)">
-                        <i class="fas fa-trash-alt"></i>
-                      </button>
-                    </td>
+
                   </tr>
                 </tbody>
               </table>
-              <div class="d-flex justify-content-center mt-3">
+              <!-- <div class="d-flex justify-content-center mt-3">
                 <Button  @click="addRow()" class="btn btn-primary">Szolgáltatás hozzáadása</Button>
-              </div>
+              </div> -->
               <div class="d-flex gap-3 mt-3">
-                <button class="btn btn-success">Ajánlat elfogadása</button>
-                <button class="btn btn-warning">Módosítás kérése</button>
+                <button
+                  class="btn btn-success"
+                  @click="acceptOfferFromFamulus"
+                  :disabled="statusChanging"
+                >
+                  <i v-if="!statusChanging" class="fas fa-check-circle me-1"></i>
+                  <i v-else class="fas fa-spinner fa-spin me-1"></i>
+                  Ajánlat elfogadása
+                </button>
+                <button
+                  class="btn btn-warning"
+                  @click="requestUfOfferChange"
+                  :disabled="statusChanging"
+                >
+                  <i v-if="!statusChanging" class="fas fa-edit me-1"></i>
+                  <i v-else class="fas fa-spinner fa-spin me-1"></i>
+                  Módosítás kérése
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Egyetem lap -->
+        <div v-if="activeTab === 'uni'" class="tab-content">
+          <div class="row mt-4">
+            <div class="col-12">
+              <h5>Egyetemi árlista</h5>
+              <div v-if="uniLoading">Árak betöltése...</div>
+              <div v-else-if="uniError" class="text-danger">{{ uniError }}</div>
+              <table v-else class="table table-bordered table-sm">
+                <thead>
+                  <tr>
+                    <th>Id</th>
+                    <th>Kérvény Id</th>
+                    <th>Szolgáltatás Id</th>
+                    <th>Megnevezés</th>
+                    <th>Kategória</th>
+                    <th>Mértékegység</th>
+                    <th>Időtartam</th>
+                    <th>Személyek száma</th>
+                    <th>Egység ár</th>
+                    <th>Teljes Szolgáltatás ára</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="item in uniPrices" :key="item.id">
+                    <td v-for="i in item">{{ i }}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <!-- <div class="d-flex justify-content-center mt-3">
+                <Button @click="addRowUni()" class="btn btn-primary">Szolgáltatás hozzáadása</Button>
+              </div> -->
+              <div class="d-flex gap-3 mt-3">
+                <button
+                  class="btn btn-success"
+                  @click="acceptOfferFromFamulus"
+                  :disabled="statusChanging"
+                >
+                  <i v-if="!statusChanging" class="fas fa-check-circle me-1"></i>
+                  <i v-else class="fas fa-spinner fa-spin me-1"></i>
+                  Ajánlat elfogadása
+                </button>
+                <button
+                  class="btn btn-warning"
+                  @click="requestUfOfferChange"
+                  :disabled="statusChanging"
+                >
+                  <i v-if="!statusChanging" class="fas fa-edit me-1"></i>
+                  <i v-else class="fas fa-spinner fa-spin me-1"></i>
+                  Módosítás kérése
+                </button>
               </div>
             </div>
           </div>
@@ -647,10 +715,13 @@ export default {
       editedEvent: {},
       isSaving: false,
       saveError: null,
-      statusChanging: false, // <<< ÚJ
+      statusChanging: false,
       famulusPrices: [],
       famulusLoading: false,
-      famulusError: null
+      famulusError: null,
+      uniPrices: [],
+      uniLoading: false,
+      uniError: null
     };
   },
   computed: {
@@ -704,6 +775,8 @@ export default {
     activeTab(newTab) {
       if (newTab === 'famulus') {
         this.fetchFamulusPrices();
+      } else if (newTab === 'uni') {
+        this.fetchUniPrices();
       }
     }
   },
@@ -722,6 +795,46 @@ export default {
         line_total: 0,
         created_at: new Date().toISOString(),
       });
+    },
+    addRowUni() {
+      this.uniPrices.push({
+        id: null,
+        kerveny_Id: this.event.id,
+        service_Id: null,
+        service_name: '',
+        rate_key: '',
+        unit: '',
+        hours: 0,
+        persons: 0,
+        unit_price: 0,
+        line_total: 0,
+        created_at: new Date().toISOString(),
+      });
+    },
+    // Uni-Famulus fül: Ajánlat elfogadása → ARAJANLAT_KESZITESERE_VAR + lista frissítés
+    async acceptOfferFromFamulus() {
+      if (!this.event?.id || this.statusChanging) return;
+      this.statusChanging = true;
+      try {
+        const resp = await axios.patch(
+          `http://localhost:3000/api/kerveny/${this.event.id}/status`,
+          { statusz: 'ARAJANLAT_KESZITESERE_VAR' }
+        );
+        if (resp.status === 200) {
+          this.$emit('status-updated', { ...this.event, statusz: 'ARAJANLAT_KESZITESERE_VAR' });
+          this.$emit('refresh-events');
+        }
+      } catch (e) {
+        console.error(e);
+        alert('Státusz váltás sikertelen.');
+      } finally {
+        this.statusChanging = false;
+      }
+    },
+    // Módosítás kérése → UF_ARAJANLATRA_VAR (reuse)
+    async requestUfOfferChange() {
+      // ugyanazt a logikát használjuk, ami már emiteli a refresh-events-et
+      await this.acceptUfQuote();
     },
     // ===== ÚJ státusz helper függvények =====
     getStatusLabel(code) {
@@ -923,6 +1036,22 @@ export default {
         this.famulusError = 'Nem sikerült betölteni a famulus árakat.';
       } finally {
         this.famulusLoading = false;
+      }
+    },
+    async fetchUniPrices() {
+      this.uniLoading = true;
+      this.uniError = null;
+      try {
+        // Állítsd az endpointot a backendhez (Egyetemi kategóriás sorok)
+        // Lehetséges alternatívák:
+        // - GET /api/kerveny/egyetem/:id
+        // - GET /api/kerveny/prices/:id?category=EGYETEM
+        const response = await axios.get(`http://localhost:3000/api/kerveny/egyetem/${this.event.id}`);
+        this.uniPrices = response.data;
+      } catch (e) {
+        this.uniError = 'Nem sikerült betölteni az egyetemi árakat.';
+      } finally {
+        this.uniLoading = false;
       }
     }
   }

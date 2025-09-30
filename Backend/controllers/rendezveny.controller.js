@@ -327,7 +327,30 @@ async function saveCostsAndAdvance(req, res) {
 
 const getFamulusPricesByKervenyId = async (req, res) => {
   const { id } = req.params;
-  const sql = 'SELECT * FROM kerveny_koltseg WHERE kerveny_id = $1';
+  const sql = `select kerveny_koltseg.id,kerveny_koltseg.kerveny_id,kerveny_koltseg.service_id,kerveny_koltseg.service_name,
+              kerveny_koltseg.rate_key,kerveny_koltseg.unit,kerveny_koltseg.hours,kerveny_koltseg.persons,
+              kerveny_koltseg.unit_price,kerveny_koltseg.line_total from kerveny_koltseg
+                inner join prices on kerveny_koltseg.service_id = prices.id
+                where prices.kategoria like 'UF' and kerveny_koltseg.kerveny_id =  $1`;
+
+  pool.query(sql, [id], (error, results) => {
+    if (error) {
+      res.status(500).json({ message: error.message });
+    } else if (results.rows.length === 0) {
+      res.status(404).json({ message: 'Nem található rekord ilyen ID-val' });
+    } else {
+      res.status(200).json(results.rows);
+    }
+  });
+};
+
+const getUniversityPricesByKervenyId = async (req, res) => {
+  const { id } = req.params;
+  const sql = `select kerveny_koltseg.id,kerveny_koltseg.kerveny_id,kerveny_koltseg.service_id,kerveny_koltseg.service_name,
+              kerveny_koltseg.rate_key,kerveny_koltseg.unit,kerveny_koltseg.hours,kerveny_koltseg.persons,
+              kerveny_koltseg.unit_price,kerveny_koltseg.line_total from kerveny_koltseg
+                inner join prices on kerveny_koltseg.service_id = prices.id
+                where prices.kategoria like 'Egyetemi' and kerveny_koltseg.kerveny_id =  $1`;
 
   pool.query(sql, [id], (error, results) => {
     if (error) {
@@ -349,5 +372,6 @@ module.exports = {
   updateKerveny,
   updateKervenyStatus,
   saveCostsAndAdvance,
-  getFamulusPricesByKervenyId
+  getFamulusPricesByKervenyId,
+  getUniversityPricesByKervenyId
 };

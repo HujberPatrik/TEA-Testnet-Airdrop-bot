@@ -33,7 +33,7 @@ function normalizeBody(body = {}) {
 
 router.get('/famulus', async (req, res) => {
   try {
-    const q = `SELECT * FROM prices WHERE kategoria LIKE 'Általános'`
+    const q = `SELECT * FROM prices WHERE kategoria LIKE 'UF'`
     const { rows } = await pool.query(q);
     res.json(rows);
   } catch (err) {

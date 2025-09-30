@@ -1,11 +1,12 @@
 const express = require('express');
-const { getAllKerveny, getKervenyById, insertKerveny, updateKerveny, updateKervenyStatus,saveCostsAndAdvance, getFamulusPricesByKervenyId } = require('../controllers/rendezveny.controller');
+const { getAllKerveny, getKervenyById, insertKerveny, updateKerveny, updateKervenyStatus,saveCostsAndAdvance, getFamulusPricesByKervenyId ,getUniversityPricesByKervenyId} = require('../controllers/rendezveny.controller');
 const router = express.Router();
 
 // Végpontok definiálása
 router.get('/kerveny', getAllKerveny);
 router.get('/kerveny/:id', getKervenyById);
 router.get('/kerveny/famulus/:id', getFamulusPricesByKervenyId);
+router.get('/kerveny/egyetem/:id', getUniversityPricesByKervenyId);
 router.post('/kerveny', insertKerveny);
 router.put('/kerveny/:id', updateKerveny);
 router.patch('/kerveny/:id/status', updateKervenyStatus);
