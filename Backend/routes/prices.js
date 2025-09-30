@@ -41,6 +41,16 @@ router.get('/famulus', async (req, res) => {
   }
 });
 
+router.get('/university', async (req, res) => {
+  try {
+    const q = `SELECT * FROM prices WHERE kategoria LIKE 'Egyetemi'`
+    const { rows } = await pool.query(q);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 
 

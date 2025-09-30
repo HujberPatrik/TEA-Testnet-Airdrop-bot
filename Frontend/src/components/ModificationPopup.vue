@@ -168,29 +168,58 @@
             </div>
           </div>
         </div>
+        <!-- Uni-Famulus lap -->
         <div v-if="activeTab === 'famulus'" class="tab-content">
-            <div class="row">
-              <div class="col-md-6">
-                <p><span class="label-text">Rendezvény neve:</span> {{ event.nev }}</p>
-                <p><span class="label-text">Helyszín:</span> {{ event.helyszin }}</p>
-                <p><span class="label-text">Cím:</span> {{ event.cim || 'Nincs megadva' }}</p>
-                <p><span class="label-text">Kezdés:</span> {{ formatDateTime(event.kezdo_datum, event.kezdo_idopont) }}</p>
-                <p><span class="label-text">Befejezés:</span> {{ formatDateTime(event.veg_datum, event.veg_idopont) }}</p>
+          <div class="row mt-4">
+            <div class="col-12">
+              <h5>Famulus árlista</h5>
+              <div v-if="famulusLoading">Árak betöltése...</div>
+              <div v-else-if="famulusError" class="text-danger">{{ famulusError }}</div>
+              <table v-else class="table table-bordered table-sm">
+                <thead>
+                  <tr>
+                    <th>Id</th>
+                    <th>Kérvény Id</th>
+                    <th>Szolgáltatás Id</th>
+                    <th>Megnevezés</th>
+                    <th>Kategória</th>
+                    <th>Mértékegység</th>
+                    <th>Időtartam</th>
+                    <th>Személyek száma</th>
+                    <th>Egység ár</th>
+                    <th>Teljes Szolgáltatás ára</th>
+                    <th>Dátum</th>
+                    <th>Törlés</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="item in famulusPrices" :key="item.id">
+                    <td v-for="i in item">{{ i }}</td>
+                    <!-- <td>{{ item.service_name }}</td>
+                    <td>{{ item.rate_key }}</td>
+                    <td>{{ item.unit }}</td>
+                    <td>{{ item.hours }} Óra </td>
+                    <td>{{ item.persons }} Fő </td>
+                    <td>{{ item.unit_price }} Ft </td>
+                    <td>{{ item.line_total }} Ft </td> -->
+                    <td>
+                      <button class="btn btn-danger btn-sm" @click="deleteFamulusItem(item.id)">
+                        <i class="fas fa-trash-alt"></i>
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="d-flex justify-content-center mt-3">
+                <Button  @click="addRow()" class="btn btn-primary">Szolgáltatás hozzáadása</Button>
               </div>
-              <div class="col-md-6">
-                <p><span class="label-text">Típus:</span> {{ event.tipus || 'Nincs megadva' }}</p>
-                <p><span class="label-text">Minősítés:</span> {{ event.minosites || 'Nincs megadva' }}</p>
-                <p><span class="label-text">Sajtónyilvános:</span> {{ event.sajto ? 'Igen' : 'Nem' }}</p>
-                <p><span class="label-text">Várható létszám:</span> {{ event.letszam || 'Nincs megadva' }} fő</p>
-              </div>
-            </div>
-            <div class="row mt-3">
-              <div class="col-12">
-                <p><span class="label-text">Leírás:</span></p>
-                <p>{{ event.leiras || 'Nincs megadva' }}</p>
+              <div class="d-flex gap-3 mt-3">
+                <button class="btn btn-success">Ajánlat elfogadása</button>
+                <button class="btn btn-warning">Módosítás kérése</button>
               </div>
             </div>
           </div>
+        </div>
 
         <!-- Szerkesztési mód - minden fülhöz a megfelelő mezőkkel -->
         <div v-if="editMode" class="edit-mode">
@@ -437,6 +466,7 @@
               </div>
             </div>
           </div>
+          <!-- Uni-Famulus fül -->
           <div v-if="activeTab === 'basic'" class="edit-tab-content">
             <div class="row">
               <div class="col-md-6 mb-3">
@@ -617,7 +647,10 @@ export default {
       editedEvent: {},
       isSaving: false,
       saveError: null,
-      statusChanging: false // <<< ÚJ
+      statusChanging: false, // <<< ÚJ
+      famulusPrices: [],
+      famulusLoading: false,
+      famulusError: null
     };
   },
   computed: {
@@ -652,7 +685,8 @@ export default {
     },
     canAcceptQuote() {
       return isAdminRole(this.effectiveUserRole);
-    }
+    },
+    
   },
   watch: {
     event: {
@@ -667,12 +701,28 @@ export default {
       },
       immediate: true
     },
-    effectiveUserRole(r) {
-      // Ideiglenes debug – ha nem kell, töröld.
-      // console.log('[ModificationPopup] role =', r);
+    activeTab(newTab) {
+      if (newTab === 'famulus') {
+        this.fetchFamulusPrices();
+      }
     }
   },
   methods: {
+    addRow() {
+      this.famulusPrices.push({
+        id: null,
+        kerveny_Id: this.event.id,
+        service_Id: null,
+        service_name: '',
+        rate_key: '',   // üres => placeholder látszik
+        unit: '',       // üres => placeholder látszik
+        hours: 0,      // üres => placeholder látszik
+        persons: 0,     // üres => placeholder látszik
+        unit_price: 0,
+        line_total: 0,
+        created_at: new Date().toISOString(),
+      });
+    },
     // ===== ÚJ státusz helper függvények =====
     getStatusLabel(code) {
       return STATUS_MAP[code]?.label || code || 'Ismeretlen';
@@ -861,6 +911,18 @@ export default {
         alert('Nem sikerült elutasítani a rendezvényt.');
       } finally {
         this.statusChanging = false;
+      }
+    },
+    async fetchFamulusPrices() {
+      this.famulusLoading = true;
+      this.famulusError = null;
+      try {
+        const response = await axios.get(`http://localhost:3000/api/kerveny/famulus/${this.event.id}`);
+        this.famulusPrices = response.data;
+      } catch (e) {
+        this.famulusError = 'Nem sikerült betölteni a famulus árakat.';
+      } finally {
+        this.famulusLoading = false;
       }
     }
   }
