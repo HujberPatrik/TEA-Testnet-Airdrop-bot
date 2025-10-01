@@ -1,9 +1,8 @@
 <template>
   <div>
     <div class="modal fade" id="serviceCostModal" tabindex="-1" ref="modal" aria-hidden="true">
-      <!-- nagyobb modal: modal-xl -->
       <div class="modal-dialog modal-xl modal-dialog-centered">
-        <div class="modal-content modal-content--overflow"> <!-- overflow-visible -->
+        <div class="modal-content modal-content--overflow">
           <div class="modal-header">
             <h5 class="modal-title">Költségkalkulátor — {{ event?.nev || 'Rendezvény' }}</h5>
             <button type="button" class="btn-close" @click="hide"></button>
@@ -17,63 +16,126 @@
             <div v-else>
               <div v-if="prices.length === 0" class="alert alert-warning">Nincsenek elérhető szolgáltatások.</div>
 
+              <!-- Két fül: külön listával és külön mentéssel -->
               <div class="mb-3">
-                <button type="button" class="btn btn-sm btn-outline-primary" @click="addRowWithType('famulus')">
-                  <i class="fas fa-plus me-1"></i> Hozzáadás (Uni‑Famulus)
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-primary ms-2" @click="addRowWithType('uni')">
-                  <i class="fas fa-plus me-1"></i> Hozzáadás (Egyetemi)
-                </button>
-                <button class="btn btn-sm btn-outline-secondary ms-2" @click="clearState" title="Súgó: törli a mentett kalkulációt">
+                <ul class="nav nav-tabs">
+                  <li class="nav-item">
+                    <button type="button" class="nav-link" :class="{ active: activeTab==='famulus' }" @click="activeTab='famulus'">
+                      Uni‑Famulus
+                    </button>
+                  </li>
+                  <li class="nav-item">
+                    <button type="button" class="nav-link" :class="{ active: activeTab==='uni' }" @click="activeTab='uni'">
+                      Egyetemi
+                    </button>
+                  </li>
+                </ul>
+
+                <div class="tab-content border border-top-0 rounded-bottom p-3">
+                  <!-- UF fül -->
+                  <div class="tab-pane fade" :class="{ 'show active': activeTab==='famulus' }">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <button type="button" class="btn btn-sm btn-outline-primary" @click="addRowWithType('famulus')">
+                        <i class="fas fa-plus me-1"></i> Hozzáadás (Uni‑Famulus)
+                      </button>
+                      <div class="text-end">
+                        <div class="h6 mb-0">UF összesen: {{ formatMoney(totalUf) }}</div>
+                      </div>
+                    </div>
+
+                    <div v-for="(row, idx) in rowsUf" :key="row.id" class="d-flex gap-2 align-items-center mb-2 row-with-trash">
+                      <select class="form-select form-select-sm service-select" style="min-width:260px;"
+                              v-model="row.serviceId" @change="onServiceChange(row)">
+                        <option :value="null">-- válassz szolgáltatást --</option>
+                        <option v-for="p in filteredPricesFor(row)" :key="p.id" :value="p.id">{{ p.name }} — {{ p.category }}</option>
+                      </select>
+
+                      <select class="form-select form-select-sm rate-select" v-model="row.rateKey">
+                        <option value="priceUniversity">Egyetemi — Normál</option>
+                        <option value="priceUniversityWeekend">Egyetemi — Hétvége/Éjszaka</option>
+                        <option value="priceExternal">Külső — Normál</option>
+                        <option value="priceExternalWeekend">Külső — Hétvége/Éjszaka</option>
+                      </select>
+
+                      <input type="number" min="0" step="0.25" class="form-control form-control-sm hours-input"
+                             style="width:110px;" v-model="row.hours" placeholder="óra" title="Órák" />
+
+                      <input type="number" min="0" step="1" class="form-control form-control-sm persons-input"
+                             style="width:90px;" v-model="row.persons" placeholder="fő" title="Fő (létszám)" />
+
+                      <div style="min-width:140px; text-align:right;">
+                        <div class="fw-bold">{{ formatMoney(getRowUnitPrice(row)) }}</div>
+                        <div class="text-muted small" v-if="getRowUnitText(row)">{{ getRowUnitText(row) }}</div>
+                      </div>
+
+                      <div style="min-width:130px; text-align:right;">
+                        <div class="fw-bold">{{ formatMoney(getRowTotal(row)) }}</div>
+                      </div>
+
+                      <button class="btn btn-sm btn-outline-danger trash-out" @click="removeRow('famulus', idx)" title="Töröl">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </div>
+
+                    <div class="d-flex justify-content-end mt-3">
+                      <button class="btn btn-primary" :disabled="rowsUf.length===0 || saving" @click="applyTab('famulus')">
+                        Mentés (UF) és státuszváltás
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Egyetemi fül -->
+                  <div class="tab-pane fade" :class="{ 'show active': activeTab==='uni' }">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <button type="button" class="btn btn-sm btn-outline-primary" @click="addRowWithType('uni')">
+                        <i class="fas fa-plus me-1"></i> Hozzáadás (Egyetemi)
+                      </button>
+                      <div class="text-end">
+                        <div class="h6 mb-0">Egyetemi összesen: {{ formatMoney(totalUni) }}</div>
+                      </div>
+                    </div>
+
+                    <div v-for="(row, idx) in rowsUni" :key="row.id" class="d-flex gap-2 align-items-center mb-2 row-with-trash">
+                      <select class="form-select form-select-sm service-select" style="min-width:260px;"
+                              v-model="row.serviceId" @change="onServiceChange(row)">
+                        <option :value="null">-- válassz szolgáltatást --</option>
+                        <option v-for="p in filteredPricesFor(row)" :key="p.id" :value="p.id">{{ p.name }} — {{ p.category }}</option>
+                      </select>
+
+                      <!-- Egyetemi fülön nincs külső tarifa -->
+                      <input type="hidden" v-model="row.rateKey" />
+
+                      <input type="number" min="0" step="0.25" class="form-control form-control-sm hours-input"
+                             style="width:110px;" v-model="row.hours" placeholder="óra" title="Órák" />
+
+                      <input type="number" min="0" step="1" class="form-control form-control-sm persons-input"
+                             style="width:90px;" v-model="row.persons" placeholder="fő" title="Fő (létszám)" />
+
+                      <div style="min-width:140px; text-align:right;">
+                        <div class="fw-bold">{{ formatMoney(getRowUnitPrice(row)) }}</div>
+                        <div class="text-muted small" v-if="getRowUnitText(row)">{{ getRowUnitText(row) }}</div>
+                      </div>
+
+                      <div style="min-width:130px; text-align:right;">
+                        <div class="fw-bold">{{ formatMoney(getRowTotal(row)) }}</div>
+                      </div>
+
+                      <button class="btn btn-sm btn-outline-danger trash-out" @click="removeRow('uni', idx)" title="Töröl">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </div>
+
+                    <div class="d-flex justify-content-end mt-3">
+                      <button class="btn btn-primary" :disabled="rowsUni.length===0 || saving" @click="applyTab('uni')">
+                        Mentés (Egyetemi)
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <button class="btn btn-sm btn-outline-secondary ms-2 mt-2" @click="clearAllState" title="Súgó: törli a mentett kalkulációkat">
                   <i class="fas fa-trash-alt"></i> LocalStorage törlése
                 </button>
-              </div>
-
-              <div v-for="(row, idx) in rows" :key="row.id" class="d-flex gap-2 align-items-center mb-2 row-with-trash">
-                <select class="form-select form-select-sm service-select" style="min-width:260px;"
-                        v-model="row.serviceId" @change="onServiceChange(row)">
-                  <option :value="null">-- válassz szolgáltatást --</option>
-                  <option v-for="p in filteredPricesFor(row)" :key="p.id" :value="p.id">{{ p.name }} — {{ p.category }}</option>
-                </select>
-
-                <select v-if="row.pricingType !== 'uni'" class="form-select form-select-sm rate-select" v-model="row.rateKey">
-                  <option value="priceUniversity">Egyetemi — Normál</option>
-                  <option value="priceUniversityWeekend">Egyetemi — Hétvége/Éjszaka</option>
-                  <option value="priceExternal">Külső — Normál</option>
-                  <option value="priceExternalWeekend">Külső — Hétvége/Éjszaka</option>
-                </select>
-
-                <input type="number" min="0" step="0.25" class="form-control form-control-sm hours-input"
-                       style="width:110px;" v-model="row.hours" placeholder="óra" title="Órák" />
-
-                <!-- ÚJ: létszám -->
-                <input type="number" min="0" step="1" class="form-control form-control-sm persons-input"
-                       style="width:90px;" v-model="row.persons" placeholder="fő" title="Fő (létszám)" />
-
-                <div style="min-width:140px; text-align:right;">
-                  <div class="fw-bold">{{ formatMoney(getRowUnitPrice(row)) }}</div>
-                  <div class="text-muted small" v-if="getRowUnitText(row)">{{ getRowUnitText(row) }}</div>
-                </div>
-
-                <div style="min-width:130px; text-align:right;">
-                  <div class="fw-bold">{{ formatMoney(getRowTotal(row)) }}</div>
-                </div>
-
-                <!-- kuka gomb: kilógó stílus -->
-                <button class="btn btn-sm btn-outline-danger trash-out" @click="removeRow(idx)" title="Töröl">
-                  <i class="fas fa-trash"></i>
-                </button>
-              </div>
-
-              <hr />
-
-              <div class="d-flex justify-content-between align-items-center">
-                <div>
-                  <small class="text-muted">Sorok: {{ rows.length }}</small>
-                </div>
-                <div class="text-end">
-                  <div class="h5 mb-0">Összesen: {{ formatMoney(total) }}</div>
-                </div>
               </div>
 
               <div v-if="error" class="alert alert-danger mt-2">{{ error }}</div>
@@ -81,10 +143,7 @@
           </div>
 
           <div class="modal-footer">
-            <button class="btn btn-secondary" @click="hide">Mégse</button>
-            <button class="btn btn-primary" :disabled="rows.length===0" @click="apply">
-              Alkalmaz és vissza a rendezvényhez
-            </button>
+            <button class="btn btn-secondary" @click="hide">Bezárás</button>
           </div>
         </div>
       </div>
@@ -98,9 +157,7 @@ import { Modal } from 'bootstrap';
 
 export default {
   name: 'ServiceCostCalculator',
-  props: {
-    event: { type: Object, default: null }
-  },
+  props: { event: { type: Object, default: null } },
   emits: ['calculated','status-updated','refresh-events'],
   setup(props, { emit }) {
     const TARGET_STATUS = 'UF_ARAJANLAT_ELFOGADASARA_VAR';
@@ -109,10 +166,15 @@ export default {
     const loading = ref(false);
     const error = ref('');
     const prices = ref([]);
-    const rows = reactive([]);
-    const saving = ref(false);
 
-    const storageKey = (eventId) => `serviceCalc:${eventId ?? 'global'}`;
+    // KÜLÖN listák
+    const rowsUf  = reactive([]);
+    const rowsUni = reactive([]);
+
+    const saving = ref(false);
+    const activeTab = ref('famulus');
+
+    const storageKey = (eventId, type) => `serviceCalc:${eventId ?? 'global'}:${type}`;
 
     const fetchPrices = async () => {
       loading.value = true;
@@ -207,30 +269,23 @@ export default {
       }
     };
 
-    const addRowWithType = async (type /* 'famulus' | 'uni' */) => {
+    const listFor = (type) => (type === 'uni' ? rowsUni : rowsUf);
+
+    const addRowWithType = async (type) => {
       await ensurePricesLoadedFor(type);
+      const arr = listFor(type);
       const row = {
         id: Date.now() + Math.random(),
         pricingType: type,
         serviceId: null,
-        rateKey: 'priceUniversity',
+        rateKey: type === 'uni' ? 'priceUniversity' : 'priceUniversity', // UF-nál később váltható külsőre is
         hours: '',
         persons: ''
       };
-      if (type === 'uni') {
-        const uniList = prices.value.filter(p => isUniCategory(p.category));
-        if (uniList.length === 0) {
-          alert('Nincs Egyetemi kategóriájú szolgáltatás az árlistában.');
-        }
-        // opcionális: előválasztás
-        // row.serviceId = uniList[0]?.id ?? null;
-      }
-      rows.push(row);
+      arr.push(row);
     };
-    // visszafelé kompatibilitás: ha valahol még az addRow hívódna
-    const addRow = () => addRowWithType('famulus');
 
-    const removeRow = (idx) => rows.splice(idx, 1);
+    const removeRow = (type, idx) => listFor(type).splice(idx, 1);
 
     const findPriceById = (id) => prices.value.find(p => p.id === id) || null;
 
@@ -240,64 +295,50 @@ export default {
       return c === 'uf' || c === 'uni-famulus' || c === 'uni famulus' || c.includes('famulus');
     };
 
-     // Egyetemi soroknál csak az "Egyetemi" kategóriájú tételek jelenjenek meg.
-     const filteredPricesFor = (row) => {
+    const filteredPricesFor = (row) => {
       if (!row?.pricingType) return prices.value;
-      if (row.pricingType === 'uni') {
-        return prices.value.filter(p => isUniCategory(p.category));     // csak Egyetemi
-      }
-      return prices.value.filter(p => isUfCategory(p.category));        // csak UF/Uni‑Famulus
-     };
+      if (row.pricingType === 'uni') return prices.value.filter(p => isUniCategory(p.category));
+      return prices.value.filter(p => isUfCategory(p.category));
+    };
+
+    const isExternalRate = (row) => row.pricingType !== 'uni' && (row.rateKey === 'priceExternal' || row.rateKey === 'priceExternalWeekend');
 
     const getRowUnitPrice = (row) => {
       const p = findPriceById(row.serviceId);
       if (!p) return 0;
       const base = Number(p[row.rateKey] ?? 0) || 0;
-      // ha a választott tarifa külső (a táblázatban +Áfa), akkor hozzáadjuk a 27% ÁFÁ-t
-      if (row.pricingType !== 'uni' && (row.rateKey === 'priceExternal' || row.rateKey === 'priceExternalWeekend')) {
-        return Math.round(base * 1.27 * 100) / 100;
-      }
-      return base;
+      return isExternalRate(row) ? Math.round(base * 1.27 * 100) / 100 : base;
     };
 
     const getRowUnitText = (row) => {
       const p = findPriceById(row.serviceId);
       if (!p) return '';
-      if (p.unit) {
-        if (row.pricingType !== 'uni' && (row.rateKey === 'priceExternal' || row.rateKey === 'priceExternalWeekend')) {
-          return `+Áfa / ${p.unit}`;
-        }
-        return `/ ${p.unit}`;
-      }
-      if (row.pricingType !== 'uni' && (row.rateKey === 'priceExternal' || row.rateKey === 'priceExternalWeekend')) {
-        return '+Áfa';
-      }
-      return '';
+      if (p.unit) return `${isExternalRate(row) ? '+Áfa / ' : '/ '}${p.unit}`;
+      return isExternalRate(row) ? '+Áfa' : '';
     };
 
     const getRowTotal = (row) => {
-      // Üres vagy nem szám -> 0
       const h = row.hours === '' ? 0 : (Number(row.hours) || 0);
       const pe = row.persons === '' ? 0 : (Number(row.persons) || 0);
       return getRowUnitPrice(row) * h * pe;
     };
 
-    const total = computed(() => {
-      return rows.reduce((s, r) => s + getRowTotal(r), 0);
-    });
+    const totalUf  = computed(() => rowsUf.reduce((s, r) => s + getRowTotal(r), 0));
+    const totalUni = computed(() => rowsUni.reduce((s, r) => s + getRowTotal(r), 0));
 
-    const formatMoney = (v) => {
-      return (Number(v) || 0).toLocaleString('hu-HU') + ' Ft';
-    };
+    const totalFor = (type) => (type === 'uni' ? totalUni.value : totalUf.value);
 
-    // ----- persistence: per-event localStorage -----
-    const saveState = (eventId) => {
+    const formatMoney = (v) => (Number(v) || 0).toLocaleString('hu-HU') + ' Ft';
+
+    // ----- per-tab localStorage -----
+    const saveState = (eventId, type) => {
       try {
-        const key = storageKey(eventId);
+        const key = storageKey(eventId, type);
+        const arr = listFor(type);
         const payload = {
-          rows: rows.map(r => ({
+          rows: arr.map(r => ({
             id: r.id,
-            pricingType: r.pricingType || 'famulus',
+            pricingType: r.pricingType,
             serviceId: r.serviceId,
             rateKey: r.rateKey,
             hours: r.hours === '' ? null : r.hours,
@@ -311,22 +352,23 @@ export default {
       }
     };
 
-    const loadState = (eventId) => {
+    const loadState = (eventId, type) => {
       try {
-        const key = storageKey(eventId);
+        const key = storageKey(eventId, type);
         const raw = localStorage.getItem(key);
         if (!raw) return false;
         const parsed = JSON.parse(raw);
         if (!parsed || !Array.isArray(parsed.rows)) return false;
-        rows.splice(0, rows.length);
+        const arr = listFor(type);
+        arr.splice(0, arr.length);
         parsed.rows.forEach(r => {
-          rows.push({
+          arr.push({
             id: r.id ?? (Date.now() + Math.random()),
-            pricingType: r.pricingType || 'famulus',
+            pricingType: r.pricingType || type,
             serviceId: r.serviceId ?? null,
-            rateKey: r.rateKey ?? (r.pricingType === 'uni' ? 'priceUniversity' : 'priceUniversity'),
-            hours: (r.hours === null || r.hours === undefined) ? '' : r.hours,
-            persons: (r.persons === null || r.persons === undefined) ? '' : r.persons
+            rateKey: r.rateKey ?? 'priceUniversity',
+            hours: (r.hours == null) ? '' : r.hours,
+            persons: (r.persons == null) ? '' : r.persons
           });
         });
         return true;
@@ -336,57 +378,62 @@ export default {
       }
     };
 
-    const clearState = () => {
+    const clearAllState = () => {
       try {
-        const key = storageKey(props.event?.id);
-        localStorage.removeItem(key);
-        // also clear current rows
-        rows.splice(0, rows.length);
+        const id = props.event?.id;
+        localStorage.removeItem(storageKey(id, 'famulus'));
+        localStorage.removeItem(storageKey(id, 'uni'));
+        rowsUf.splice(0, rowsUf.length);
+        rowsUni.splice(0, rowsUni.length);
       } catch (e) {
-        console.error('clearState error', e);
+        console.error('clearAllState error', e);
       }
     };
 
-    // autosave on rows change (deep)
-    watch(rows, () => {
-      if (props.event && props.event.id != null) saveState(props.event.id);
-    }, { deep: true });
+    // autosave mindkét listára
+    watch(rowsUf,  () => { if (props.event?.id != null) saveState(props.event.id, 'famulus'); }, { deep: true });
+    watch(rowsUni, () => { if (props.event?.id != null) saveState(props.event.id, 'uni'); }, { deep: true });
 
-    // if event prop changes, attempt to load saved state for that event
-    watch(() => props.event, (newEv) => {
-      if (newEv && newEv.id != null) {
-        const loaded = loadState(newEv.id);
-        if (!loaded) {
-          // no saved state: ensure at least one empty row
-          rows.splice(0, rows.length);
-          addRow();
-        }
+    // event váltáskor betöltjük mindkét listát
+    watch(() => props.event, (ev) => {
+      rowsUf.splice(0, rowsUf.length);
+      rowsUni.splice(0, rowsUni.length);
+      if (ev?.id != null) {
+        const gotUf  = loadState(ev.id, 'famulus');
+        const gotUni = loadState(ev.id, 'uni');
+        if (!gotUf && rowsUf.length === 0)  addRowWithType('famulus');
+        if (!gotUni && rowsUni.length === 0) addRowWithType('uni');
       } else {
-        // no event: keep one row
-        rows.splice(0, rows.length);
-        addRow();
+        addRowWithType('famulus');
+        addRowWithType('uni');
       }
     }, { immediate: false });
 
     const show = async () => {
       if (!modalInstance) modalInstance = new Modal(modal.value, { backdrop: 'static' });
       await fetchPrices();
-      // try to load saved state for current event when showing
-      if (props.event && props.event.id != null) {
-        const ok = loadState(props.event.id);
-        if (!ok && rows.length === 0) addRow();
+      const id = props.event?.id;
+      if (id != null) {
+        const okUf  = loadState(id, 'famulus');
+        const okUni = loadState(id, 'uni');
+        if (!okUf && rowsUf.length === 0) addRowWithType('famulus');
+        if (!okUni && rowsUni.length === 0) addRowWithType('uni');
       } else {
-        if (rows.length === 0) addRow();
+        if (rowsUf.length === 0) addRowWithType('famulus');
+        if (rowsUni.length === 0) addRowWithType('uni');
       }
       modalInstance.show();
     };
 
     const hide = () => {
-      if (props.event && props.event.id != null) saveState(props.event.id);
+      const id = props.event?.id;
+      if (id != null) {
+        saveState(id, 'famulus');
+        saveState(id, 'uni');
+      }
       if (modalInstance) modalInstance.hide();
     };
 
-    // státusz váltás: UF Árajánlat elfogadására vár
     const setStatusUFOfferPending = async () => {
       if (!props.event || props.event.id == null) return;
       const res = await fetch(`/api/kerveny/${props.event.id}/status`, {
@@ -416,10 +463,12 @@ export default {
       }
     };
 
-    const apply = async () => {
-      const breakdown = rows.map(r => {
+    const buildBreakdown = (type) => {
+      const arr = listFor(type);
+      return arr.map(r => {
         const p = findPriceById(r.serviceId);
         return {
+          pricingType: type,
           serviceId: r.serviceId,
           serviceName: p ? p.name : null,
           hours: (r.hours === '' ? 0 : (Number(r.hours) || 0)),
@@ -430,21 +479,29 @@ export default {
           rateKey: r.rateKey
         };
       });
+    };
 
-      const payload = { breakdown, total: total.value };
+    const applyTab = async (type /* 'famulus' | 'uni' */) => {
+      const breakdown = buildBreakdown(type);
+      const payload = { breakdown, total: totalFor(type), pricingType: type };
       try {
-        await saveAndAdvanceStatus(payload);         // költségek mentése
-        await setStatusUFOfferPending();            // státusz átállítás UF_ARAJANLAT_ELFOGADASARA_VAR-ra
+        await saveAndAdvanceStatus(payload);      // csak az adott típus sorai kerülnek mentésre
+        if (type === 'famulus') {
+          await setStatusUFOfferPending();       // UF mentés után státusz mint eddig
+        }
       } catch (e) {
         error.value = e.message || 'Mentési hiba';
         return;
       }
 
-      if (props.event && props.event.id != null) saveState(props.event.id);
-      emit('status-updated', { id: props.event.id, statusz: TARGET_STATUS });
-      emit('refresh-events');                       // szülő komponens frissítse a listát
-      emit('calculated', { event: props.event, breakdown, total: total.value });
-      hide();
+      const id = props.event?.id;
+      if (id != null) saveState(id, type);
+
+      if (type === 'famulus') {
+        emit('status-updated', { id, statusz: TARGET_STATUS });
+      }
+      emit('refresh-events');
+      emit('calculated', { event: props.event, breakdown, total: totalFor(type), pricingType: type });
     };
 
     const onServiceChange = (row) => {
@@ -460,16 +517,22 @@ export default {
     };
 
     return {
-      modal, loading, prices, rows, addRow, removeRow,
-      getRowUnitPrice, getRowTotal, total, formatMoney,
-      show, hide, apply, error, onServiceChange, getRowUnitText,
-      clearState, saving, addRowWithType, filteredPricesFor
+      modal, loading, prices,
+      rowsUf, rowsUni,
+      addRowWithType, removeRow,
+      getRowUnitPrice, getRowUnitText, getRowTotal,
+      totalUf, totalUni, formatMoney,
+      show, hide, error, onServiceChange,
+      clearAllState, saving, filteredPricesFor,
+      activeTab, applyTab
     };
   }
 };
 </script>
 
 <style scoped>
+/* opcionális: semmi extra nem szükséges, Bootstrap nav-tabs elég */
+
 /* opcionális kis kiegészítés: a két szám mező közelebb kerülhet */
 .row-with-trash input[type=number] { text-align: right; }
 
