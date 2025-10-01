@@ -271,55 +271,127 @@ const updateKervenyStatus = async (req, res) => {
   }
 };
 
+// segédfüggvények az egységhez
+function normUnit(s) {
+  return (s ?? '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+}
+function calcMultiplier(u, { hours=0, persons=0, days=0, occasions=0, quantity=0 }) {
+  const unit = normUnit(u);
+  if (unit.includes('db/alkalom')) return (quantity || 0) * (occasions || 0);
+  if (unit.includes('fo/ora'))     return (persons || 0) * (hours || 0);
+  if (unit.includes('nap'))        return (days || 0);
+  if (unit.includes('ora'))        return (hours || 0);
+  if (unit === 'fo' || unit.includes(' fo')) return (persons || 0);
+  if (unit.includes('alkalom'))    return (occasions || 0);
+  if (unit === 'db' || unit.includes(' db')) return (quantity || 0);
+  // fallback
+  return (persons || 0) * (hours || 0);
+}
+
 async function saveCostsAndAdvance(req, res) {
   const client = await pool.connect();
   try {
     const { id } = req.params;
-    const { breakdown, total } = req.body;
+    const { breakdown, total } = req.body || {};
+    const rawType = (req.body?.pricingType || req.body?.type || '').toString().toLowerCase();
+    const pricingType = ['uni', 'egyetemi', 'university'].includes(rawType) ? 'uni' : 'famulus';
 
     if (!id) return res.status(400).json({ error: 'Missing id' });
     if (!Array.isArray(breakdown)) return res.status(400).json({ error: 'Invalid breakdown' });
 
+    const UF_WHERE = `
+      kategoria IS NOT NULL AND (
+        lower(kategoria) IN ('uf','uni-famulus','uni famulus')
+        OR kategoria ILIKE '%famulus%'
+      )`;
+    const isUniCategory = (cat) => (cat || '').trim().toLowerCase() === 'egyetemi';
+    const isUfCategory  = (cat) => {
+      const c = (cat || '').trim().toLowerCase();
+      return c === 'uf' || c === 'uni-famulus' || c === 'uni famulus' || c.includes('famulus');
+    };
+
+    const RATE_KEYS = new Set(['priceUniversity','priceUniversityWeekend','priceExternal','priceExternalWeekend']);
+
     await client.query('BEGIN');
 
-    await client.query('DELETE FROM kerveny_koltseg WHERE kerveny_id = $1', [id]);
+    // csak az adott kategóriájú régi sorok törlése
+    const deleteSql = pricingType === 'uni'
+      ? `DELETE FROM kerveny_koltseg WHERE kerveny_id = $1
+           AND service_id IN (SELECT id FROM prices WHERE lower(kategoria) = 'egyetemi')`
+      : `DELETE FROM kerveny_koltseg WHERE kerveny_id = $1
+           AND service_id IN (SELECT id FROM prices WHERE ${UF_WHERE})`;
+    await client.query(deleteSql, [id]);
 
-    const insertText = `
+    const insertSql = `
       INSERT INTO kerveny_koltseg
-        (kerveny_id, service_id, service_name, rate_key, unit, hours, persons, unit_price, line_total)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-    `;
+        (kerveny_id, service_id, service_name, rate_key, unit,
+         hours, persons, days, occasions, quantity,
+         unit_price, line_total)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`;
 
-    for (const row of breakdown) {
-      await client.query(insertText, [
-        id,
-        row.serviceId || null,
-        row.serviceName || null,
-        row.rateKey || null,
-        row.unit || null,
-        row.hours || 0,
-        row.persons || 0,
-        row.unitPrice || 0,
-        row.lineTotal || 0
+    let inserted = 0;
+
+    for (const r of breakdown) {
+      const serviceId = Number(r.serviceId) || null;
+      if (!serviceId) continue;
+
+      const rateKey = String(r.rateKey || 'priceUniversity');
+      if (!RATE_KEYS.has(rateKey)) continue;
+
+      const hours = Number(r.hours) || 0;
+      const persons = Number(r.persons) || 0;
+      const days = Number(r.days) || 0;
+      const occasions = Number(r.occasions) || 0;
+      const quantity = Number(r.quantity) || 0;
+
+      const pr = await client.query(
+        `SELECT id, megnevezes, kategoria, mertekegyseg,
+                ar_egyetem, ar_egyetem_hetvege, ar_kulso, ar_kulso_hetvege
+           FROM prices WHERE id = $1`, [serviceId]);
+      if (pr.rowCount === 0) continue;
+
+      const p = pr.rows[0];
+      if (pricingType === 'uni' && !isUniCategory(p.kategoria)) continue;
+      if (pricingType === 'famulus' && !isUfCategory(p.kategoria)) continue;
+
+      const unitPriceMap = {
+        priceUniversity: Number(p.ar_egyetem) || 0,
+        priceUniversityWeekend: Number(p.ar_egyetem_hetvege) || 0,
+        priceExternal: Number(p.ar_kulso) || 0,
+        priceExternalWeekend: Number(p.ar_kulso_hetvege) || 0
+      };
+      const unit_price = unitPriceMap[rateKey] || 0;
+      const multiplier = calcMultiplier(p.mertekegyseg, { hours, persons, days, occasions, quantity });
+      const line_total = unit_price * multiplier;
+
+      await client.query(insertSql, [
+        id, p.id, p.megnevezes || null, rateKey, p.mertekegyseg || null,
+        hours, persons, days, occasions, quantity,
+        unit_price, line_total
       ]);
+      inserted++;
     }
 
-    await client.query(`
-      ALTER TABLE kerveny
-      ADD COLUMN IF NOT EXISTS koltseg_osszesen NUMERIC(14,2)
-    `);
-
-    const result = await client.query(
-      'UPDATE kerveny SET koltseg_osszesen = $2, statusz = $3 WHERE id = $1 RETURNING id,statusz,koltseg_osszesen',
-      [id, total || 0, TARGET_STATUS_AFTER_COST]
+    // főösszeg frissítése
+    const sumRes = await client.query(
+      'SELECT COALESCE(SUM(line_total),0) AS s FROM kerveny_koltseg WHERE kerveny_id = $1',
+      [id]
     );
+    const newTotal = Number(sumRes.rows[0]?.s || 0);
+
+    // UF mentésnél opcionális státuszléptetés (ha kell)
+    if (pricingType === 'famulus') {
+      await client.query('UPDATE kerveny SET koltseg_osszesen = $2 WHERE id = $1', [id, newTotal]);
+      // státuszt a frontend külön PATCH-eli, így itt nem írunk bele
+    } else {
+      await client.query('UPDATE kerveny SET koltseg_osszesen = $2 WHERE id = $1', [id, newTotal]);
+    }
 
     await client.query('COMMIT');
-    res.json({ ok: true, event: result.rows[0] });
+    res.json({ ok: true, pricingType, inserted, total: newTotal, clientTotal: Number(total) || 0 });
   } catch (e) {
     await client.query('ROLLBACK');
-    console.error('saveCostsAndAdvance error', e);
-    res.status(500).json({ error: 'Cost save failed' });
+    res.status(500).json({ error: e.message || 'Mentési hiba' });
   } finally {
     client.release();
   }

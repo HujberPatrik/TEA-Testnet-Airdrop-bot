@@ -178,38 +178,30 @@
               <h5>Famulus árlista</h5>
               <div v-if="famulusLoading">Árak betöltése...</div>
               <div v-else-if="famulusError" class="text-danger">{{ famulusError }}</div>
-              <table v-else class="table table-bordered table-sm">
-                <thead>
-                  <tr>
-                    <th>Id</th>
-                    <th>Kérvény Id</th>
-                    <th>Szolgáltatás Id</th>
-                    <th>Megnevezés</th>
-                    <th>Kategória</th>
-                    <th>Mértékegység</th>
-                    <th>Időtartam</th>
-                    <th>Személyek száma</th>
-                    <th>Egység ár</th>
-                    <th>Teljes Szolgáltatás ára</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="item in famulusPrices" :key="item.id">
-                    <td v-for="i in item">{{ i }}</td>
-                    <!-- <td>{{ item.service_name }}</td>
-                    <td>{{ item.rate_key }}</td>
-                    <td>{{ item.unit }}</td>
-                    <td>{{ item.hours }} Óra </td>
-                    <td>{{ item.persons }} Fő </td>
-                    <td>{{ item.unit_price }} Ft </td>
-                    <td>{{ item.line_total }} Ft </td> -->
 
-                  </tr>
-                </tbody>
-              </table>
-              <!-- <div class="d-flex justify-content-center mt-3">
-                <Button  @click="addRow()" class="btn btn-primary">Szolgáltatás hozzáadása</Button>
-              </div> -->
+              <div v-else>
+                <div v-for="grp in famulusGroups" :key="'fam-'+grp.unitNorm" class="mb-4">
+                  <h6 class="mb-2">Mértékegység: <strong>{{ grp.unitLabel || '—' }}</strong></h6>
+                  <table class="table table-bordered table-sm">
+                    <thead>
+                      <tr>
+                        <th>Megnevezés</th>
+                        <th v-for="c in grp.cols" :key="c.key">{{ c.label }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="row in grp.rows" :key="row.id">
+                        <td>{{ row.service_name || row.megnevezes }}</td>
+                        <td v-for="c in grp.cols" :key="c.key">
+                          <span v-if="c.format === 'money'">{{ money(row[c.key]) }}</span>
+                          <span v-else>{{ displayNumber(row[c.key]) }}</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
               <div class="d-flex gap-3 mt-3">
                 <button
                   class="btn btn-success"
@@ -241,43 +233,41 @@
               <h5>Egyetemi árlista</h5>
               <div v-if="uniLoading">Árak betöltése...</div>
               <div v-else-if="uniError" class="text-danger">{{ uniError }}</div>
-              <table v-else class="table table-bordered table-sm">
-                <thead>
-                  <tr>
-                    <th>Id</th>
-                    <th>Kérvény Id</th>
-                    <th>Szolgáltatás Id</th>
-                    <th>Megnevezés</th>
-                    <th>Kategória</th>
-                    <th>Mértékegység</th>
-                    <th>Időtartam</th>
-                    <th>Személyek száma</th>
-                    <th>Egység ár</th>
-                    <th>Teljes Szolgáltatás ára</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="item in uniPrices" :key="item.id">
-                    <td v-for="i in item">{{ i }}</td>
-                  </tr>
-                </tbody>
-              </table>
-              <!-- <div class="d-flex justify-content-center mt-3">
-                <Button @click="addRowUni()" class="btn btn-primary">Szolgáltatás hozzáadása</Button>
-              </div> -->
+              <div v-else>
+                <div v-for="grp in universityGroups" :key="'uni-'+grp.unitNorm" class="mb-4">
+                  <h6 class="mb-2">Mértékegység: <strong>{{ grp.unitLabel || '—' }}</strong></h6>
+                  <table class="table table-bordered table-sm">
+                    <thead>
+                      <tr>
+                        <th>Megnevezés</th>
+                        <th v-for="c in grp.cols" :key="c.key">{{ c.label }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="row in grp.rows" :key="row.id">
+                        <td>{{ row.service_name || row.megnevezes }}</td>
+                        <td v-for="c in grp.cols" :key="c.key">
+                          <span v-if="c.format === 'money'">{{ money(row[c.key]) }}</span>
+                          <span v-else>{{ displayNumber(row[c.key]) }}</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
               <div class="d-flex gap-3 mt-3">
                 <button
                   class="btn btn-success"
-                  @click="acceptOfferFromFamulus"
+                  @click="generateUniversityQuote"
                   :disabled="statusChanging"
                 >
                   <i v-if="!statusChanging" class="fas fa-check-circle me-1"></i>
                   <i v-else class="fas fa-spinner fa-spin me-1"></i>
-                  Ajánlat elfogadása
+                  Árajánlat generálása
                 </button>
                 <button
                   class="btn btn-warning"
-                  @click="requestUfOfferChange"
+                  @click="requestUniversityOfferChange"
                   :disabled="statusChanging"
                 >
                   <i v-if="!statusChanging" class="fas fa-edit me-1"></i>
@@ -757,7 +747,13 @@ export default {
     canAcceptQuote() {
       return isAdminRole(this.effectiveUserRole);
     },
-    
+    // Egység (mértékegység) szerinti csoportosítás a táblázathoz
+    famulusGroups() {
+      return this.buildUnitGroups(this.famulusPrices);
+    },
+    universityGroups() {
+      return this.buildUnitGroups(this.uniPrices);
+    }
   },
   watch: {
     event: {
@@ -831,6 +827,51 @@ export default {
         this.statusChanging = false;
       }
     },
+    async generateUniversityQuote() {
+      if (!this.event?.id || this.statusChanging) return;
+      this.statusChanging = true;
+      try {
+        const newStatus = 'ARAJANLAT_ELFOGADASRA_VAR';
+        const resp = await axios.patch(
+          `http://localhost:3000/api/kerveny/${this.event.id}/status`,
+          { statusz: newStatus }
+        );
+        if (resp.status === 200) {
+          // Lokális állapot frissítése (azonnali UI visszajelzés)
+          this.event.statusz = newStatus;
+          // Szülő értesítése + lista frissítés
+          this.$emit('status-updated', { ...this.event, statusz: newStatus });
+          this.$emit('refresh-events'); // fetchevents
+        }
+      } catch (e) {
+        console.error('Árajánlat generálása státuszváltás hiba:', e);
+        alert('Nem sikerült átállítani a státuszt.');
+      } finally {
+        this.statusChanging = false;
+      }
+    },
+    // Egyetem fül: Módosítás kérése → Árajánlat készítésére vár
+    async requestUniversityOfferChange() {
+      if (!this.event?.id || this.statusChanging) return;
+      this.statusChanging = true;
+      try {
+        const newStatus = 'ARAJANLAT_KESZITESERE_VAR';
+        const resp = await axios.patch(
+          `http://localhost:3000/api/kerveny/${this.event.id}/status`,
+          { statusz: newStatus }
+        );
+        if (resp.status === 200) {
+          this.event.statusz = newStatus;
+          this.$emit('status-updated', { ...this.event, statusz: newStatus });
+          this.$emit('refresh-events'); // fetchevents
+        }
+      } catch (e) {
+        console.error('Egyetemi módosítás státusz hiba:', e);
+       alert('Nem sikerült visszaállítani a státuszt.');
+      } finally {
+       this.statusChanging = false;
+      }
+  },
     // Módosítás kérése → UF_ARAJANLATRA_VAR (reuse)
     async requestUfOfferChange() {
       // ugyanazt a logikát használjuk, ami már emiteli a refresh-events-et
@@ -1053,7 +1094,69 @@ export default {
       } finally {
         this.uniLoading = false;
       }
-    }
+    },
+    // ===== Dinamikus táblázat segédek (mértékegység alapján) =====
+    normalizeUnit(s) {
+      return (s ?? '')
+        .toString()
+        .toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .trim();
+    },
+    unitColumnDefs(unitNorm) {
+      // csak az adott egységhez kapcsolódó oszlopok
+      // minden táblában a "Megnevezés" oszlop fixen megjelenik (service_name)
+      const cols = [];
+      const add = (key, label, format) => cols.push({ key, label, format });
+      if (unitNorm.includes('db/alkalom')) {
+        add('quantity', 'Darab');
+        add('occasions', 'Alkalom');
+      } else if (unitNorm.includes('fo/ora')) {
+        add('hours', 'Óra');
+        add('persons', 'Fő');
+      } else if (unitNorm.includes('nap')) {
+        add('days', 'Nap');
+      } else if (unitNorm.includes('ora')) {
+        add('hours', 'Óra');
+      } else if (unitNorm === 'fo' || unitNorm.includes(' fo')) {
+        add('persons', 'Fő');
+      } else if (unitNorm.includes('alkalom')) {
+        add('occasions', 'Alkalom');
+      } else if (unitNorm === 'db' || unitNorm.includes(' db')) {
+        add('quantity', 'Darab');
+      } else {
+        // ismeretlen egység → óra × fő a visszaesés
+        add('hours', 'Óra'); add('persons', 'Fő');
+      }
+      add('unit_price', 'Egység ár', 'money');
+      add('line_total', 'Teljes Szolgáltatás ára', 'money');
+      return cols;
+    },
+    buildUnitGroups(items) {
+      const map = new Map();
+      (Array.isArray(items) ? items : []).forEach(r => {
+        const unitLabel = r.unit || r.mertekegyseg || '';
+        const unitNorm = this.normalizeUnit(unitLabel);
+        if (!map.has(unitNorm)) {
+          map.set(unitNorm, { unitNorm, unitLabel, rows: [] });
+        }
+        map.get(unitNorm).rows.push(r);
+      });
+      return Array.from(map.values()).map(g => ({
+        ...g,
+        cols: this.unitColumnDefs(g.unitNorm)
+      }));
+    },
+    money(v) {
+      const n = Number(v) || 0;
+      return n.toLocaleString('hu-HU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    },
+    displayNumber(v) {
+      const n = Number(v);
+      if (Number.isNaN(n)) return v ?? '';
+      // egész számokra nincs tizedes, egyébként 2 tizedes
+      return Number.isInteger(n) ? n.toString() : n.toFixed(2);
+    },
   }
 };
 </script>
@@ -1493,6 +1596,9 @@ export default {
 }
 
 /* Hibaüzenetek */
+
+
+
 .error-message {
   color: #dc3545;
   font-size: 0.875rem;
@@ -1584,7 +1690,7 @@ export default {
 .status-unknown { background:#ccc; color:#333; }
 
 /* Státusz modal csoportosítás */
-.status-phase-group + .status-phase-group {
+.status-phase-group + .status-phasegroup {
   margin-top:1rem;
   padding-top:.75rem;
   border-top:1px solid #e5e5e5;

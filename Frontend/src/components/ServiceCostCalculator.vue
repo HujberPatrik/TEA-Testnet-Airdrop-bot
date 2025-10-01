@@ -78,8 +78,8 @@
                     </div>
 
                     <div class="d-flex justify-content-end mt-3">
-                      <button class="btn btn-primary" :disabled="rowsUf.length===0 || saving" @click="applyTab('famulus')">
-                        Mentés (UF) és státuszváltás
+                      <button class="btn btn-primary" :disabled="rowsUf.length===0 || saving" @click="commitUf">
+                        Mentés (UF)
                       </button>
                     </div>
                   </div>
@@ -105,10 +105,20 @@
                       <!-- Egyetemi fülön nincs külső tarifa -->
                       <input type="hidden" v-model="row.rateKey" />
 
-                      <input type="number" min="0" step="0.25" class="form-control form-control-sm hours-input"
+                      <!-- D I N A M I K U S   M E Z Ő K   A   M É R T É K E G Y S É G   A L A P J Á N -->
+                      <input v-if="showQuantity(row)" type="number" min="0" step="1" class="form-control form-control-sm"
+                             style="width:110px;" v-model="row.quantity" placeholder="db" title="Darabszám" />
+
+                      <input v-if="showOccasions(row)" type="number" min="0" step="1" class="form-control form-control-sm"
+                             style="width:110px;" v-model="row.occasions" placeholder="alkalom" title="Alkalom" />
+
+                      <input v-if="showDays(row)" type="number" min="0" step="0.25" class="form-control form-control-sm"
+                             style="width:110px;" v-model="row.days" placeholder="nap" title="Napok" />
+
+                      <input v-if="showHours(row)" type="number" min="0" step="0.25" class="form-control form-control-sm"
                              style="width:110px;" v-model="row.hours" placeholder="óra" title="Órák" />
 
-                      <input type="number" min="0" step="1" class="form-control form-control-sm persons-input"
+                      <input v-if="showPersons(row)" type="number" min="0" step="1" class="form-control form-control-sm"
                              style="width:90px;" v-model="row.persons" placeholder="fő" title="Fő (létszám)" />
 
                       <div style="min-width:140px; text-align:right;">
@@ -126,7 +136,7 @@
                     </div>
 
                     <div class="d-flex justify-content-end mt-3">
-                      <button class="btn btn-primary" :disabled="rowsUni.length===0 || saving" @click="applyTab('uni')">
+                      <button class="btn btn-primary" :disabled="rowsUni.length===0 || saving" @click="commitUni">
                         Mentés (Egyetemi)
                       </button>
                     </div>
@@ -278,9 +288,10 @@ export default {
         id: Date.now() + Math.random(),
         pricingType: type,
         serviceId: null,
-        rateKey: type === 'uni' ? 'priceUniversity' : 'priceUniversity', // UF-nál később váltható külsőre is
-        hours: '',
-        persons: ''
+        rateKey: type === 'uni' ? 'priceUniversity' : 'priceUniversity',
+        hours: '', persons: '',
+        // új mennyiségi mezők (egyetemi egységekhez)
+        days: '', occasions: '', quantity: ''
       };
       arr.push(row);
     };
@@ -317,10 +328,53 @@ export default {
       return isExternalRate(row) ? '+Áfa' : '';
     };
 
+    const normalizeUnit = (s) =>
+      (s ?? '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
+    const unitFields = (unit) => {
+      const u = normalizeUnit(unit);
+      // preferált specifikus találatok
+      if (u.includes('db/alkalom')) return { qty:true, occ:true };
+      if (u.includes('fo/ora'))     return { per:true, hrs:true };
+      if (u.includes('nap'))        return { days:true };
+      if (u.includes('ora'))        return { hrs:true };
+      if (u === 'fo' || u.includes(' fo')) return { per:true };
+      if (u.includes('alkalom'))    return { occ:true };
+      if (u === 'db' || u.includes(' db')) return { qty:true };
+      // alapértelmezett: órák × fő (visszafelé kompatibilitás)
+      return { per:true, hrs:true };
+    };
+
+    const showPersons   = (row) => unitFields(findPriceById(row.serviceId)?.unit).per  === true;
+    const showHours     = (row) => unitFields(findPriceById(row.serviceId)?.unit).hrs  === true;
+    const showDays      = (row) => unitFields(findPriceById(row.serviceId)?.unit).days === true;
+    const showOccasions = (row) => unitFields(findPriceById(row.serviceId)?.unit).occ  === true;
+    const showQuantity  = (row) => unitFields(findPriceById(row.serviceId)?.unit).qty  === true;
+
+    const getMultiplier = (row) => {
+      const p = findPriceById(row.serviceId);
+      const u = normalizeUnit(p?.unit);
+      const h  = row.hours === '' ? 0 : Number(row.hours) || 0;
+      const pe = row.persons === '' ? 0 : Number(row.persons) || 0;
+      const d  = row.days === '' ? 0 : Number(row.days) || 0;
+      const oc = row.occasions === '' ? 0 : Number(row.occasions) || 0;
+      const q  = row.quantity === '' ? 0 : Number(row.quantity) || 0;
+
+      if (u.includes('db/alkalom')) return q * oc;
+      if (u.includes('fo/ora'))     return pe * h;
+      if (u.includes('nap'))        return d;
+      if (u.includes('ora'))        return h;
+      if (u === 'fo' || u.includes(' fo')) return pe;
+      if (u.includes('alkalom'))    return oc;
+      if (u === 'db' || u.includes(' db')) return q;
+
+      // fallback: fő × óra
+      return pe * h;
+    };
+
     const getRowTotal = (row) => {
-      const h = row.hours === '' ? 0 : (Number(row.hours) || 0);
-      const pe = row.persons === '' ? 0 : (Number(row.persons) || 0);
-      return getRowUnitPrice(row) * h * pe;
+      const unit = getRowUnitPrice(row);
+      return unit * getMultiplier(row);
     };
 
     const totalUf  = computed(() => rowsUf.reduce((s, r) => s + getRowTotal(r), 0));
@@ -342,7 +396,10 @@ export default {
             serviceId: r.serviceId,
             rateKey: r.rateKey,
             hours: r.hours === '' ? null : r.hours,
-            persons: r.persons === '' ? null : r.persons
+            persons: r.persons === '' ? null : r.persons,
+            days: r.days === '' ? null : r.days,
+            occasions: r.occasions === '' ? null : r.occasions,
+            quantity: r.quantity === '' ? null : r.quantity
           })),
           savedAt: Date.now()
         };
@@ -368,7 +425,10 @@ export default {
             serviceId: r.serviceId ?? null,
             rateKey: r.rateKey ?? 'priceUniversity',
             hours: (r.hours == null) ? '' : r.hours,
-            persons: (r.persons == null) ? '' : r.persons
+            persons: (r.persons == null) ? '' : r.persons,
+            days: (r.days == null) ? '' : r.days,
+            occasions: (r.occasions == null) ? '' : r.occasions,
+            quantity: (r.quantity == null) ? '' : r.quantity
           });
         });
         return true;
@@ -447,17 +507,74 @@ export default {
       }
     };
 
-    const saveAndAdvanceStatus = async (payload) => {
-      if (!props.event || props.event.id == null) return;
+    // segéd: POST több lehetséges útvonalra, az első sikeresig
+    const postWithFallback = async (paths, payload) => {
+      let lastErr;
+      for (const p of paths) {
+        try {
+          const res = await fetch(p, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (res.ok) return await res.json();
+          lastErr = new Error(`HTTP ${res.status}`);
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+      throw lastErr || new Error('Ismeretlen hiba');
+    };
+
+    // UF mentés külön “SQL insert”-ként
+    const commitUf = async () => {
+      if (!props.event?.id) return;
       saving.value = true;
+      const id = props.event.id;
+      const breakdown = buildBreakdown('famulus');
+      const payload = { breakdown, total: totalUf.value, pricingType: 'famulus' };
       try {
-        const res = await fetch(`/api/kerveny/${props.event.id}/costs/commit`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        if (!res.ok) throw new Error('Mentés hiba');
-        return await res.json();
+        await postWithFallback(
+          [
+            `/api/kerveny/${id}/costs/commit-uf`,
+            `/api/kerveny/${id}/costs/commit?type=famulus`,
+            `/api/kerveny/${id}/costs/commit`
+          ],
+          payload
+        );
+        await setStatusUFOfferPending();
+        saveState(id, 'famulus');
+        emit('status-updated', { id, statusz: TARGET_STATUS });
+        emit('refresh-events');
+        emit('calculated', { event: props.event, breakdown, total: totalUf.value, pricingType: 'famulus' });
+      } catch (e) {
+        error.value = e.message || 'Mentési hiba (UF)';
+      } finally {
+        saving.value = false;
+      }
+    };
+
+    // Egyetemi mentés külön “SQL insert”-ként
+    const commitUni = async () => {
+      if (!props.event?.id) return;
+      saving.value = true;
+      const id = props.event.id;
+      const breakdown = buildBreakdown('uni');
+      const payload = { breakdown, total: totalUni.value, pricingType: 'uni' };
+      try {
+        await postWithFallback(
+          [
+            `/api/kerveny/${id}/costs/commit-uni`,
+            `/api/kerveny/${id}/costs/commit?type=uni`,
+            `/api/kerveny/${id}/costs/commit`
+          ],
+          payload
+        );
+        saveState(id, 'uni');
+        emit('refresh-events');
+        emit('calculated', { event: props.event, breakdown, total: totalUni.value, pricingType: 'uni' });
+      } catch (e) {
+        error.value = e.message || 'Mentési hiba (Egyetemi)';
       } finally {
         saving.value = false;
       }
@@ -473,6 +590,9 @@ export default {
           serviceName: p ? p.name : null,
           hours: (r.hours === '' ? 0 : (Number(r.hours) || 0)),
           persons: (r.persons === '' ? 0 : (Number(r.persons) || 0)),
+          days: (r.days === '' ? 0 : (Number(r.days) || 0)),
+          occasions: (r.occasions === '' ? 0 : (Number(r.occasions) || 0)),
+          quantity: (r.quantity === '' ? 0 : (Number(r.quantity) || 0)),
           unitPrice: getRowUnitPrice(r),
           lineTotal: getRowTotal(r),
           unit: p ? p.unit : null,
@@ -524,7 +644,9 @@ export default {
       totalUf, totalUni, formatMoney,
       show, hide, error, onServiceChange,
       clearAllState, saving, filteredPricesFor,
-      activeTab, applyTab
+      activeTab, applyTab, commitUf, commitUni,
+      // <<< ezek hiányoztak
+      showQuantity, showOccasions, showDays, showHours, showPersons
     };
   }
 };
