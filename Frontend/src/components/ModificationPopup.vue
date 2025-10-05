@@ -1,6 +1,6 @@
 <template>
   <!-- Esemény részletes popup -->
-  <div class="event-details-modal" v-if="event" @click.self="closeEventDetails">
+  <div class="event-details-modal" v-if="event" v-show="!detailsHidden" @click.self="closeEventDetails">
     <div class="event-details-content sze-theme" :class="{ 'dark-mode': isDarkMode }">
       <div class="event-details-header">
         <h3>{{ event.nev }}</h3>
@@ -43,12 +43,7 @@
           <li class="nav-item">
             <a class="nav-link" :class="{ active: activeTab === 'client' }" @click.prevent="activeTab = 'client'" href="#">Megrendelő</a>
           </li>
-          <li class="nav-item">
-            <a class="nav-link" :class="{ active: activeTab === 'famulus' }" @click.prevent="activeTab = 'famulus'" href="#">Uni-Famulus</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" :class="{ active: activeTab === 'uni' }" @click.prevent="activeTab = 'uni'" href="#">Egyetem</a>
-          </li>
+          <!-- Uni-Famulus és Egyetem fülek ELTÁVOLÍTVA -->
         </ul>
 
         <!-- Csak olvasható mód -->
@@ -171,114 +166,8 @@
             </div>
           </div>
         </div>
-        <!-- Uni-Famulus lap -->
-        <div v-if="activeTab === 'famulus'" class="tab-content">
-          <div class="row mt-4">
-            <div class="col-12">
-              <h5>Famulus árlista</h5>
-              <div v-if="famulusLoading">Árak betöltése...</div>
-              <div v-else-if="famulusError" class="text-danger">{{ famulusError }}</div>
-
-              <div v-else>
-                <div v-for="grp in famulusGroups" :key="'fam-'+grp.unitNorm" class="mb-4">
-                  <h6 class="mb-2">Mértékegység: <strong>{{ grp.unitLabel || '—' }}</strong></h6>
-                  <table class="table table-bordered table-sm">
-                    <thead>
-                      <tr>
-                        <th>Megnevezés</th>
-                        <th v-for="c in grp.cols" :key="c.key">{{ c.label }}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="row in grp.rows" :key="row.id">
-                        <td>{{ row.service_name || row.megnevezes }}</td>
-                        <td v-for="c in grp.cols" :key="c.key">
-                          <span v-if="c.format === 'money'">{{ money(row[c.key]) }}</span>
-                          <span v-else>{{ displayNumber(row[c.key]) }}</span>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div class="d-flex gap-3 mt-3">
-                <button
-                  class="btn btn-success"
-                  @click="acceptOfferFromFamulus"
-                  :disabled="statusChanging"
-                >
-                  <i v-if="!statusChanging" class="fas fa-check-circle me-1"></i>
-                  <i v-else class="fas fa-spinner fa-spin me-1"></i>
-                  Ajánlat elfogadása
-                </button>
-                <button
-                  class="btn btn-warning"
-                  @click="requestUfOfferChange"
-                  :disabled="statusChanging"
-                >
-                  <i v-if="!statusChanging" class="fas fa-edit me-1"></i>
-                  <i v-else class="fas fa-spinner fa-spin me-1"></i>
-                  Módosítás kérése
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Egyetem lap -->
-        <div v-if="activeTab === 'uni'" class="tab-content">
-          <div class="row mt-4">
-            <div class="col-12">
-              <h5>Egyetemi árlista</h5>
-              <div v-if="uniLoading">Árak betöltése...</div>
-              <div v-else-if="uniError" class="text-danger">{{ uniError }}</div>
-              <div v-else>
-                <div v-for="grp in universityGroups" :key="'uni-'+grp.unitNorm" class="mb-4">
-                  <h6 class="mb-2">Mértékegység: <strong>{{ grp.unitLabel || '—' }}</strong></h6>
-                  <table class="table table-bordered table-sm">
-                    <thead>
-                      <tr>
-                        <th>Megnevezés</th>
-                        <th v-for="c in grp.cols" :key="c.key">{{ c.label }}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="row in grp.rows" :key="row.id">
-                        <td>{{ row.service_name || row.megnevezes }}</td>
-                        <td v-for="c in grp.cols" :key="c.key">
-                          <span v-if="c.format === 'money'">{{ money(row[c.key]) }}</span>
-                          <span v-else>{{ displayNumber(row[c.key]) }}</span>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              <div class="d-flex gap-3 mt-3">
-                <button
-                  class="btn btn-success"
-                  @click="generateUniversityQuote"
-                  :disabled="statusChanging"
-                >
-                  <i v-if="!statusChanging" class="fas fa-check-circle me-1"></i>
-                  <i v-else class="fas fa-spinner fa-spin me-1"></i>
-                  Árajánlat generálása
-                </button>
-                <button
-                  class="btn btn-warning"
-                  @click="requestUniversityOfferChange"
-                  :disabled="statusChanging"
-                >
-                  <i v-if="!statusChanging" class="fas fa-edit me-1"></i>
-                  <i v-else class="fas fa-spinner fa-spin me-1"></i>
-                  Módosítás kérése
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
+        <!-- Uni-Famulus lap ELTÁVOLÍTVA -->
+        <!-- Egyetem lap ELTÁVOLÍTVA -->
         <!-- Szerkesztési mód - minden fülhöz a megfelelő mezőkkel -->
         <div v-if="editMode" class="edit-mode">
           <!-- Alapadatok fül tartalma -->
@@ -500,7 +389,7 @@
           </div>
 
           <!-- Megrendelő fül tartalma -->
-          <div v-if="activeTab === 'famulus'" class="edit-tab-content">
+          <div v-if="activeTab === 'client'" class="edit-tab-content">
             <div class="row">
               <div class="col-md-6 mb-3">
                 <label for="edit-client-name">Megrendelő neve/cégneve</label>
@@ -524,90 +413,15 @@
               </div>
             </div>
           </div>
-          <!-- Uni-Famulus fül -->
-          <div v-if="activeTab === 'basic'" class="edit-tab-content">
-            <div class="row">
-              <div class="col-md-6 mb-3">
-                <label for="edit-name">Rendezvény neve</label>
-                <input type="text" id="edit-name" class="form-control" v-model="editedEvent.nev">
-              </div>
-              <div class="col-md-6 mb-3">
-                <label for="edit-type">Rendezvény típusa</label>
-                <select id="edit-type" class="form-control" v-model="editedEvent.tipus">
-                  <option value="Egyetemi szervezésű rendezvény">Egyetemi szervezésű rendezvény</option>
-                  <option value="Egyetemi szervezésű hallgatói rendezvény">Egyetemi szervezésű hallgatói rendezvény</option>
-                  <option value="Egyetemi szervezésű sportrendezvény">Egyetemi szervezésű sportrendezvény</option>
-                  <option value="Külső szervezésű sportrendezvény">Külső szervezésű sportrendezvény</option>
-                  <option value="Külső szervezésű rendezvény">Külső szervezésű rendezvény</option>
-                </select>
-              </div>
-              <div class="col-md-6 mb-3">
-                <label for="edit-qualification">Rendezvény minősítése</label>
-                <select id="edit-qualification" class="form-control" v-model="editedEvent.minosites">
-                  <option value="Nyilvános">Nyilvános</option>
-                  <option value="Zártkörű">Zártkörű</option>
-                </select>
-              </div>
-              <div class="col-md-6 mb-3">
-                <label for="edit-participants">Létszám</label>
-                <input type="number" id="edit-participants" class="form-control" v-model="editedEvent.letszam">
-              </div>
-              <div class="col-md-6 mb-3">
-                <label for="edit-location">Helyszín</label>
-                <input type="text" id="edit-location" class="form-control" v-model="editedEvent.helyszin">
-              </div>
-              <div class="col-md-6 mb-3">
-                <label for="edit-address">Cím</label>
-                <input type="text" id="edit-address" class="form-control" v-model="editedEvent.cim">
-              </div>
-              <div class="col-md-6 mb-3">
-                <label for="edit-start-date">Kezdő dátum</label>
-                <input type="date" id="edit-start-date" class="form-control" v-model="editedEvent.kezdo_datum">
-              </div>
-              <div class="col-md-6 mb-3">
-                <label for="edit-start-time">Kezdő időpont</label>
-                <input type="time" id="edit-start-time" class="form-control" v-model="editedEvent.kezdo_idopont">
-              </div>
-              <div class="col-md-6 mb-3">
-                <label for="edit-end-date">Befejező dátum</label>
-                <input type="date" id="edit-end-date" class="form-control" v-model="editedEvent.veg_datum">
-              </div>
-              <div class="col-md-6 mb-3">
-                <label for="edit-end-time">Befejező időpont</label>
-                <input type="time" id="edit-end-time" class="form-control" v-model="editedEvent.veg_idopont">
-              </div>
-              <div class="col-md-12 mb-3">
-                <label for="edit-description">Leírás</label>
-                <textarea id="edit-description" class="form-control" v-model="editedEvent.leiras" rows="3"></textarea>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
       <div class="event-details-footer">
         <div class="footer-left">
-          <!-- Admin / Főadmin / Uni-Famulus -->
-          <button
-            class="btn btn-success admin-accept-btn"
-            @click="acceptUfQuote"
-            :disabled="statusChanging"
-            title="Státusz váltás: UF Árajánlatra vár"
-          >
-            <i v-if="!statusChanging" class="fas fa-check-circle me-1"></i>
-            <i v-else class="fas fa-spinner fa-spin me-1"></i>
-            Elfogadás
-          </button>
+          <!-- Elfogadás/Elutasítás gombok ELTÁVOLÍTVA -->
 
-          <!-- ÚJ: Elutasítás gomb -->
-          <button
-            class="btn btn-danger admin-reject-btn"
-            @click="rejectEvent"
-            :disabled="statusChanging"
-            title="Státusz váltás: Elutasítva"
-          >
-            <i v-if="!statusChanging" class="fas fa-times-circle me-1"></i>
-            <i v-else class="fas fa-spinner fa-spin me-1"></i>
-            Elutasítás
+          <!-- Tovább gomb megmarad -->
+          <button class="btn btn-outline-primary" @click="openPricingWizard">
+            Tovább
           </button>
         </div>
         <div class="footer-right">
@@ -663,12 +477,25 @@
       </div>
     </div>
   </div>
+
+  <!-- Teleport: a folyamat popup mindig a <body>-ra kerül -->
+  <teleport to="body">
+    <PricingFlowWizard
+      v-if="pricingWizardVisible"
+      :event="event"
+      @close="onClosePricingWizard"
+      @status-updated="$emit('status-updated', $event)"
+      @refresh-events="$emit('refresh-events')"
+    />
+  </teleport>
 </template>
 
 <script>
 import axios from 'axios';
 import { STATUSES, TERMINAL_STATUS_CODES } from '@/constants/statuses.js';
-import { isAdminRole } from '@/constants/roles.js'; // <<< ÚJ
+import { isAdminRole } from '@/constants/roles.js';
+// ÚJ import
+import PricingFlowWizard from '@/components/PricingFlowWizard.vue';
 
 const STATUS_MAP = STATUSES.reduce((a,s)=>{a[s.code]=s;return a;}, {});
 const PHASE_LABELS = {
@@ -691,6 +518,10 @@ const LEGACY_NUMERIC_MAP = {
 
 export default {
   name: 'ModificationPopup',
+  components: {
+    // ...existing code...
+    PricingFlowWizard // ÚJ
+  },
   props: {
     isDarkMode: { type: Boolean, default: false },
     event: { type: Object, default: null },
@@ -711,7 +542,9 @@ export default {
       famulusError: null,
       uniPrices: [],
       uniLoading: false,
-      uniError: null
+      uniError: null,
+      detailsHidden: false,   // a ModificationPopup láthatóságának vezérlése
+      pricingWizardVisible: false
     };
   },
   computed: {
@@ -764,6 +597,7 @@ export default {
           this.activeTab = 'basic';
           this.editMode = false;
           document.body.style.overflow = 'hidden';
+          this.detailsHidden = false; // új megnyitáskor legyen látható
         }
       },
       immediate: true
@@ -1157,6 +991,18 @@ export default {
       // egész számokra nincs tizedes, egyébként 2 tizedes
       return Number.isInteger(n) ? n.toString() : n.toFixed(2);
     },
+    openPricingWizard() {
+      // Szülő értesítése → wizard megnyitása
+      this.$emit('open-pricing-wizard', this.event);
+      // Popup teljes bezárása
+      this.$emit('close');
+      document.body.style.overflow = '';
+    },
+    onClosePricingWizard() {
+      this.pricingWizardVisible = false;
+      document.body.style.overflow = '';
+      // szándékosan nem állítjuk vissza detailsHidden-t → a popup zárva marad
+    }
   }
 };
 </script>
@@ -1540,7 +1386,7 @@ export default {
   }
 }
 
-/* Tab navigáció kijavított stílusai */
+/* Tab navigáció kijavított stílus */
 .nav-tabs {
   border-bottom: 1px solid #dee2e6;
   margin-bottom: 1rem;
@@ -1812,6 +1658,7 @@ export default {
 
 /* Kisebb kijelzőn visszaáll az eredeti (egyoszlopos) elrendezés */
 @media (max-width: 820px) {
+
   .status-options.status-options--wide {
     display: block;
   }

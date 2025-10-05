@@ -162,7 +162,19 @@
     @status-updated="onStatusUpdated"
     @event-updated="onEventUpdated"
     @refresh-events="fetchEvents"
+    @open-pricing-wizard="onOpenPricingWizard"
   ></ModificationPopup>
+
+  <!-- Wizard külön modálként a body-ra teleportalva -->
+  <teleport to="body">
+    <PricingFlowWizard
+      v-if="showPricingWizard"
+      :event="wizardEvent"
+      @close="closeWizard"
+      @status-updated="onStatusUpdated"
+      @refresh-events="fetchEvents"
+    />
+  </teleport>
 
   <!-- Opcionális - Exportálási állapot jelző -->
   <div v-if="exportStatus.isLoading" class="position-fixed bottom-0 end-0 p-3">
@@ -180,20 +192,14 @@
   </div>
 
   <!-- Szolgáltatási költség kalkulátor komponens -->
-  <ServiceCostCalculator
-    ref="serviceCost"
-    :event="costEvent"
-    @calculated="handleCostCalculated"
-    @refresh-events="fetchEvents"
-  />
 </template>
 
 <script>
 import axios from 'axios';
-import ServiceCostCalculator from './ServiceCostCalculator.vue';
 import FilterButtons from './FilterButtons.vue'; // <<< ÚJ
 import { STATUSES, TERMINAL_STATUS_CODES } from '@/constants/statuses.js';
 import ModificationPopup from '@/components/ModificationPopup.vue';
+import PricingFlowWizard from '@/components/PricingFlowWizard.vue'; // ÚJ
 import auth from '../services/auth';
 
 const STATUS_MAP = STATUSES.reduce((a,s)=>{a[s.code]=s;return a;}, {});
@@ -207,7 +213,7 @@ const LEGACY_NUMERIC_MAP = {
 };
 
 export default {
-  components: { ServiceCostCalculator, FilterButtons, ModificationPopup }, // <<< BŐVÍTVE
+  components: { FilterButtons, ModificationPopup, PricingFlowWizard }, // <<< BŐVÍTVE
   props: {
     isDarkMode: { type: Boolean, default: false },
     hideTerminal: { type: Boolean, default: true } // statusFilter prop törölhető
@@ -225,7 +231,9 @@ export default {
       showCostModal: false,
       costEvent: null,
       statusFilterCodes: [], // <<< ÚJ (kategória szűrés)
-      currentUser: null                    // <<< HOZZÁADVA
+      currentUser: null,                    // <<< HOZZÁADVA
+      showPricingWizard: false,  // ÚJ
+      wizardEvent: null          // ÚJ
     };
   },
   computed: {
@@ -388,9 +396,12 @@ export default {
       this.selectedEvent = null;
       document.body.style.overflow = '';
     },
-    onStatusUpdated(updated) {             // (ha még nincs, csak példa – lehet hogy már létezik)
-      this.selectedEvent = updated;
-      this.fetchEvents();
+    onStatusUpdated(updated) {
+      // lista és lokális state frissítés
+      this.fetchEvents?.();
+      if (this.showPricingWizard && this.wizardEvent && updated && this.wizardEvent.id === updated.id) {
+        this.wizardEvent = { ...this.wizardEvent, ...updated };
+      }
     },
     onEventUpdated(updated) {
       this.selectedEvent = updated;
@@ -470,7 +481,17 @@ export default {
       } finally {
         this.exportStatus.isLoading = false;
       }
-    }
+    },
+    onOpenPricingWizard(ev) {     // ÚJ
+      this.selectedEvent = null;  // ModificationPopup bezárása
+      this.wizardEvent = ev;      // átadjuk az eseményt a wizardnak
+      this.showPricingWizard = true;
+      document.body.style.overflow = 'hidden';
+    },
+    closeWizard() {               // ÚJ
+      this.showPricingWizard = false;
+      document.body.style.overflow = '';
+    },
   },
   mounted() {
     this.fetchEvents();

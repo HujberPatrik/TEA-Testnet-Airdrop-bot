@@ -1,5 +1,5 @@
 const pool = require('../config/db');
-const { sendSuccessEmail, sendRejectionEmail } = require('../emailService');
+const { generateUniversityOfferFromCosts, getUniversityDocxTags } = require('../documentService');
 require('dotenv').config();
 
 // ÚJ: támogatott státuszkódok + legacy numerikus mapping
@@ -399,44 +399,112 @@ async function saveCostsAndAdvance(req, res) {
 
 const getFamulusPricesByKervenyId = async (req, res) => {
   const { id } = req.params;
-  const sql = `select kerveny_koltseg.id,kerveny_koltseg.kerveny_id,kerveny_koltseg.service_id,kerveny_koltseg.service_name,
-              kerveny_koltseg.rate_key,kerveny_koltseg.unit,kerveny_koltseg.hours,kerveny_koltseg.persons,
-              kerveny_koltseg.unit_price,kerveny_koltseg.line_total from kerveny_koltseg
-                inner join prices on kerveny_koltseg.service_id = prices.id
-                where prices.kategoria like 'UF' and kerveny_koltseg.kerveny_id =  $1`;
-
+  const sql = `
+    SELECT
+      kk.id, kk.kerveny_id, kk.service_id, kk.service_name,
+      kk.rate_key, kk.unit,
+      kk.hours, kk.persons, kk.days, kk.occasions, kk.quantity,
+      kk.unit_price, kk.line_total
+    FROM kerveny_koltseg kk
+    INNER JOIN prices p ON kk.service_id = p.id
+    WHERE kk.kerveny_id = $1
+      AND (
+        lower(p.kategoria) IN ('uf','uni-famulus','uni famulus')
+        OR p.kategoria ILIKE '%famulus%'
+      )
+    ORDER BY kk.id ASC`;
   pool.query(sql, [id], (error, results) => {
     if (error) {
       res.status(500).json({ message: error.message });
-    } else if (results.rows.length === 0) {
-      res.status(404).json({ message: 'Nem található rekord ilyen ID-val' });
     } else {
-      res.status(200).json(results.rows);
+      res.status(200).json(results.rows || []);
     }
   });
 };
 
 const getUniversityPricesByKervenyId = async (req, res) => {
   const { id } = req.params;
-  const sql = `select kerveny_koltseg.id,kerveny_koltseg.kerveny_id,kerveny_koltseg.service_id,kerveny_koltseg.service_name,
-              kerveny_koltseg.rate_key,kerveny_koltseg.unit,kerveny_koltseg.hours,kerveny_koltseg.persons,
-              kerveny_koltseg.unit_price,kerveny_koltseg.line_total from kerveny_koltseg
-                inner join prices on kerveny_koltseg.service_id = prices.id
-                where prices.kategoria like 'Egyetemi' and kerveny_koltseg.kerveny_id =  $1`;
-
+  const sql = `
+    SELECT
+      kk.id, kk.kerveny_id, kk.service_id, kk.service_name,
+      kk.rate_key, kk.unit,
+      kk.hours, kk.persons, kk.days, kk.occasions, kk.quantity,
+      kk.unit_price, kk.line_total
+    FROM kerveny_koltseg kk
+    INNER JOIN prices p ON kk.service_id = p.id
+    WHERE kk.kerveny_id = $1
+      AND lower(p.kategoria) = 'egyetemi'
+    ORDER BY kk.id ASC`;
   pool.query(sql, [id], (error, results) => {
     if (error) {
       res.status(500).json({ message: error.message });
-    } else if (results.rows.length === 0) {
-      res.status(404).json({ message: 'Nem található rekord ilyen ID-val' });
     } else {
-      res.status(200).json(results.rows);
+      res.status(200).json(results.rows || []);
     }
   });
 };
 
+async function clearCostsForType(kervenyId, type) {
+  const client = await pool.connect();
+  try {
+    const UF_WHERE = `
+      kategoria IS NOT NULL AND (
+        lower(kategoria) IN ('uf','uni-famulus','uni famulus')
+        OR kategoria ILIKE '%famulus%'
+      )`;
+    await client.query('BEGIN');
+    const sql = (type === 'uni')
+      ? `DELETE FROM kerveny_koltseg
+           WHERE kerveny_id = $1
+             AND service_id IN (SELECT id FROM prices WHERE lower(kategoria) = 'egyetemi')`
+      : `DELETE FROM kerveny_koltseg
+           WHERE kerveny_id = $1
+             AND service_id IN (SELECT id FROM prices WHERE ${UF_WHERE})`;
+    await client.query(sql, [kervenyId]);
+    // összeg frissítése
+    const sumRes = await client.query(
+      'SELECT COALESCE(SUM(line_total),0) AS s FROM kerveny_koltseg WHERE kerveny_id = $1',
+      [kervenyId]
+    );
+    const total = Number(sumRes.rows[0]?.s || 0);
+    await client.query('UPDATE kerveny SET koltseg_osszesen = $2 WHERE id = $1', [kervenyId, total]);
+    await client.query('COMMIT');
+    return true;
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
+}
 
+// Egyetemi árajánlat DOCX letöltés
+async function downloadUniversityDocx(req, res) {
+  try {
+    const { id } = req.params;
+    const buffer = await generateUniversityOfferFromCosts(id);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `attachment; filename="egyetemi-ajanlat-${id}.docx"`);
+    res.send(buffer);
+  } catch (e) {
+    console.error('downloadUniversityDocx error:', e);
+    res.status(500).json({ message: 'DOCX generálás hiba' });
+  }
+}
 
+// DOCX tag-ek listázása (segítség a sablonhoz)
+async function listUniversityDocxTags(req, res) {
+  try {
+    const { id } = req.params;
+    const tags = await getUniversityDocxTags(id);
+    res.json(tags);
+  } catch (e) {
+    console.error('listUniversityDocxTags error:', e);
+    res.status(500).json({ message: e.message });
+  }
+}
+
+// Export bővítése – tedd a fájl VÉGÉRE, hogy semmi ne írja felül
 module.exports = {
   getAllKerveny,
   getKervenyById,
@@ -445,5 +513,8 @@ module.exports = {
   updateKervenyStatus,
   saveCostsAndAdvance,
   getFamulusPricesByKervenyId,
-  getUniversityPricesByKervenyId
+  getUniversityPricesByKervenyId,
+  clearCostsForType,
+  downloadUniversityDocx,
+  listUniversityDocxTags
 };
