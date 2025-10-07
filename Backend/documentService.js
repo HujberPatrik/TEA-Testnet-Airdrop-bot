@@ -260,40 +260,114 @@ async function generateUfOfferFromCosts(kervenyId) {
   return await generateDocument(templatePath, data);
 }
 
-// --- SEGÉDFÜGGVÉNYEK (unit -> látható oszlopok) ---
-function normalizeUnit(u) {
-  return String(u || '')
-    .toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .trim();
-}
-function columnsForUnit(u) {
-  const s = String(u || '').toLowerCase();
-  const has = (t) => s.includes(t);
-  const isPerHour = has('fő/óra') || has('fo/ora') || (has('fő') && has('óra')) || (has('fo') && has('ora'));
-  const hasDbAlkalom = has('db/alkalom');
-  return {
-    hours: isPerHour || has('óra') || has('ora'),
-    persons: isPerHour || (has('fő') || has('fo')),
-    days: has('nap'),
-    occasions: has('alkalom'),
-    quantity: hasDbAlkalom || (has('db') && !hasDbAlkalom)
-  };
-}
+// --- formázók ---
 const fmt2   = (n) => new Intl.NumberFormat('hu-HU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0);
 const fmtHuf = (n) => new Intl.NumberFormat('hu-HU', { style: 'currency', currency: 'HUF', maximumFractionDigits: 0 }).format(Number(n) || 0);
 
-// --- EGYETEMI ÁRAJÁNLAT DOCX (csak a táblázatban megjelenő oszlopokkal) ---
+// ÚJ: ÁFA/bruttó kalkulátor a prices.afa alapján
+function calcVatAndGross(net, applyVat) {
+  const netN = Number(net) || 0;
+  if (!applyVat) return { vat: 0, gross: netN };
+  const vat = Number((netN * 0.27).toFixed(2));
+  const gross = Number((netN + vat).toFixed(2));
+  return { vat, gross };
+}
+
+// ÚJ: ÁFA százalék szöveg (0% | 27%)
+function vatRateLabel(applyVat) {
+  return applyVat ? '27%' : '0%';
+}
+
+// Erős boolean konverzió DB-ből érkező értékekhez
+function toBool(v) {
+  if (v === true || v === false) return v;
+  if (typeof v === 'number') return v !== 0;
+  if (typeof v === 'string') {
+    const s = v.trim().toLowerCase();
+    if (['true','t','1','yes','y','on'].includes(s)) return true;
+    if (['false','f','0','no','n','off'].includes(s)) return false;
+  }
+  return !!v;
+}
+
+// UF árajánlat (ÁFA számítás: kizárólag prices.afa alapján)
+async function generateUfOfferFromCosts(kervenyId) {
+  if (!kervenyId) throw new Error('Hiányzó kervenyId');
+
+  const { rows } = await pool.query(`
+    SELECT kk.id, kk.kerveny_id, kk.service_id, kk.service_name, kk.rate_key, kk.unit,
+           kk.hours, kk.persons, kk.unit_price, kk.line_total, kk.created_at,
+           COALESCE(p.afa, false) AS price_afa                   -- csak prices.afa
+    FROM kerveny_koltseg kk
+    LEFT JOIN prices p ON p.id = kk.service_id
+    WHERE kk.kerveny_id = $1
+    ORDER BY kk.id
+  `, [kervenyId]);
+
+  if (!rows.length) {
+    throw new Error('Nincs mentett költség ehhez a kérvényhez.');
+  }
+
+  const totalsNet = rows.reduce((acc, r) => {
+    acc.hours   += Number(r.hours)      || 0;
+    acc.persons += Number(r.persons)    || 0;
+    acc.total   += Number(r.line_total) || 0;
+    return acc;
+  }, { hours: 0, persons: 0, total: 0 });
+
+  const costs = rows.map(r => {
+    const applyVat = toBool(r.price_afa);
+    const { vat, gross } = calcVatAndGross(r.line_total, applyVat);
+    const unitGross = calcVatAndGross(r.unit_price, applyVat).gross;
+    return {
+      ...r,
+      unit_price_fmt: fmtHuf(r.unit_price),
+      line_total_fmt: fmtHuf(r.line_total),
+      gross_unit_fmt: fmtHuf(unitGross),
+      vat_line_fmt:   fmtHuf(vat),
+      gross_line_fmt: fmtHuf(gross),
+      vat_rate:       applyVat ? '27%' : '0%'
+    };
+  });
+
+  const totalsVatGross = rows.reduce((acc, r) => {
+    const applyVat = toBool(r.price_afa);
+    const { vat, gross } = calcVatAndGross(r.line_total, applyVat);
+    acc.vat += vat; acc.gross += gross;
+    return acc;
+  }, { vat: 0, gross: 0 });
+
+  const globalVatRate = rows.some(r => toBool(r.price_afa)) ? '27%' : '0%';
+
+  const data = {
+    costs,
+    sum_hours: totalsNet.hours,
+    sum_persons: totalsNet.persons,
+    sum_total: totalsNet.total,
+    sum_hours_fmt: fmt2(totalsNet.hours),
+    sum_persons_fmt: fmt2(totalsNet.persons),
+    sum_total_fmt: fmtHuf(totalsNet.total),
+    sum_vat_fmt: fmtHuf(totalsVatGross.vat),
+    sum_gross_fmt: fmtHuf(totalsVatGross.gross),
+    today: new Date().toLocaleDateString('hu-HU'),
+    afa: globalVatRate // DOCX {afa}
+  };
+
+  const templatePath = path.join(templatesDir, 'UF_arajanlat_sablon.docx');
+  return await generateDocument(templatePath, data);
+}
+
+// --- EGYETEMI ÁRAJÁNLAT (ÁFA: csak prices.afa) ---
 async function generateUniversityOfferFromCosts(kervenyId) {
   if (!kervenyId) throw new Error('Hiányzó kervenyId');
 
-  // Csak az EGYETEMI kategóriájú tételek
   const { rows } = await pool.query(
     `
     SELECT kk.id, kk.kerveny_id, kk.service_id, kk.service_name,
            kk.rate_key, kk.unit,
            kk.hours, kk.persons, kk.days, kk.occasions, kk.quantity,
-           kk.unit_price, kk.line_total, kk.created_at
+           kk.unit_price, kk.line_total, kk.created_at,
+           COALESCE(p.afa, false) AS price_afa                   -- csak prices.afa
     FROM kerveny_koltseg kk
     INNER JOIN prices p ON p.id = kk.service_id
     WHERE kk.kerveny_id = $1
@@ -303,27 +377,23 @@ async function generateUniversityOfferFromCosts(kervenyId) {
     [kervenyId]
   );
 
-  if (!rows.length) {
-    throw new Error('Nincs mentett egyetemi költség ehhez a kérvényhez.');
-  }
+  if (!rows.length) throw new Error('Nincs mentett egyetemi költség ehhez a kérvényhez.');
 
-  // Látható oszlopok meghatározása globálisan (legalább egy sor alapján)
-  const visible = rows.reduce(
-    (acc, r) => {
-      const c = columnsForUnit(normalizeUnit(r.unit));
-      acc.hours    ||= c.hours;
-      acc.persons  ||= c.persons;
-      acc.days     ||= c.days;
-      acc.occasions||= c.occasions;
-      acc.quantity ||= c.quantity;
-      return acc;
-    },
-    { hours: false, persons: false, days: false, occasions: false, quantity: false }
-  );
-
-  // Sorok előkészítése (nem látható oszlopok üresen mennek a sablonba)
-  const items = rows.map(r => {
+  const visible = rows.reduce((acc, r) => {
     const c = columnsForUnit(normalizeUnit(r.unit));
+    acc.hours    ||= c.hours;
+    acc.persons  ||= c.persons;
+    acc.days     ||= c.days;
+    acc.occasions||= c.occasions;
+    acc.quantity ||= c.quantity;
+    return acc;
+  }, { hours: false, persons: false, days: false, occasions: false, quantity: false });
+
+  const items = rows.map(r => {
+    const applyVat = toBool(r.price_afa);
+    const c = columnsForUnit(normalizeUnit(r.unit));
+    const unitGross = calcVatAndGross(r.unit_price, applyVat).gross;
+    const { vat, gross } = calcVatAndGross(r.line_total, applyVat);
     return {
       service_name: r.service_name,
       unit: r.unit,
@@ -334,14 +404,20 @@ async function generateUniversityOfferFromCosts(kervenyId) {
       occasions: c.occasions ? Number(r.occasions) || 0 : '',
       quantity:  c.quantity  ? Number(r.quantity)  || 0 : '',
       unit_price_fmt: fmtHuf(r.unit_price),
-      line_total_fmt: fmtHuf(r.line_total)
+      line_total_fmt: fmtHuf(r.line_total),
+      gross_unit_fmt: fmtHuf(unitGross),
+      vat_line_fmt:   fmtHuf(vat),
+      gross_line_fmt: fmtHuf(gross),
+      vat_rate:       applyVat ? '27%' : '0%'
     };
   });
 
-  // Név szerinti gyors elérés a DOCX-hez (service_name -> slug -> adatok)
   const byName = rows.reduce((acc, r) => {
+    const applyVat = toBool(r.price_afa);
     const key = slugifyName(r.service_name);
     const c = columnsForUnit(normalizeUnit(r.unit));
+    const unitGross = calcVatAndGross(r.unit_price, applyVat).gross;
+    const { vat, gross } = calcVatAndGross(r.line_total, applyVat);
     acc[key] = {
       service_name: r.service_name,
       unit: r.unit,
@@ -352,35 +428,43 @@ async function generateUniversityOfferFromCosts(kervenyId) {
       occasions: c.occasions ? Number(r.occasions) || 0 : '',
       quantity:  c.quantity  ? Number(r.quantity)  || 0 : '',
       unit_price_fmt: fmtHuf(r.unit_price),
-      line_total_fmt: fmtHuf(r.line_total)
+      line_total_fmt: fmtHuf(r.line_total),
+      gross_unit_fmt: fmtHuf(unitGross),
+      vat_line_fmt:   fmtHuf(vat),
+      gross_line_fmt: fmtHuf(gross),
+      vat_rate:       applyVat ? '27%' : '0%'
     };
     return acc;
   }, {});
 
-  const totals = rows.reduce(
-    (acc, r) => ({ ...acc, total: acc.total + (Number(r.line_total) || 0) }),
-    { total: 0 }
-  );
+  const totals = rows.reduce((acc, r) => {
+    const applyVat = toBool(r.price_afa);
+    const net = Number(r.line_total) || 0;
+    const { vat, gross } = calcVatAndGross(net, applyVat);
+    acc.net += net; acc.vat += vat; acc.gross += gross;
+    return acc;
+  }, { net: 0, vat: 0, gross: 0 });
 
-  // Kerveny meta adatok betöltése
+  const globalVatRateUni = rows.some(r => toBool(r.price_afa)) ? '27%' : '0%';
+
   const kerveny = await fetchKervenyMeta(kervenyId);
 
   const data = {
-    // Kerveny mezőket top-levelre is kiterítjük, hogy a meglévő boolean mezők működjenek
     ...kerveny,
-    // és külön objektumként is elérhetők:
     kerveny,
-
-    items,                         // loop-hoz {#items}...{/items}
-    byName,                        // név szerinti elérés
+    items,
+    byName,
     show_hours: visible.hours,
     show_persons: visible.persons,
     show_days: visible.days,
     show_occasions: visible.occasions,
     show_quantity: visible.quantity,
-    sum_total_fmt: fmtHuf(totals.total),
+    sum_total_fmt: fmtHuf(totals.net),
+    sum_vat_fmt:   fmtHuf(totals.vat),
+    sum_gross_fmt: fmtHuf(totals.gross),
     today: new Date().toLocaleDateString('hu-HU'),
-    kervenyId
+    kervenyId,
+    afa: globalVatRateUni // DOCX {afa}
   };
 
   const templatePath = path.join(templatesDir, 'SZE_arajanlat_sablon.docx');
@@ -437,12 +521,12 @@ function buildQtyLabel(row) {
   return unit || '';
 }
 
-// A sablonba beilleszthető tagek listája a megadott kérvényhez
+// A sablon tagek gyűjtése – itt is csak prices.afa-t hozzuk (price_afa)
 async function getUniversityDocxTags(kervenyId) {
   const { rows } = await pool.query(
     `
     SELECT kk.service_name, kk.unit, kk.hours, kk.persons, kk.days, kk.occasions, kk.quantity,
-           kk.unit_price, kk.line_total
+           kk.unit_price, kk.line_total, COALESCE(p.afa, false) AS price_afa
     FROM kerveny_koltseg kk
     INNER JOIN prices p ON p.id = kk.service_id
     WHERE kk.kerveny_id = $1
@@ -457,18 +541,56 @@ async function getUniversityDocxTags(kervenyId) {
     return {
       name: r.service_name,
       slug,
-      // Ezeket a változókat használhatod a DOCX-ben:
       qty_label: `{byName.${slug}.qty_label}`,
       net_unit: `{byName.${slug}.unit_price_fmt}`,
-      gross_line: `{byName.${slug}.line_total_fmt}`,
-      // Ha külön oszlopokra is szükség van:
-      hours: `{byName.${slug}.hours}`,
-      persons: `{byName.${slug}.persons}`,
-      days: `{byName.${slug}.days}`,
-      occasions: `{byName.${slug}.occasions}`,
-      quantity: `{byName.${slug}.quantity}`
+      net_line: `{byName.${slug}.line_total_fmt}`,
+      gross_unit: `{byName.${slug}.gross_unit_fmt}`,
+      gross_line: `{byName.${slug}.gross_line_fmt}`,
+      vat_line: `{byName.${slug}.vat_line_fmt}`,
+      vat_rate: `{byName.${slug}.vat_rate}`
     };
   });
+  return result;
+}
+
+// Egység (unit) normalizálása
+function normalizeUnit(u) {
+  return String(u || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // ékezetek le
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Eldönti, mely oszlopokat kell megjeleníteni az adott unit alapján
+function columnsForUnit(unitRaw) {
+  const unit = normalizeUnit(unitRaw);
+  const has = (t) => unit.includes(t);
+
+  const result = { hours: false, persons: false, days: false, occasions: false, quantity: false };
+
+  const isPerHour =
+    has('fo/ora') ||
+    ((has('fo') || has('fő')) && (has('ora') || has('óra')));
+
+  if (isPerHour) {
+    result.hours = true;
+    result.persons = true;
+  } else {
+    if (has('ora') || has('óra')) result.hours = true;
+    if (has('fo') || has('fő')) result.persons = true;
+  }
+
+  if (has('nap')) result.days = true;
+
+  // alkalom/db/alkalom logika
+  if (has('db/alkalom')) {
+    result.quantity = true;
+    result.occasions = true;
+  } else {
+    if (has('alkalom')) result.occasions = true;
+    if (has('db')) result.quantity = true;
+  }
 
   return result;
 }

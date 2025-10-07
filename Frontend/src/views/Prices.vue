@@ -57,22 +57,22 @@
 
               <td class="price-cell">
                 <div class="price-badge">{{ formatPrice(item.priceUniversity) }}</div>
-                <div class="unit" v-if="item.unit">{{ unitSuffix(item.unit, false) }}</div>
+                <div class="unit" v-if="item.unit">{{ unitSuffix(item.unit) }}</div>
               </td>
 
               <td class="price-cell">
                 <div class="price-badge">{{ formatPrice(item.priceUniversityWeekend) }}</div>
-                <div class="unit" v-if="item.unit">{{ unitSuffix(item.unit, false) }}</div>
+                <div class="unit" v-if="item.unit">{{ unitSuffix(item.unit) }}</div>
               </td>
 
               <td class="price-cell">
                 <div class="price-badge price-external">{{ formatPrice(item.priceExternal) }}</div>
-                <div class="unit">{{ unitSuffix(item.unit, true) }}</div>
+                <div class="unit" v-if="item.unit">{{ unitSuffix(item.unit) }}</div>
               </td>
 
               <td class="price-cell">
                 <div class="price-badge price-external">{{ formatPrice(item.priceExternalWeekend) }}</div>
-                <div class="unit">{{ unitSuffix(item.unit, true) }}</div>
+                <div class="unit" v-if="item.unit">{{ unitSuffix(item.unit) }}</div>
               </td>
 
               <td class="actions-cell">
@@ -124,12 +124,24 @@
                 <input v-model="currentItem.unit" type="text" class="form-control" />
               </div>
 
-              <div class="col-md-4">
+              <!-- ÚJ: Áfa kapcsoló gomb -->
+              <div class="col-md-2 d-flex align-items-end">
+                <button
+                  type="button"
+                  class="btn btn-outline-secondary w-100"
+                  @click="currentItem.afa = !currentItem.afa"
+                  :aria-pressed="currentItem.afa ? 'true' : 'false'"
+                >
+                  {{ currentItem.afa ? 'Áfa: Igen' : 'Áfa: Nem' }}
+                </button>
+              </div>
+
+              <div class="col-md-3">
                 <label class="form-label">Egyetemi ár (normál)</label>
                 <input v-model.number="currentItem.priceUniversity" type="number" min="0" class="form-control" />
               </div>
 
-              <div class="col-md-4">
+              <div class="col-md-3">
                 <label class="form-label">Egyetemi ár (hétvégén)</label>
                 <input v-model.number="currentItem.priceUniversityWeekend" type="number" min="0" class="form-control" />
               </div>
@@ -193,7 +205,8 @@ export default {
       priceUniversityWeekend: 0,
       priceExternal: 0,
       priceExternalWeekend: 0,
-      notes: ''
+      notes: '',
+      afa: false // <<< ÚJ
     });
     const formErrors = ref({});
     const modalError = ref('');
@@ -209,7 +222,8 @@ export default {
       priceExternal: Number(i.ar_kulso ?? i.priceExternal ?? i.priceexternal) || 0,
       priceExternalWeekend: Number(i.ar_kulso_hetvege ?? i.priceExternalWeekend ?? i.priceexternalweekend) || 0,
       notes: i.megjegyzes ?? i.notes ?? '',
-      category: i.kategoria ?? i.category ?? 'Általános'
+      category: i.kategoria ?? i.category ?? 'Általános',
+      afa: !!(i.afa ?? false) // <<< ÚJ
     });
 
     const fetchPrices = async () => {
@@ -250,7 +264,8 @@ export default {
         priceUniversityWeekend: 0,
         priceExternal: 0,
         priceExternalWeekend: 0,
-        notes: ''
+        notes: '',
+        afa: false // <<< ÚJ
       };
       priceModalInstance.show();
     };
@@ -268,7 +283,8 @@ export default {
         priceUniversityWeekend: item.priceUniversityWeekend,
         priceExternal: item.priceExternal,
         priceExternalWeekend: item.priceExternalWeekend,
-        notes: item.notes || ''
+        notes: item.notes || '',
+        afa: !!item.afa // <<< ÚJ
       };
       priceModalInstance.show();
     };
@@ -304,7 +320,8 @@ export default {
           ar_egyetem_hetvege: Number(currentItem.value.priceUniversityWeekend) || 0,
           ar_kulso: Number(currentItem.value.priceExternal) || 0,
           ar_kulso_hetvege: Number(currentItem.value.priceExternalWeekend) || 0,
-          megjegyzes: currentItem.value.notes || ''
+          megjegyzes: currentItem.value.notes || '',
+          afa: !!currentItem.value.afa // <<< ÚJ
         };
 
         let res;
@@ -346,9 +363,10 @@ export default {
       return Number(v).toLocaleString('hu-HU') + ' Ft';
     };
 
-    const unitSuffix = (unit, external = false) => {
-      if (!unit) return external ? '+Áfa' : '';
-      return external ? ('+Áfa / ' + unit) : ('/ ' + unit);
+    // Ne legyen fix “+Áfa” szöveg – csak az egységet jelenítjük meg
+    const unitSuffix = (unit) => {
+      if (!unit) return '';
+      return '/ ' + unit;
     };
 
     const goDashboard = () => {
