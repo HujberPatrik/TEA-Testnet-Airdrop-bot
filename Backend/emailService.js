@@ -309,9 +309,65 @@ app.post('/send-rejection-email', async (req, res) => {
   }
 });
 
+// Lemondás értesítő e-mail
+const sendCancelEmail = async (email, felelos, eventNev = '', reason = '') => {
+  const mailOptions = {
+    from: 'souris20013@gmail.com',
+    to: email,
+    subject: 'Széchenyi Egyetem - Rendezvény lemondva',
+    html: `
+      <div style="font-family: 'Montserrat', sans-serif; font-weight: 300; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+        <header style="text-align: center; padding: 20px 0; background-color: #1c2442; color: #fff; border-radius: 8px 8px 0 0;">
+          <img src="cid:logo" alt="Széchenyi Egyetem" style="max-width: 250px; margin-bottom: 10px;">
+        </header>
+        <main style="padding: 20px;">
+          <p style="font-size: 16px; color: #333;">Kedves ${felelos || 'Felhasználó'}!</p>
+          <p style="font-size: 16px; color: #333;">Tájékoztatjuk, hogy a${eventNev ? ` <strong>${eventNev}</strong>` : ''} rendezvény <strong>lemondásra került</strong>.</p>
+          ${reason ? `<p style="font-size: 16px; color: #333;"><strong>Megjegyzés:</strong> ${reason}</p>` : ''}
+          <p style="font-size: 16px; color: #333;">Amennyiben kérdése merül fel, kérjük, vegye fel a kapcsolatot az illetékes szervezővel.</p>
+          <p style="font-size: 16px; color: #333;">Üdvözlettel,</p>
+          <p style="font-size: 16px; color: #333; font-weight: bold;">Széchenyi István Egyetem Csapata</p>
+        </main>
+        <footer style="text-align: center; padding: 10px 0; background-color: #f4f4f4; color: #666; font-size: 12px; border-radius: 0 0 8px 8px;">
+          <p style="margin: 0;">Széchenyi István Egyetem</p>
+          <p style="margin: 0;">9026 Győr, Egyetem tér 1.</p>
+          <p style="margin: 0;">Telefon: +36 96 503 400</p>
+          <p style="margin: 0;">Email: info@sze.hu</p>
+        </footer>
+      </div>
+    `,
+    attachments: [{ filename: 'logo.png', path: __dirname + '/assets/logo.png', cid: 'logo' }]
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log('Lemondás értesítő email elküldve:', email);
+  } catch (error) {
+    console.error('Lemondás email küldési hiba:', error);
+    throw new Error('Hiba történt a lemondás email küldése során.');
+  }
+};
+
+// Lemondás e-mail küldése (címzett a bejelentkezett felhasználó tokenből)
+app.post('/send-cancel-email', async (req, res) => {
+  const { felelos, eventNev, reason } = req.body;
+  const toEmail = getLoggedInEmail(req);
+  if (!toEmail) {
+    return res.status(401).json({ success: false, message: 'Nincs bejelentkezett felhasználó, vagy hiányzik az email a tokenből.' });
+  }
+  try {
+    await sendCancelEmail(toEmail, felelos, eventNev, reason);
+    res.status(200).json({ success: true, message: 'Lemondás e-mail sikeresen elküldve.' });
+  } catch (error) {
+    console.error('Hiba a lemondás e-mail küldése során:', error);
+    res.status(500).json({ success: false, message: 'Hiba történt a lemondás e-mail küldése során.' });
+  }
+});
+
 module.exports = {
   sendSuccessEmail,
-  sendRejectionEmail
+  sendRejectionEmail,
+  sendCancelEmail
 };
 
 // Backend indítása

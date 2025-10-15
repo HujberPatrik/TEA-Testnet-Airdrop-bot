@@ -124,9 +124,62 @@
             <div class="text-end fw-bold">Egyetemi összesen: {{ money(sum(uniItems)) }}</div>
           </div>
 
-          <div class="d-flex gap-2 mt-3">
-            <button class="btn btn-warning" :disabled="busy" @click="requestUniversityOfferChange">Módosítás kérése</button>
-            <button class="btn btn-success" :disabled="busy" @click="downloadUniversityDocx">Egyetemi árajánlat (DOCX)</button>
+          <hr class="my-4" />
+          <h6>Uni‑Famulus árajánlat ellenőrzése</h6>
+          <div class="d-flex align-items-center gap-2">
+            <span>Mentett UF ajánlat</span>
+            <button class="btn btn-sm btn-outline-secondary" @click="fetchUfBreakdown" :disabled="loading.uf">Frissítés</button>
+          </div>
+          <div v-if="loading.uf" class="text-muted mt-2">Betöltés…</div>
+          <div v-else-if="ufItems.length === 0" class="text-muted mt-2">Még nincs mentett UF ajánlat.</div>
+          <div v-else class="table-responsive mt-2">
+            <table class="table table-sm table-bordered">
+              <thead>
+                <tr>
+                  <th>Megnevezés</th>
+                  <th>M.e.</th>
+                  <th v-if="visibleUfCols.hours">Óra</th>
+                  <th v-if="visibleUfCols.persons">Fő</th>
+                  <th v-if="visibleUfCols.days">Nap</th>
+                  <th v-if="visibleUfCols.occasions">Alkalom</th>
+                  <th v-if="visibleUfCols.quantity">Darab</th>
+                  <th>Egység ár</th>
+                  <th>Összesen</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="r in ufItems" :key="r.id">
+                  <td>{{ r.service_name }}</td>
+                  <td>{{ r.unit }}</td>
+                  <td v-if="visibleUfCols.hours">{{ z(derivedUf(r).hours) }}</td>
+                  <td v-if="visibleUfCols.persons">{{ z(derivedUf(r).persons) }}</td>
+                  <td v-if="visibleUfCols.days">{{ z(derivedUf(r).days) }}</td>
+                  <td v-if="visibleUfCols.occasions">{{ z(derivedUf(r).occasions) }}</td>
+                  <td v-if="visibleUfCols.quantity">{{ z(derivedUf(r).quantity) }}</td>
+                  <td>{{ money(r.unit_price) }}</td>
+                  <td>{{ money(r.line_total) }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="text-end fw-bold">UF összesen: {{ money(sum(ufItems)) }}</div>
+          </div>
+
+          <div class="d-flex gap-2 mt-3 align-items-center">
+            <div class="position-relative d-inline-block">
+              <button class="btn btn-warning" :disabled="busy" @click.stop="toggleModifyChoice($event)">
+                Módosítás kérése
+              </button>
+              <!-- lenyíló választó -->
+              <div v-show="showModifyChoice" class="dropdown-menu show p-2 shadow-sm" style="display:block; min-width: 220px;" @click.stop>
+                <button class="dropdown-item" :disabled="busy" @click="onModifyChoice('uni')">
+                  Egyetemi módosítása
+                </button>
+                <button class="dropdown-item" :disabled="busy" @click="onModifyChoice('uf')">
+                  UF módosítása
+                </button>
+              </div>
+            </div>
+            <button class="btn btn-success" :disabled="busy" @click="downloadUniversityDocx">Árajánlat generálása (DOCX)</button>
           </div>
         </section>
       </div>
@@ -183,7 +236,8 @@ export default {
       statusOverride: null,
       // ÚJ: külön kalkulátor modálok láthatósága
       showUfCalc: false,
-      showUniCalc: false
+      showUniCalc: false,
+      showModifyChoice: false
     };
   },
   computed: {
@@ -235,12 +289,326 @@ export default {
       handler(s) {
         if (s === 'UF_ARAJANLATRA_VAR') this.fetchUfBreakdown?.();
         if (s === 'UF_ARAJANLAT_ELFOGADASARA_VAR') this.fetchUfBreakdown?.();
-        if (s === 'ARAJANLAT_ELFOGADASRA_VAR') this.fetchUniBreakdown?.();
+        if (s === 'ARAJANLAT_ELFOGADASRA_VAR') {
+          this.fetchUniBreakdown?.();
+          this.fetchUfBreakdown?.(); // UF táblázat is jelenjen meg ebben a státuszban
+        }
+        // módosító menü elrejtése státuszváltáskor
+        this.showModifyChoice = false;
       }
     }
   },
   methods: {
     isStatus(code) { return this.statusCode === code; },
+
+    // Dropdown megnyitás/bezárás a "Módosítás kérése" gombhoz
+    toggleModifyChoice(e) {
+      if (e?.stopPropagation) e.stopPropagation();
+      this.showModifyChoice = !this.showModifyChoice;
+    },
+    hideModifyChoice() {
+      this.showModifyChoice = false;
+    },
+    async onModifyChoice(type) {
+      try {
+        if (type === 'uf') {
+          await this.requestUfOfferChange();
+        } else {
+          await this.requestUniversityOfferChange();
+        }
+      } finally {
+        this.showModifyChoice = false;
+      }
+    },
+
+    // UF lépés státuszok – meglévő logikával
+    async acceptUfQuote() {
+      if (!this.event?.id || this.busy) return;
+      this.busy = true;
+      try {
+        const newStatus = 'UF_ARAJANLATRA_VAR';
+        const r = await axios.patch(`http://localhost:3000/api/kerveny/${this.event.id}/status`, { statusz: newStatus });
+        if (r.status === 200) {
+          this.statusOverride = newStatus;            // azonnali UI frissítés
+          this.$emit('status-updated', { ...this.event, statusz: newStatus });
+          this.$emit('refresh-events');
+        }
+      } finally { this.busy = false; }
+    },
+    async rejectEvent() {
+      if (!this.event?.id || this.busy) return;
+      this.busy = true;
+      try {
+        const newStatus = 'ELUTASITVA';
+        const r = await axios.patch(`http://localhost:3000/api/kerveny/${this.event.id}/status`, { statusz: newStatus });
+        if (r.status === 200) {
+          this.statusOverride = newStatus;
+          this.$emit('status-updated', { ...this.event, statusz: newStatus });
+          this.$emit('refresh-events');
+        }
+      } finally { this.busy = false; }
+    },
+
+    // UF: visszadobás szerkesztésre
+    async requestUfOfferChange() {
+      if (!this.event?.id || this.busy) return;
+      this.busy = true;
+      try {
+        const newStatus = 'UF_ARAJANLATRA_VAR';
+        const r = await axios.patch(`http://localhost:3000/api/kerveny/${this.event.id}/status`, { statusz: newStatus });
+        if (r.status === 200) {
+          this.statusOverride = newStatus;
+          this.$emit('status-updated', { ...this.event, statusz: newStatus });
+          this.$emit('refresh-events');
+        }
+      } finally { this.busy = false; }
+    },
+
+    // már létező: UF elfogadás → Árajánlat készítésére vár
+    async acceptOfferFromFamulus() {
+      if (!this.event?.id || this.busy) return;
+      this.busy = true;
+      try {
+        const newStatus = 'ARAJANLAT_KESZITESERE_VAR';
+        const r = await axios.patch(`http://localhost:3000/api/kerveny/${this.event.id}/status`, { statusz: newStatus });
+        if (r.status === 200) {
+          this.statusOverride = newStatus;
+          this.$emit('status-updated', { ...this.event, statusz: newStatus });
+          this.$emit('refresh-events');
+        }
+      } finally { this.busy = false; }
+    },
+
+    // Egyetem lépés státuszok – generálás gomb NEM kell, csak kalkulátor és a többi lépés marad
+
+    async requestUniversityOfferChange() {
+      if (!this.event?.id || this.busy) return;
+      this.busy = true;
+      try {
+        const newStatus = 'ARAJANLAT_KESZITESERE_VAR';
+        const r = await axios.patch(`http://localhost:3000/api/kerveny/${this.event.id}/status`, { statusz: newStatus });
+        if (r.status === 200) {
+          this.statusOverride = newStatus;
+          this.$emit('status-updated', { ...this.event, statusz: newStatus });
+          this.$emit('refresh-events');
+        }
+      } finally { this.busy = false; }
+    },
+    async acceptUniversityQuote() {
+      if (!this.event?.id || this.busy) return;
+      this.busy = true;
+      try {
+        const newStatus = 'SZERZODES_ALAIRVA'; // ha más a végső státusz, cseréld
+        const r = await axios.patch(`http://localhost:3000/api/kerveny/${this.event.id}/status`, { statusz: newStatus });
+        if (r.status === 200) {
+          this.statusOverride = newStatus;
+          this.$emit('status-updated', { ...this.event, statusz: newStatus });
+          this.$emit('refresh-events');
+        }
+      } finally { this.busy = false; }
+    },
+
+    // Lemondás: minden státuszban elérhető
+    async cancelEvent() {
+      if (!this.event?.id || this.cancelling) return;
+      this.cancelling = true;
+      try {
+        const newStatus = 'LEMONDVA';
+        const r = await axios.patch(`http://localhost:3000/api/kerveny/${this.event.id}/status`, { statusz: newStatus });
+        if (r.status === 200) {
+          // e-mail küldés: 3000-es backend API
+          try {
+            await axios.post('http://localhost:3000/api/email/cancel', {
+              email: this.event?.email || this.event?.kapcsolattartoEmail || this.event?.szervezoEmail || '', // ha van
+              felelos: this.event?.felelos || this.event?.szervezo || '',
+              eventNev: this.event?.nev || this.event?.name || '',
+              reason: 'A rendezvény lemondásra került.'
+            });
+          } catch (e) {
+            console.warn('Lemondás e-mail küldése nem sikerült:', e?.response?.data || e.message);
+          }
+          this.statusOverride = newStatus;
+          this.$emit('status-updated', { ...this.event, statusz: newStatus });
+          this.$emit('refresh-events');
+        }
+      } finally { this.cancelling = false; }
+    },
+
+    // Breakdown betöltések
+    async fetchUfBreakdown() {
+      if (!this.event?.id) return;
+      this.loading.uf = true;
+      try {
+        const r = await axios.get(`http://localhost:3000/api/kerveny/famulus/${this.event.id}`);
+        const rows = Array.isArray(r.data) ? r.data : [];
+        this.ufItems = rows.map(this.normalizeRow);
+      } finally { this.loading.uf = false; }
+    },
+    async fetchUniBreakdown() {
+      if (!this.event?.id) return;
+      this.loading.uni = true;
+      try {
+        const r = await axios.get(`http://localhost:3000/api/kerveny/egyetem/${this.event.id}`);
+        const rows = Array.isArray(r.data) ? r.data : [];
+        this.uniItems = rows.map(this.normalizeRow);
+      } finally { this.loading.uni = false; }
+    },
+
+    // ÚJ: a megfelelő kalkulátor modál megnyitása
+    openCalculator(type) {
+      if (type === 'famulus') {
+        this.showUfCalc = true;
+      } else {
+        this.showUniCalc = true;
+      }
+    },
+
+    // Formázók
+    z(v) { const n = Number(v); return Number.isFinite(n) ? (Number.isInteger(n) ? n : n.toFixed(2)) : ''; },
+    money(v) { const n = Number(v) || 0; return n.toLocaleString('hu-HU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+    sum(arr) { return (arr || []).reduce((s, r) => s + (Number(r.line_total) || 0), 0); },
+
+    onChildStatusUpdated(updated) {
+      // azonnali UI frissítés a wizardban
+      this.statusOverride = updated?.statusz || updated?.status || null;
+      this.$emit('status-updated', updated);   // tovább a szülőnek (Table.vue)
+    },
+    // Mértékegység → oszlopok (ugyanúgy, mint fő/óra)
+    columnsForUnit(u) {
+      const s = String(u || '').toLowerCase();
+      const has = (t) => s.includes(t);
+      const isPerHour = has('fo/ora') || (has('fo') && has('ora')); // fő/óra
+      const hasDbAlkalom = has('db/alkalom');
+      return {
+        hours: isPerHour || has('ora'),
+        persons: isPerHour || (has('fo') && !has('fo/ora')),
+        days: has('nap'),
+        occasions: has('alkalom'),
+        quantity: hasDbAlkalom || (has('db') && !hasDbAlkalom)
+      };
+    },
+
+    // Biztonságos szám konverzió
+    num(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; },
+
+    // Sor normalizálása: kulcsok egységesítése és szám konverzió
+    normalizeRow(row = {}) {
+      const pick = (obj, keys) => {
+        // 1) direkt kulcs
+        for (const k of keys) if (obj[k] !== undefined) return obj[k];
+        // 2) case-insensitive egyezés
+        const lc = Object.keys(obj).reduce((m, k) => (m[k.toLowerCase()] = k, m), {});
+        for (const k of keys) {
+          const real = lc[k.toLowerCase()];
+          if (real) return obj[real];
+        }
+        return undefined;
+      };
+      return {
+        ...row,
+        unit: pick(row, ['unit']) ?? '',
+        hours: this.num(pick(row, ['hours','hour','ora'])),
+        persons: this.num(pick(row, ['persons','person','fo','people'])),
+        days: this.num(pick(row, ['days','nap'])),
+        occasions: this.num(pick(row, ['occasions','occasion','alkalom'])),
+        quantity: this.num(pick(row, ['quantity','db','darab']))
+      };
+    },
+
+    // Első létező mező kiolvasása több lehetséges kulcs közül (case-insensitive)
+    getNumField(row = {}, keys) {
+      // 1) direkt egyezés
+      for (const k of keys) {
+        if (row[k] !== undefined) return this.num(row[k]);
+      }
+      // 2) case-insensitive egyezés
+      const entries = Object.entries(row);
+      for (const wanted of keys) {
+        const hit = entries.find(([k]) => k.toLowerCase() === wanted.toLowerCase());
+        if (hit) return this.num(hit[1]);
+      }
+      return 0;
+    },
+
+    // Egyetemi sor derivált értékei – közvetlen, több kulcsot kezelő leképezés
+    derivedUni(r) {
+      const u = this.normalizeUnit(r?.unit);
+      const c = this.columnsForUnit(u);
+      return {
+        hours:     c.hours     ? this.getNumField(r, ['hours', 'ora']) : 0,
+        persons:   c.persons   ? this.getNumField(r, ['persons', 'fo', 'people']) : 0,
+        days:      c.days      ? this.getNumField(r, ['days', 'nap']) : 0,
+        occasions: c.occasions ? this.getNumField(r, ['occasions', 'occasion', 'alkalom']) : 0,
+        quantity:  c.quantity  ? this.getNumField(r, ['quantity', 'darab', 'db']) : 0
+      };
+    },
+
+    // UF sor derivált értékei – ugyanaz az elv
+    derivedUf(r) {
+      const u = this.normalizeUnit(r?.unit);
+      const c = this.columnsForUnit(u);
+      return {
+        hours:     c.hours     ? this.getNumField(r, ['hours', 'ora']) : 0,
+        persons:   c.persons   ? this.getNumField(r, ['persons', 'fo', 'people']) : 0,
+        days:      c.days      ? this.getNumField(r, ['days', 'nap']) : 0,
+        occasions: c.occasions ? this.getNumField(r, ['occasions', 'occasion', 'alkalom']) : 0,
+        quantity:  c.quantity  ? this.getNumField(r, ['quantity', 'darab', 'db']) : 0
+      };
+    },
+
+    // Mértékegység normalizálása (kisbetű, ékezetek nélkül)
+    normalizeUnit(u) {
+      return String(u || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim();
+    },
+    async downloadUniversityDocx() {
+      if (!this.event?.id || this.busy) return;
+      this.busy = true;
+      try {
+        const url = `http://localhost:3000/api/kerveny/egyetem/${this.event.id}/docx`;
+        const res = await axios.get(url, { responseType: 'blob' });
+        const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `egyetemi-ajanlat-${this.event.id}.docx`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      } finally { this.busy = false; }
+    }
+  },
+  mounted() {
+    // kívülre kattintásra zárjuk a választót
+    document.addEventListener('click', this.hideModifyChoice);
+  },
+  beforeUnmount() {
+    document.removeEventListener('click', this.hideModifyChoice);
+  },
+  methods: {
+    isStatus(code) { return this.statusCode === code; },
+
+    // Dropdown megnyitás/bezárás a "Módosítás kérése" gombhoz
+    toggleModifyChoice(e) {
+      if (e?.stopPropagation) e.stopPropagation();
+      this.showModifyChoice = !this.showModifyChoice;
+    },
+    hideModifyChoice() {
+      this.showModifyChoice = false;
+    },
+    async onModifyChoice(type) {
+      try {
+        if (type === 'uf') {
+          await this.requestUfOfferChange();
+        } else {
+          await this.requestUniversityOfferChange();
+        }
+      } finally {
+        this.showModifyChoice = false;
+      }
+    },
 
     // UF lépés státuszok – meglévő logikával
     async acceptUfQuote() {
@@ -337,6 +705,17 @@ export default {
         const newStatus = 'LEMONDVA';
         const r = await axios.patch(`http://localhost:3000/api/kerveny/${this.event.id}/status`, { statusz: newStatus });
         if (r.status === 200) {
+          // e-mail küldés: 3000-es backend API
+          try {
+            await axios.post('http://localhost:3000/api/email/cancel', {
+              email: this.event?.email || this.event?.kapcsolattartoEmail || this.event?.szervezoEmail || '', // ha van
+              felelos: this.event?.felelos || this.event?.szervezo || '',
+              eventNev: this.event?.nev || this.event?.name || '',
+              reason: 'A rendezvény lemondásra került.'
+            });
+          } catch (e) {
+            console.warn('Lemondás e-mail küldése nem sikerült:', e?.response?.data || e.message);
+          }
           this.statusOverride = newStatus;
           this.$emit('status-updated', { ...this.event, statusz: newStatus });
           this.$emit('refresh-events');
@@ -518,4 +897,24 @@ export default {
   border-top: 1px solid #e5e7eb;
   background: #fff;
 }
+
+/* egyszerű dropdown stílus, ha nincs Bootstrap JS */
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 2050;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,.15);
+  border-radius: .25rem;
+}
+.dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: .375rem .5rem;
+}
+.dropdown-item:hover { background: #f8f9fa; }
 </style>

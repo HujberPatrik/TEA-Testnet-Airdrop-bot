@@ -1,5 +1,6 @@
 const pool = require('../config/db');
-const { generateUniversityOfferFromCosts, getUniversityDocxTags } = require('../documentService');
+const { generateCombinedUniversityAndUfOffer, generateUniversityOfferFromCosts } = require('../documentService');
+const emailService = require('../emailService'); // transporter + sablonok
 require('dotenv').config();
 
 // ÚJ: támogatott státuszkódok + legacy numerikus mapping
@@ -482,7 +483,9 @@ async function clearCostsForType(kervenyId, type) {
 async function downloadUniversityDocx(req, res) {
   try {
     const { id } = req.params;
-    const buffer = await generateUniversityOfferFromCosts(id);
+    const buffer = await (generateCombinedUniversityAndUfOffer
+      ? generateCombinedUniversityAndUfOffer(id)
+      : generateUniversityOfferFromCosts(id)); // fallback
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.setHeader('Content-Disposition', `attachment; filename="egyetemi-ajanlat-${id}.docx"`);
     res.send(buffer);
@@ -504,6 +507,23 @@ async function listUniversityDocxTags(req, res) {
   }
 }
 
+// Lemondás e-mail küldése
+async function sendCancelMail(req, res) {
+  try {
+    const { email, felelos, eventNev, reason } = req.body || {};
+    const to = email || process.env.MAIL_TEST_TO;
+    if (!to) return res.status(400).json({ message: 'Hiányzó email címzett.' });
+    await emailService.sendCancelEmail(to, felelos, eventNev, reason);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('sendCancelMail error:', e);
+    res.status(500).json({ ok: false, message: 'Lemondás e-mail küldési hiba.' });
+  }
+}
+
+// export bővítése – semmit ne törölj
+module.exports.sendCancelMail = module.exports.sendCancelMail || sendCancelMail;
+
 // Export bővítése – tedd a fájl VÉGÉRE, hogy semmi ne írja felül
 module.exports = {
   getAllKerveny,
@@ -516,5 +536,6 @@ module.exports = {
   getUniversityPricesByKervenyId,
   clearCostsForType,
   downloadUniversityDocx,
-  listUniversityDocxTags
+  listUniversityDocxTags,
+  sendCancelMail
 };

@@ -30,6 +30,9 @@ router.delete('/:id/costs', async (req, res) => {
   }
 });
 
+// Lemondás e-mail küldése
+router.post('/email/cancel', ctrl.sendCancelMail);
+
 module.exports = router;
 
 

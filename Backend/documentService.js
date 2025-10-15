@@ -348,9 +348,10 @@ async function generateUfOfferFromCosts(kervenyId) {
     sum_persons_fmt: fmt2(totalsNet.persons),
     sum_total_fmt: fmtHuf(totalsNet.total),
     sum_vat_fmt: fmtHuf(totalsVatGross.vat),
-    sum_gross_fmt: fmtHuf(totalsVatGross.gross),
+    // csak akkor bruttó, ha van ÁFA, különben nettó
+    sum_gross_fmt: fmtHuf(globalVatRate === '27%' ? totalsVatGross.gross : totalsNet.total),
     today: new Date().toLocaleDateString('hu-HU'),
-    afa: globalVatRate // DOCX {afa}
+    afa: globalVatRate
   };
 
   const templatePath = path.join(templatesDir, 'UF_arajanlat_sablon.docx');
@@ -447,24 +448,19 @@ async function generateUniversityOfferFromCosts(kervenyId) {
 
   const globalVatRateUni = rows.some(r => toBool(r.price_afa)) ? '27%' : '0%';
 
-  const kerveny = await fetchKervenyMeta(kervenyId);
-
   const data = {
-    ...kerveny,
-    kerveny,
-    items,
-    byName,
-    show_hours: visible.hours,
-    show_persons: visible.persons,
-    show_days: visible.days,
-    show_occasions: visible.occasions,
-    show_quantity: visible.quantity,
-    sum_total_fmt: fmtHuf(totals.net),
-    sum_vat_fmt:   fmtHuf(totals.vat),
-    sum_gross_fmt: fmtHuf(totals.gross),
+    costs,
+    sum_hours: totalsNet.hours,
+    sum_persons: totalsNet.persons,
+    sum_total: totalsNet.total,
+    sum_hours_fmt: fmt2(totalsNet.hours),
+    sum_persons_fmt: fmt2(totalsNet.persons),
+    sum_total_fmt: fmtHuf(totalsNet.total),
+    sum_vat_fmt: fmtHuf(totalsVatGross.vat),
+    // csak akkor bruttó, ha van ÁFA, különben nettó
+    sum_gross_fmt: fmtHuf(globalVatRateUni === '27%' ? totalsVatGross.gross : totalsNet.total),
     today: new Date().toLocaleDateString('hu-HU'),
-    kervenyId,
-    afa: globalVatRateUni // DOCX {afa}
+    afa: globalVatRateUni
   };
 
   const templatePath = path.join(templatesDir, 'SZE_arajanlat_sablon.docx');
@@ -595,12 +591,181 @@ function columnsForUnit(unitRaw) {
   return result;
 }
 
+// Kombinált (Egyetemi + UF) árajánlat ugyanabba a sablonba
+async function generateCombinedUniversityAndUfOffer(kervenyId) {
+  if (!kervenyId) throw new Error('Hiányzó kervenyId');
+
+  // 1) Egyetemi sorok (ÁFA: prices.afa)
+  const { rows: uniRows } = await pool.query(`
+    SELECT kk.id, kk.kerveny_id, kk.service_id, kk.service_name,
+           kk.rate_key, kk.unit,
+           kk.hours, kk.persons, kk.days, kk.occasions, kk.quantity,
+           kk.unit_price, kk.line_total, kk.created_at,
+           COALESCE(p.afa, false) AS price_afa
+    FROM kerveny_koltseg kk
+    INNER JOIN prices p ON p.id = kk.service_id
+    WHERE kk.kerveny_id = $1
+      AND lower(p.kategoria) = 'egyetemi'
+    ORDER BY kk.id
+  `, [kervenyId]);
+
+  // 2) UF sorok (ÁFA: csak UF kategória + rate_key = priceExternal)
+  const { rows: ufRows } = await pool.query(`
+    SELECT kk.id, kk.kerveny_id, kk.service_id, kk.service_name,
+           kk.rate_key, kk.unit,
+           kk.hours, kk.persons, kk.days, kk.occasions, kk.quantity,
+           kk.unit_price, kk.line_total, kk.created_at,
+           p.kategoria AS price_category
+    FROM kerveny_koltseg kk
+    INNER JOIN prices p ON p.id = kk.service_id
+    WHERE kk.kerveny_id = $1
+      AND (
+        lower(p.kategoria) IN ('uf','uni-famulus','uni famulus')
+        OR p.kategoria ILIKE '%famulus%'
+      )
+    ORDER BY kk.id
+  `, [kervenyId]);
+
+  // kis debug, hogy lásd mennyi sor jött
+  console.log('[DOCX][combined] uniRows:', uniRows.length, 'ufRows:', ufRows.length);
+
+  const isUfCategory = (cat) => {
+    const c = String(cat || '').trim().toLowerCase();
+    return c === 'uf' || c === 'uni-famulus' || c === 'uni famulus' || c.includes('famulus');
+  };
+  const shouldTaxUf = (r) => isUfCategory(r.price_category) && String(r.rate_key) === 'priceExternal';
+
+  const rowToItem = (r, applyVat) => {
+    const c = columnsForUnit(normalizeUnit(r.unit));
+    const unitGross = calcVatAndGross(r.unit_price, applyVat).gross;
+    const { vat, gross } = calcVatAndGross(r.line_total, applyVat);
+    return {
+      service_name: r.service_name,
+      unit: r.unit,
+      qty_label: buildQtyLabel(r),
+      hours:     c.hours     ? Number(r.hours)     || 0 : '',
+      persons:   c.persons   ? Number(r.persons)   || 0 : '',
+      days:      c.days      ? Number(r.days)      || 0 : '',
+      occasions: c.occasions ? Number(r.occasions) || 0 : '',
+      quantity:  c.quantity  ? Number(r.quantity)  || 0 : '',
+      unit_price_fmt: fmtHuf(r.unit_price),
+      line_total_fmt: fmtHuf(r.line_total),
+      gross_unit_fmt: fmtHuf(unitGross),
+      vat_line_fmt:   fmtHuf(vat),
+      gross_line_fmt: fmtHuf(gross),
+      vat_rate:       applyVat ? '27%' : '0%'
+    };
+  };
+
+  // Egyetemi tételek
+  const items_uni = uniRows.map(r => rowToItem(r, !!r.price_afa));
+  const byName_uni = uniRows.reduce((acc, r) => {
+    acc[slugifyName(r.service_name)] = rowToItem(r, !!r.price_afa);
+    return acc;
+  }, {});
+
+  // UF tételek
+  const items_uf = ufRows.map(r => rowToItem(r, shouldTaxUf(r)));
+  const byName_uf = ufRows.reduce((acc, r) => {
+    acc[slugifyName(r.service_name)] = rowToItem(r, shouldTaxUf(r));
+    return acc;
+  }, {});
+
+  // Láthatóságok (mindkét halmaz alapján)
+  const visible = [...uniRows, ...ufRows].reduce((acc, r) => {
+    const c = columnsForUnit(normalizeUnit(r.unit));
+    acc.hours    ||= c.hours;
+    acc.persons  ||= c.persons;
+    acc.days     ||= c.days;
+    acc.occasions||= c.occasions;
+    acc.quantity ||= c.quantity;
+    return acc;
+  }, { hours: false, persons: false, days: false, occasions: false, quantity: false });
+
+  // Összesítők (nettó/ÁFA/bruttó) mindkét halmazra külön és összesen
+  const sumRows = (arr, taxFn) => arr.reduce((acc, r) => {
+    const net = Number(r.line_total) || 0;
+    const { vat, gross } = calcVatAndGross(net, taxFn(r));
+    acc.net += net; acc.vat += vat; acc.gross += gross;
+    return acc;
+  }, { net: 0, vat: 0, gross: 0 });
+
+  const totals_uni = sumRows(uniRows, (r)=>!!r.price_afa);
+  const totals_uf  = sumRows(ufRows,  shouldTaxUf);
+  const totals_all = {
+    net:   totals_uni.net   + totals_uf.net,
+    vat:   totals_uni.vat   + totals_uf.vat,
+    gross: totals_uni.gross + totals_uf.gross
+  };
+
+  const kerveny = await fetchKervenyMeta(kervenyId);
+
+  // byName összefésülése (egyetemi elsődleges; a hiányzókat UF tölti ki)
+  const byName = { ...byName_uni, ...Object.fromEntries(
+    Object.entries(byName_uf).filter(([k]) => !byName_uni[k])
+  ) };
+
+  const anyTaxAll =
+    uniRows.some(r => toBool(r.price_afa)) ||
+    ufRows.some(r => (String(r.rate_key) === 'priceExternal' && (String(r.price_category||'').toLowerCase().includes('famulus') || ['uf','uni-famulus','uni famulus'].includes(String(r.price_category||'').toLowerCase()))));
+
+  const data = {
+    ...kerveny,
+    kerveny,
+
+    // Egy táblába is fűzheted: {#items}{/items}
+    items: [...items_uni, ...items_uf].map(x => ({ ...x })),
+
+    // Választhatóan külön szekciókhoz:
+    items_uni,
+    items_uf,
+
+    // Név szerinti elérés
+    byName,
+    byName_uni,
+    byName_uf,
+
+    // Oszlopok láthatósága
+    show_hours: visible.hours,
+    show_persons: visible.persons,
+    show_days: visible.days,
+    show_occasions: visible.occasions,
+    show_quantity: visible.quantity,
+
+    // Összesítők
+    sum_total_fmt: fmtHuf(totals_all.net),
+    sum_vat_fmt:   fmtHuf(totals_all.vat),
+    // csak akkor bruttó, ha van ÁFA, különben nettó
+    sum_gross_fmt: fmtHuf(anyTaxAll ? totals_all.gross : totals_all.net),
+
+    sum_total_uni_fmt: fmtHuf(totals_uni.net),
+    sum_vat_uni_fmt:   fmtHuf(totals_uni.vat),
+    sum_gross_uni_fmt: fmtHuf(totals_uni.gross),
+
+    sum_total_uf_fmt: fmtHuf(totals_uf.net),
+    sum_vat_uf_fmt:   fmtHuf(totals_uf.vat),
+    sum_gross_uf_fmt: fmtHuf(totals_uf.gross),
+
+    has_uni: !!uniRows.length,
+    has_uf:  !!ufRows.length,
+
+    today: new Date().toLocaleDateString('hu-HU'),
+    kervenyId
+  };
+
+  // Ugyanaz a sablon, mint az egyeteminél
+  const templatePath = path.join(templatesDir, 'SZE_arajanlat_sablon.docx');
+  return await generateDocument(templatePath, data);
+}
+
+// export bővítése – MINDEN meglévő export megmarad, csak kiegészítjük
 module.exports = {
+  ...module.exports,
   generateDocument,
   templatesDir,
   generateUfOfferFromCosts,
   generateUniversityOfferFromCosts,
+  generateCombinedUniversityAndUfOffer,   // <- EZ HIÁNYZOTT
   getUniversityDocxTags,
-  // új helper export (ha máshol is kell)
   fetchKervenyMeta
 };
