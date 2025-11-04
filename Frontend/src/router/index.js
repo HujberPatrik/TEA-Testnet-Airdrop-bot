@@ -63,4 +63,18 @@ const router = createRouter({
    ],
  });
  
+ router.beforeEach((to, from, next) => {
+  const user = router.app?.$store?.state?.auth?.user
+    || JSON.parse(localStorage.getItem('user') || 'null')
+    || {};
+  const role = String(user?.role || user?.szerepkor || user?.szerep || '').toUpperCase();
+  const isUf = ['UNI-FAMULUS','UNI_FAMULUS','UNIFAMULUS','UF'].includes(role);
+
+  // Ezeket a route NEVEKET igazítsd a projektedhez
+  const adminOnly = ['ArchivedEvents', 'PriceList', 'NeptunRoleAssign'];
+
+  if (isUf && adminOnly.includes(to.name)) return next({ name: 'Kezdolap' });
+  next();
+});
+
  export default router;

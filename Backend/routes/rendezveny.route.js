@@ -13,6 +13,9 @@ router.put('/kerveny/:id', ctrl.updateKerveny);
 router.patch('/kerveny/:id/status', ctrl.updateKervenyStatus);
 router.post('/kerveny/:id/costs/commit', ctrl.saveCostsAndAdvance);
 
+// PATCH csak modositasi_indok és/vagy statusz frissítéshez
+router.patch('/kerveny/:id', ctrl.patchKervenyFields);
+
 // DOCX letöltés endpoint (a router az appban /api alá van mountolva, ezért itt NEM kell /api)
 router.get('/kerveny/egyetem/:id/docx', ctrl.downloadUniversityDocx);
 router.get('/kerveny/egyetem/:id/docx-tags', ctrl.listUniversityDocxTags);

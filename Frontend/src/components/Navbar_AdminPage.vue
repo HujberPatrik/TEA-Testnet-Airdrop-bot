@@ -70,9 +70,7 @@ import auth from '../services/auth';
 import defaultAvatar from '@/assets/img/user.jpg';
 
 export default {
-  props: {
-    isDarkMode: Boolean
-  },
+  props: { isDarkMode: Boolean },
   data() {
     return {
       userName: 'Vendég',
@@ -83,13 +81,15 @@ export default {
   },
   computed: {
     avatarSrc() {
-      if (!this.userAvatar) return defaultAvatar;
-      // ha teljes URL (http/https) -> használjuk
-      if (/^https?:\/\//.test(this.userAvatar)) return this.userAvatar;
-      // ha kezdő / -> ugyanarról a hostról (Vite proxy átirányítja a backendre)
-      if (this.userAvatar.startsWith('/')) return this.userAvatar;
-      // egyébként visszaesésként default
-      return defaultAvatar;
+      // Forrás sorrend: state -> localStorage.avatar_url -> localStorage.user.avatar_url
+      const storedDirect = localStorage.getItem('avatar_url');
+      let storedFromUser = null;
+      try {
+        storedFromUser = JSON.parse(localStorage.getItem('user') || 'null')?.avatar_url || null;
+      } catch {}
+      const candidate = this.userAvatar || storedDirect || storedFromUser || null;
+      const absolute = this.normalizeAvatar(candidate);
+      return absolute || defaultAvatar;
     }
   },
   async mounted() {
@@ -97,102 +97,112 @@ export default {
     if (user) {
       this.userName = user.full_name || user.email || 'Vendég';
       this.userRole = user.role || null;
-      this.userAvatar = user.avatar_url || null;
+      // avatar beállítás és perzisztálás – userből elsődlegesen
+      const uAvatar = user.avatar_url || (user.profile && user.profile.avatar_url) || null;
+      this.setUserAvatar(uAvatar || localStorage.getItem('avatar_url') || null);
+      // Ha most még nincs avatar az ensureAuthUser válaszban, megpróbáljuk újratölteni kicsit később
+      if (!uAvatar) {
+        setTimeout(() => this.refreshUserAvatar(), 300);
+      }
+    } else {
+      // fallback: ha nincs user, de volt eltárolt avatar, használjuk
+      const stored = localStorage.getItem('avatar_url');
+      if (stored) this.userAvatar = stored;
     }
-    // hallgató avatar frissítésre
+
     window.addEventListener('avatar-updated', this.onAvatarUpdated);
-    // init Bootstrap Dropdown a ref alapján
+    window.addEventListener('storage', this.onStorage);
+
     if (this.$refs.dropdownToggle) {
       this.dropdownInstance = new Dropdown(this.$refs.dropdownToggle, { popperConfig: { modifiers: [{ name: 'offset', options: { offset: [0, 6] } }] } });
     }
-    // kattintás a body-n bezáráshoz, ha nyitva van
     document.addEventListener('click', this.onDocumentClick);
   },
   beforeUnmount() {
     window.removeEventListener('avatar-updated', this.onAvatarUpdated);
-    if (this.dropdownInstance && typeof this.dropdownInstance.dispose === 'function') {
-      this.dropdownInstance.dispose();
-      this.dropdownInstance = null;
-    }
+    window.removeEventListener('storage', this.onStorage);
+    if (this.dropdownInstance?.dispose) this.dropdownInstance.dispose();
     document.removeEventListener('click', this.onDocumentClick);
   },
   methods: {
-    onToggleClick() {
-      if (!this.dropdownInstance) return;
-      this.dropdownInstance.toggle();
-    },
-
+    onToggleClick() { if (this.dropdownInstance) this.dropdownInstance.toggle(); },
     onDocumentClick(e) {
-      // ha a kattintás nem a dropdown root vagy gyereke, zárjuk
       const root = this.$refs.profileRoot;
       if (!root) return;
       if (!root.contains(e.target)) {
-        if (this.dropdownInstance && this.dropdownInstance._element && this.$refs.dropdownMenu?.classList.contains('show')) {
-          this.dropdownInstance.hide();
-        }
+        if (this.$refs.dropdownMenu?.classList.contains('show')) this.dropdownInstance?.hide();
       }
     },
-
-    showNotifications() {
-      alert('Értesítések funkció hamarosan elérhető!');
-    },
-
-    navigateToProfile() {
-      this.$router.push('/profile');
-    },
-
-    navigateToSettings() {
-      alert('Beállítások oldal hamarosan elérhető!');
-    },
+    showNotifications() { alert('Értesítések funkció hamarosan elérhető!'); },
+    navigateToProfile() { this.$router.push('/profile'); },
+    navigateToSettings() { alert('Beállítások oldal hamarosan elérhető!'); },
 
     logout() {
-      // töröljük a tokent, reseteljük a felhasználó státuszt és bezárjuk a menüt, majd átirányítjuk
       auth.logout();
       this.userName = 'Vendég';
       this.userRole = null;
-      this.userAvatar = null;
+      this.setUserAvatar(null);  // törlés localStorage-ból is
       this.$emit('token-cleared');
-      if (this.dropdownInstance && typeof this.dropdownInstance.hide === 'function') {
-        this.dropdownInstance.hide();
-      }
+      this.dropdownInstance?.hide?.();
       this.$router.push('/login');
     },
 
+    // Relatív/abszolút avatar URL normalizálás
+    normalizeAvatar(url) {
+      if (!url) return null;
+      const u = String(url);
+      if (/^https?:\/\//i.test(u)) return u;
+      if (u.startsWith('/')) return u;
+      const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+      return `${base}/${u.replace(/^\/+/, '')}`;
+    },
+
+    setUserAvatar(url) {
+      const normalized = url || null;
+      if (normalized) {
+        localStorage.setItem('avatar_url', normalized);
+        this.userAvatar = normalized;
+      } else {
+        localStorage.removeItem('avatar_url');
+        this.userAvatar = null;
+      }
+    },
+
+    // ÚJ: avatar frissítése biztos forrásból (ensureAuthUser)
+    async refreshUserAvatar() {
+      try {
+        const user = await auth.ensureAuthUser();
+        const next = user?.avatar_url || user?.profile?.avatar_url || null;
+        if (next) this.setUserAvatar(next);
+      } catch {}
+    },
+
     onAvatarUpdated(e) {
-      this.userAvatar = e?.detail?.avatar_url || null;
+      const next = e?.detail?.avatar_url || null;
+      this.setUserAvatar(next);
+      // cache-elt user frissítése
+      try {
+        const u = JSON.parse(localStorage.getItem('user') || 'null');
+        if (u) {
+          u.avatar_url = next;
+          localStorage.setItem('user', JSON.stringify(u));
+        }
+      } catch {}
+    },
+
+    onStorage(e) {
+      // mind a külön avatar_url kulcsot, mind a user objektumot figyeljük
+      if (e?.key === 'avatar_url') {
+        this.userAvatar = e.newValue || null;
+      }
+      if (e?.key === 'user') {
+        try {
+          const u = JSON.parse(e.newValue || 'null');
+          const next = u?.avatar_url || null;
+          if (next) this.userAvatar = next;
+        } catch {}
+      }
     }
   }
 };
 </script>
-
-<style scoped>
-.navbar {
-    position: relative;
-    z-index: 1000;
-}
-
-/* --- ÚJ: a dropdown a navbar aljához kapcsolódjon és legyen lekerekítve --- */
-.profile-dropdown {
-  position: absolute !important;
-  top: 100% !important;        /* közvetlenül a toggle alatt (navbar alja felé) */
-  right: 0 !important;         /* jobbra igazítva ahogy eddig is */
-  left: auto !important;
-  margin-top: 6px !important;  /* kis távolság, hogy ne érjen rá teljesen, állítható */
-  border-radius: 8px !important; /* enyhe lekerekítés */
-  overflow: hidden;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
-  transform: none !important;
-  min-width: 200px;
-}
-
-/* Opció: ha a navbar sötét, a dropdown is harmonizáljon vele */
-.navbar-dark .profile-dropdown {
-  background-color: #2b2b2b;
-  color: #fff;
-}
-
-/* Dropdown elemeknél ne legyenek éles sarkak belül */
-.profile-dropdown .dropdown-item {
-  border-radius: 0;
-}
-</style>

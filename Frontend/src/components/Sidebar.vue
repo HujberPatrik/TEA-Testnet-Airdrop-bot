@@ -12,17 +12,14 @@
         <a href="#" @click.prevent="navigateTo('/admin')" class="nav-item nav-link" :class="{ active: isActivePath('/admin') }">
           <i class="fa fa-tachometer-alt me-2"></i>Főoldal
         </a>
-        <a href="#" @click.prevent="navigateTo('/admin/archived')" class="nav-item nav-link" :class="{ active: isActivePath('/admin/archived') }">
+        <a href="#" @click.prevent="navigateTo('/admin/archived')" class="nav-item nav-link" :class="{ active: isActivePath('/admin/archived') }" v-if="!isUfRole">
           <i class="fa fa-archive me-2"></i>Archivált
         </a>
-        <a href="#" @click.prevent="navigateToRoot" class="nav-item nav-link">
-          <i class="fa fa-home me-2"></i>Űrlap
-        </a>
         <a href="signin.html" class="nav-item nav-link"><i class="fa fa-chart-bar me-2"></i>Teszt </a>
-        <router-link to="/price-list" class="nav-item nav-link">
+        <router-link to="/price-list" class="nav-item nav-link" v-if="!isUfRole">
           <i class="fa fa-table me-2"></i>Árak
         </router-link>
-        <router-link to="/admin/users" class="nav-item nav-link" :class="{ active: isActivePath('/admin/users') }">
+        <router-link to="/admin/users" class="nav-item nav-link" :class="{ active: isActivePath('/admin/users') }" v-if="!isUfRole">
           <i class="fa fa-users me-2"></i>Felhasználók
         </router-link>
         <div class="nav-item dropdown">
@@ -39,6 +36,8 @@
 </template>
 
 <script>
+import auth from '../services/auth';
+
 export default {
   props: {
     isDarkMode: Boolean
@@ -53,6 +52,38 @@ export default {
     navigateToRoot() {
       // A böngésző ablakot irányítja át a localhost gyökeréhez
       window.location.href = "http://localhost:5173/";
+    }
+  },
+  data() {
+    return {
+      userRole: null
+    };
+  },
+  async mounted() {
+    // Ugyanaz a forrás és minta, mint Navbar_AdminPage.vue-ban
+    const user = await auth.ensureAuthUser();
+    if (user) this.userRole = user.role || null;
+  },
+  computed: {
+    currentUser() {
+      return this.$store?.state?.auth?.user
+        || this.$store?.state?.user
+        || JSON.parse(localStorage.getItem('user') || 'null')
+        || {};
+    },
+    isUfRole() {
+      const r = String(this.userRole || '')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // ékezetek eltávolítása
+        .toUpperCase()
+        .replace(/[_-]/g, ' ')
+        .trim();
+      return (
+        r === 'UF' ||
+        r === 'UNI FAMULUS' ||
+        r === 'UNIFAMULUS' ||
+        r === 'RENDEZVENYSZERVEZO' ||   // Rendezvényszervező is ide tartozik
+        r === 'RENDEZVENY SZERVEZO'
+      );
     }
   }
 };

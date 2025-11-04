@@ -111,6 +111,7 @@
                   <option value="Admin">Admin</option>
                   <option value="Főadmin">Főadmin</option>
                   <option value="Uni-Famulus">Uni-Famulus</option>
+                  <option value="Rendezvényszervező">Rendezvényszervező</option>
                 </select>
               </div>
 

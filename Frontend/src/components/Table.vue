@@ -7,6 +7,7 @@
 
       <!-- ÚJ: kategória státusz szűrő gombok -->
       <FilterButtons
+        v-if="!isUfRole"
         :events="events"
         @filter-status="handleStatusCodes"
         class="mb-3"
@@ -233,7 +234,8 @@ export default {
       statusFilterCodes: [], // <<< ÚJ (kategória szűrés)
       currentUser: null,                    // <<< HOZZÁADVA
       showPricingWizard: false,  // ÚJ
-      wizardEvent: null          // ÚJ
+      wizardEvent: null,         // ÚJ
+      userRole: null             // ensureAuthUser()-ból töltjük
     };
   },
   computed: {
@@ -242,6 +244,14 @@ export default {
     },
     uniqueTypes() {
       return [...new Set(this.events.map(e => e.tipus).filter(Boolean))];
+    },
+    // Ugyanaz a role validálás, mint a Sidebar.vue-ban (ensureAuthUser által beállított userRole)
+    isUfRole() {
+      const r = String(this.userRole || '')
+        .toUpperCase()
+        .replace(/[_-]/g, ' ')
+        .trim();
+      return r === 'UF' || r === 'UNI FAMULUS' || r === 'UNIFAMULUS';
     },
     sortedAndFilteredEvents() {
       let filteredEvents = this.events.map(e => ({
@@ -282,6 +292,13 @@ export default {
 
       if (this.filters.type) {
         filteredEvents = filteredEvents.filter(e => e.tipus === this.filters.type);
+      }
+
+      // Uni-Famulus csak az UF_ARAJANLATRA_VAR státuszú rendezvényeket lássa
+      if (this.isUfRole) {
+        filteredEvents = filteredEvents.filter(
+          e => String(e.statusz || '').toUpperCase() === 'UF_ARAJANLATRA_VAR'
+        );
       }
 
       return filteredEvents.sort((a,b) => {
@@ -399,8 +416,13 @@ export default {
     onStatusUpdated(updated) {
       // lista és lokális state frissítés
       this.fetchEvents?.();
+      // wizardEvent is frissüljön, ha nyitva van és azonos az id
       if (this.showPricingWizard && this.wizardEvent && updated && this.wizardEvent.id === updated.id) {
         this.wizardEvent = { ...this.wizardEvent, ...updated };
+      }
+      // selectedEvent is frissüljön, ha nyitva van és azonos az id
+      if (this.selectedEvent && updated && this.selectedEvent.id === updated.id) {
+        this.selectedEvent = { ...this.selectedEvent, ...updated };
       }
     },
     onEventUpdated(updated) {
@@ -493,8 +515,15 @@ export default {
       document.body.style.overflow = '';
     },
   },
-  mounted() {
+  async mounted() {
     this.fetchEvents();
+    // Ugyanaz a forrás, mint a Sidebar.vue-ban: ensureAuthUser()
+    try {
+      const user = await auth.ensureAuthUser();
+      this.userRole = user?.role || null;
+    } catch {
+      this.userRole = null;
+    }
   }
 };
 </script>

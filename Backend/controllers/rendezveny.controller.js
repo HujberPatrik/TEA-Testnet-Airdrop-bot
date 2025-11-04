@@ -521,6 +521,35 @@ async function sendCancelMail(req, res) {
   }
 }
 
+// ÚJ: PATCH csak modositasi_indok és/vagy statusz frissítéshez (rugalmas, nem írja felül a többi mezőt)
+const patchKervenyFields = async (req, res) => {
+  const { id } = req.params;
+  const fields = req.body;
+  if (!id || !fields || typeof fields !== 'object') {
+    return res.status(400).json({ message: 'Hiányzó adatok.' });
+  }
+  // Csak engedélyezett mezők frissítése
+  const allowed = ['modositasi_indok', 'statusz'];
+  const updates = [];
+  const values = [];
+  let idx = 1;
+  for (const key of allowed) {
+    if (fields[key] !== undefined) {
+      updates.push(`${key} = $${idx++}`);
+      values.push(fields[key]);
+    }
+  }
+  if (!updates.length) return res.status(400).json({ message: 'Nincs frissítendő mező.' });
+  values.push(id);
+  const sql = `UPDATE kerveny SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`;
+  try {
+    const { rows } = await pool.query(sql, values);
+    res.json(rows[0]);
+  } catch (e) {
+    res.status(500).json({ message: 'Adatbázis hiba.' });
+  }
+};
+
 // export bővítése – semmit ne törölj
 module.exports.sendCancelMail = module.exports.sendCancelMail || sendCancelMail;
 
@@ -537,5 +566,6 @@ module.exports = {
   clearCostsForType,
   downloadUniversityDocx,
   listUniversityDocxTags,
-  sendCancelMail
+  sendCancelMail,
+  patchKervenyFields
 };

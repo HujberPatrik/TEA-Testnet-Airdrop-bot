@@ -8,7 +8,7 @@ router.post('/assign-role', /* requireAuth, requireAdmin, */ async (req, res) =>
   const { neptun, role, reason, email } = req.body || {};
   if (!neptun && !email) return res.status(400).json({ error: 'Neptun vagy email szükséges' });
   const neptunCode = neptun ? String(neptun).trim().toUpperCase() : null;
-  const allowed = ['Admin', 'Főadmin', 'Uni-Famulus'];
+  const allowed = ['Admin', 'Főadmin', 'Uni-Famulus', 'Rendezvényszervező'];
   if (!role || !allowed.includes(role)) return res.status(400).json({ error: 'Érvénytelen szerepkör' });
 
   const client = await pool.connect();

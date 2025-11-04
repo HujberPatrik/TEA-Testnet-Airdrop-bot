@@ -6,6 +6,7 @@ async function seed() {
     { email: 'admin@example.com', neptun: 'AAA111', full_name: 'Admin User', role: 'Admin', password: 'Admin@123' },
     { email: 'foadmin@example.com', neptun: 'BBB222', full_name: 'Főadmin User', role: 'Főadmin', password: 'FoAdmin@123' },
     { email: 'famulus@example.com', neptun: 'CCC333', full_name: 'Uni Famulus', role: 'Uni-Famulus', password: 'Famulus@123' },
+    { email: 'rendezveny@example.com', neptun: 'DDD444', full_name: 'Rendezvényszervező User', role: 'Rendezvényszervező', password: 'Rendezveny@123' },
   ];
 
   const client = await pool.connect();
