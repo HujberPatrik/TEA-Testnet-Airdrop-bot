@@ -4,7 +4,7 @@
       <div class="wizard-header">
         <h4 class="mb-0">Jóváhagyási folyamat</h4>
         <div class="d-flex align-items-center gap-2">
-          <span class="badge bg-secondary">{{ statusLabel }}</span>
+          <span class="status-badge" :class="statusClass" :title="statusCode">{{ statusLabel }}</span>
           <button class="btn btn-sm btn-outline-secondary" @click="$emit('close')">Bezárás</button>
         </div>
       </div>
@@ -73,7 +73,8 @@
           </div>
 
           <div class="d-flex gap-2 mt-3">
-            <button class="btn btn-warning" :disabled="busy" @click="requestUfOfferChange">Módosítás kérése</button>
+            <!-- Indok megadása modálon keresztül (UF) -->
+            <button class="btn btn-warning" :disabled="busy" @click="onModifyChoice('uf')">Módosítás kérése</button>
             <button class="btn btn-success" :disabled="busy" @click="acceptOfferFromFamulus">UF árajánlat elfogadása</button>
           </div>
         </section>
@@ -297,7 +298,7 @@ export default {
   computed: {
     statusCode() {
       const raw = this.statusOverride ?? (this.localEvent?.statusz ?? this.localEvent?.status ?? 'BEERKEZETT');
-      return String(raw).trim().toUpperCase();
+      return this.normalizeStatusCode(raw);
     },
     statusLabel() {
       const map = {
@@ -305,7 +306,8 @@ export default {
         UF_ARAJANLATRA_VAR: 'UF árajánlatra vár',
         UF_ARAJANLAT_ELFOGADASARA_VAR: 'UF árajánlat elfogadására vár',
         ARAJANLAT_KESZITESERE_VAR: 'Árajánlat készítésére vár',
-        ARAJANLAT_ELFOGADASRA_VAR: 'Árajánlat elfogadásra vár'
+        ARAJANLAT_ELFOGADASRA_VAR: 'Árajánlat elfogadásra vár',
+        MEGVALOSITASRA_VAR: 'Megvalósításra vár'
       };
       return map[this.statusCode] || this.statusCode;
     },
@@ -339,9 +341,31 @@ export default {
     // Rendezvényszervező ne tudja módosítani az UF_ARAJANLATRA_VAR státuszt
     canModifyUfInThisStatus() {
       return !(this.isEventOrganizer && this.statusCode === 'UF_ARAJANLATRA_VAR');
+    },
+    // Színezés: a korábbi logikához illeszkedő fázis és class
+    statusPhase() {
+      const s = this.statusCode;
+      if (['UF_ARAJANLATRA_VAR', 'UF_ARAJANLAT_ELFOGADASARA_VAR', 'ARAJANLAT_KESZITESERE_VAR', 'ARAJANLAT_ELFOGADASRA_VAR'].includes(s)) {
+        return 'szerzodes';
+      }
+      if (['MEGVALOSITASRA_VAR', 'MEGVALOSULASRA_VAR'].includes(s)) return 'megvalositas';
+      if (['ELSZAMOLASRA_VAR'].includes(s)) return 'elszamolas';
+      if (['LEZART', 'LEZARVA', 'ELUTASITVA', 'LEMONDVA'].includes(s)) return 'lezart';
+      return 'beerkezett';
+    },
+    statusClass() {
+      return `phase-${this.statusPhase}`;
     }
   },
   methods: {
+    normalizeStatusCode(code) {
+      const c = String(code || '').trim().toUpperCase();
+      const aliases = {
+        // backend alias -> front-end canonical
+        MEGVALOSULASRA_VAR: 'MEGVALOSITASRA_VAR'
+      };
+      return aliases[c] || c;
+    },
     isStatus(code) { return this.statusCode === code; },
 
     // Dropdown megnyitás/bezárás a "Módosítás kérése" gombhoz
@@ -460,14 +484,17 @@ export default {
       if (!this.event?.id || this.busy) return;
       this.busy = true;
       try {
-        const newStatus = 'MEGVALOSULASRA_VAR';
-        const r = await axios.patch(`http://localhost:3000/api/kerveny/${this.event.id}/status`, { statusz: newStatus });
-        if (r.status === 200) {
-          this.statusOverride = newStatus;
-          this.$emit('status-updated', { ...this.event, statusz: newStatus });
-          this.$emit('refresh-events');
-        }
-      } finally { this.busy = false; }
+        const desired = 'MEGVALOSITASRA_VAR';
+        const r = await axios.patch(`http://localhost:3000/api/kerveny/${this.event.id}/status`, { statusz: desired });
+         if (r.status === 200) {
+          // ha a backend alias kódot küld vissza, normalizáljuk
+          const returned = r.data?.statusz || r.data?.status || desired;
+          const normalized = this.normalizeStatusCode(returned);
+          this.statusOverride = normalized;
+          this.$emit('status-updated', { ...this.event, statusz: normalized });
+           this.$emit('refresh-events');
+         }
+       } finally { this.busy = false; }
     },
 
     // Lemondás: minden státuszban elérhető, csak státuszváltás (nincs e-mail)
@@ -547,8 +574,8 @@ export default {
 
     onChildStatusUpdated(updated) {
       // mentsük el a VÁLTÁS ELŐTTI státuszt
-      const prev = String(this.statusCode || '').toUpperCase().trim();
-      const next = String(updated?.statusz || updated?.status || '').toUpperCase().trim();
+      const prev = this.statusCode;
+      const next = this.normalizeStatusCode(updated?.statusz || updated?.status || '');
 
       // azonnali UI frissítés a wizardban
       this.statusOverride = updated?.statusz || updated?.status || null;
@@ -744,4 +771,16 @@ export default {
   width: 96vw;
   box-shadow: 0 8px 32px rgba(0,0,0,.18);
 }
+
+/* Egységes státusz jelvény stílus (Table komponenssel azonos színek) */
+.status-badge {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .25rem .55rem; border-radius: 12px; font-size: .75rem;
+  font-weight: 600; letter-spacing: .3px; line-height: 1.1; white-space: nowrap;
+}
+.phase-beerkezett   { background:#ffe0e3; color:#9d1d30; }
+.phase-szerzodes    { background:#fde8cc; color:#a65f00; }
+.phase-megvalositas { background:#d8eefc; color:#05537a; }
+.phase-elszamolas   { background:#e1f5e8; color:#1f6d3f; }
+.phase-lezart       { background:#e0e0e0; color:#555; }
 </style>

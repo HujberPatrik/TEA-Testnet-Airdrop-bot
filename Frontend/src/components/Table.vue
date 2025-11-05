@@ -13,6 +13,44 @@
         class="mb-3"
       />
 
+      <!-- ÚJ: Külön szekciók a módosítás kéréssel érintett rendezvényekhez -->
+      <div class="row g-3 mb-3" v-if="modificationEventsUf.length || modificationEventsUni.length">
+        <!-- Rendezvényszervező NE lássa az UF módosítás szekciót -->
+        <div class="col-md-6" v-if="modificationEventsUf.length && !isEventOrganizer">
+          <div class="card border-warning h-100">
+            <div class="card-header bg-warning text-dark fw-bold">UF módosítás kérve</div>
+            <ul class="list-group list-group-flush">
+              <li class="list-group-item" v-for="ev in modificationEventsUf" :key="'uf-'+ev.id">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div>
+                    <div class="fw-semibold">{{ ev.nev }}</div>
+                    <small class="text-muted d-block">Indok: {{ ev.modositasi_indok }}</small>
+                  </div>
+                  <span class="badge bg-warning text-dark">UF</span>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="col-md-6" v-if="modificationEventsUni.length">
+          <div class="card border-info h-100">
+            <div class="card-header bg-info text-dark fw-bold">Egyetemi módosítás kérve</div>
+            <ul class="list-group list-group-flush">
+              <li class="list-group-item" v-for="ev in modificationEventsUni" :key="'uni-'+ev.id">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div>
+                    <div class="fw-semibold">{{ ev.nev }}</div>
+                    <small class="text-muted d-block">Indok: {{ ev.modositasi_indok }}</small>
+                  </div>
+                  <span class="badge bg-info text-dark">Egyetem</span>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <!-- /ÚJ szekciók -->
+
       <div v-if="loading" class="text-center my-5">
         <div class="spinner-border text-primary" role="status">
           <span class="visually-hidden">Betöltés...</span>
@@ -115,6 +153,14 @@
                     <i :class="getStatusIcon(event.statusz)"></i>
                     {{ getStatusLabel(event.statusz) }}
                   </span>
+                  <span
+                    v-if="modificationType(event)"
+                    class="badge ms-2"
+                    :class="modificationType(event) === 'UF' ? 'bg-warning text-dark' : 'bg-info text-dark'"
+                    :title="event.modositasi_indok"
+                  >
+                    {{ modificationType(event) }} módosítás kérve
+                  </span>
                 </td>
                 <td>{{ event.nev }}</td>
                 <td>{{ event.helyszin }}</td>
@@ -135,7 +181,6 @@
                     >
                       <i class="fas fa-calculator"></i>
                     </button>
-                    <!-- ÚJ: UF Árajánlat DOCX generálás -->
                     <button
                       class="btn btn-sm btn-outline-success"
                       @click.stop="exportUfOffer(event)"
@@ -253,6 +298,24 @@ export default {
         .trim();
       return r === 'UF' || r === 'UNI FAMULUS' || r === 'UNIFAMULUS';
     },
+    // Rendezvényszervező szerep felismerése (ensureAuthUser() által beállított userRole alapján)
+    isEventOrganizer() {
+      const r = String(this.userRole || '')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase().replace(/[_-]/g, ' ').trim();
+      return r === 'RENDEZVENYSZERVEZO' || r === 'RENDEZVENY SZERVEZO';
+    },
+    // ÚJ: módosítás-kérés szerint elkülönített listák (a jelenlegi szűrés/sorrend után)
+    modificationEventsUf() {
+      return this.sortedAndFilteredEvents.filter(
+        e => !!e.modositasi_indok && String(e.statusz || '').toUpperCase() === 'UF_ARAJANLATRA_VAR'
+      );
+    },
+    modificationEventsUni() {
+      return this.sortedAndFilteredEvents.filter(
+        e => !!e.modositasi_indok && String(e.statusz || '').toUpperCase() === 'ARAJANLAT_KESZITESERE_VAR'
+      );
+    },
     sortedAndFilteredEvents() {
       let filteredEvents = this.events.map(e => ({
         ...e,
@@ -321,10 +384,6 @@ export default {
     effectiveUserRole() {                  // <<< HOZZÁADVA
       return JSON.parse(localStorage.getItem('auth_user'));
     }
-  },
-  created() {
-    this.fetchEvents();
-    this.fetchCurrentUser();               // <<< HOZZÁADVA
   },
   methods: {
     normalizeStatusCode(raw) {
@@ -513,6 +572,14 @@ export default {
     closeWizard() {               // ÚJ
       this.showPricingWizard = false;
       document.body.style.overflow = '';
+    },
+    // ÚJ: visszaadja, hogy UF vagy Egyetem módosítás-e (indok alapján)
+    modificationType(e) {
+      if (!e || !e.modositasi_indok) return null;
+      const s = String(e.statusz || '').toUpperCase();
+      if (s === 'UF_ARAJANLATRA_VAR') return 'UF';
+      if (s === 'ARAJANLAT_KESZITESERE_VAR') return 'Egyetem';
+      return null;
     },
   },
   async mounted() {
