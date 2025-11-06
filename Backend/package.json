@@ -12,7 +12,7 @@
   "dependencies": {
     "axios": "^1.x.x",
     "bcrypt": "^5.1.1",
-    "bcryptjs": "^3.0.2",
+    "bcryptjs": "^3.0.3",
     "body-parser": "^1.20.3",
     "cors": "^2.8.5",
     "docxtemplater": "^3.61.1",
