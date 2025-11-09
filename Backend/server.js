@@ -9,6 +9,7 @@ const documentRoutes = require('./routes/document.route');
 const usersRouter = require('./routes/users');
 const authRouter = require('./src/routes/auth');
 const pricesRouter = require('./routes/prices')
+const { initChatController } = require('./controllers/chat.controller'); // chat API hozzáadva
 require('dotenv').config(); // npm install dotenv --save ha még nincs
 const { JWT_SECRET } = require('./src/config/jwt');
 console.log('[startup] JWT_SECRET from config present?:', !!JWT_SECRET, 'value preview:', JWT_SECRET ? JWT_SECRET.slice(0,6) + '...' : null);
@@ -36,6 +37,8 @@ app.use('/api/document', documentRoutes);
 app.use('/api/users', usersRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/prices',pricesRouter);
+// Chat végpontok: GET/POST/DELETE /api/chat/messages
+initChatController(app, '/api/chat');
 
 // prices route betöltése hibakezeléssel
 // let pricesRoute;
@@ -98,3 +101,10 @@ try {
 } catch (err) {
   console.warn('Failed to start login service (login.js):', err.message);
 }
+
+// (ha már van app példány és middleware-k beállítva, csak mountold)
+initChatController(app, '/api/chat');
+
+// Indítás 3005-ös porton (nem töröl más listen hívást; ha már van, hagyd azt is)
+const CHAT_PORT = 3005;
+app.listen(CHAT_PORT, () => console.log(`[chat] listening on http://localhost:${CHAT_PORT}`));

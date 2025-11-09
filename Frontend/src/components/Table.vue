@@ -176,10 +176,10 @@
                     </button>
                     <button
                       class="btn btn-sm btn-outline-secondary"
-                      @click.stop="openCostCalculator(event)"
-                      title="Szolgáltatási költség kalkulálása"
+                      @click.stop="openChat(event)"
+                      title="Chat megnyitása a rendezvényhez"
                     >
-                      <i class="fas fa-calculator"></i>
+                      <i class="fas fa-comments"></i>
                     </button>
                     <button
                       class="btn btn-sm btn-outline-success"
@@ -238,6 +238,14 @@
   </div>
 
   <!-- Szolgáltatási költség kalkulátor komponens -->
+  <!-- Chat komponens megjelenítése -->
+  <Chat
+    v-if="showChat"
+    :is-dark-mode="isDarkMode"
+    :kerveny-id="chatKervenyId"
+    @close="closeChat"
+    @toggle="closeChat"
+  />
 </template>
 
 <script>
@@ -247,6 +255,7 @@ import { STATUSES, TERMINAL_STATUS_CODES } from '@/constants/statuses.js';
 import ModificationPopup from '@/components/ModificationPopup.vue';
 import PricingFlowWizard from '@/components/PricingFlowWizard.vue'; // ÚJ
 import auth from '../services/auth';
+import Chat from '@/components/Chat.vue'; // <<< CHAT HOZZÁADVA
 
 const STATUS_MAP = STATUSES.reduce((a,s)=>{a[s.code]=s;return a;}, {});
 // Régi numerikus -> új kód (ha backend még nem frissült)
@@ -259,7 +268,7 @@ const LEGACY_NUMERIC_MAP = {
 };
 
 export default {
-  components: { FilterButtons, ModificationPopup, PricingFlowWizard }, // <<< BŐVÍTVE
+  components: { FilterButtons, ModificationPopup, PricingFlowWizard, Chat }, // <<< BŐVÍTVE
   props: {
     isDarkMode: { type: Boolean, default: false },
     hideTerminal: { type: Boolean, default: true } // statusFilter prop törölhető
@@ -280,7 +289,9 @@ export default {
       currentUser: null,                    // <<< HOZZÁADVA
       showPricingWizard: false,  // ÚJ
       wizardEvent: null,         // ÚJ
-      userRole: null             // ensureAuthUser()-ból töltjük
+      userRole: null,             // ensureAuthUser()-ból töltjük
+      showChat: false,
+      chatKervenyId: null
     };
   },
   computed: {
@@ -580,6 +591,15 @@ export default {
       if (s === 'UF_ARAJANLATRA_VAR') return 'UF';
       if (s === 'ARAJANLAT_KESZITESERE_VAR') return 'Egyetem';
       return null;
+    },
+    openChat(event) {
+      if (!event || !event.id) return;
+      this.chatKervenyId = Number(event.id);
+      this.showChat = true;
+    },
+    closeChat() {
+      this.showChat = false;
+      this.chatKervenyId = null;
     },
   },
   async mounted() {
