@@ -1,65 +1,129 @@
 <template>
-  <div class="scc-overlay" @click.self="$emit('close')">
+  <div class="scc-overlay" @click.self="$emit('close')" role="dialog" aria-modal="true">
     <div class="scc-modal">
       <div class="scc-header">
-        <h5 class="mb-0">Egyetemi kalkulátor — {{ event?.nev || 'Rendezvény' }}</h5>
-        <button class="btn btn-sm btn-outline-secondary" @click="$emit('close')">Bezárás</button>
+        <h5 class="title mb-0 d-flex align-items-center gap-2">
+          <i class="fas fa-calculator"></i>
+          <span>Egyetemi kalkulátor — {{ event?.nev || 'Rendezvény' }}</span>
+        </h5>
+        <button class="pill-btn pill-light pill-sm" @click="$emit('close')" title="Bezárás">
+          <i class="fas fa-times"></i>
+          <span class="d-none d-sm-inline">Bezárás</span>
+        </button>
       </div>
 
       <div class="scc-body">
         <div v-if="loading" class="text-center py-4">
-          <div class="spinner-border" role="status"></div>
+          <i class="fas fa-spinner fa-spin fa-2x text-primary"></i>
         </div>
 
         <div v-else>
-          <div v-if="prices.length === 0" class="alert alert-warning">Nincsenek elérhető szolgáltatások.</div>
+          <div v-if="prices.length === 0" class="alert alert-warning rounded-3">
+            Nincsenek elérhető szolgáltatások.
+          </div>
 
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <button type="button" class="btn btn-sm btn-outline-primary" @click="addRow()">
-              <i class="fas fa-plus me-1"></i> Hozzáadás (Egyetemi)
+          <div class="toolbar d-flex justify-content-between align-items-center mb-3">
+            <button type="button" class="pill-btn pill-primary pill-sm" @click="addRow()">
+              <i class="fas fa-plus"></i> <span>Hozzáadás (Egyetemi)</span>
             </button>
-            <div class="text-end">
-              <div class="h6 mb-0">Egyetemi összesen: {{ formatMoney(total) }}</div>
+            <div class="total-chip">
+              <span class="label">Egyetemi összesen</span>
+              <span class="value">{{ formatMoney(total) }}</span>
             </div>
           </div>
 
-          <div v-for="(row, idx) in rows" :key="row.id" class="d-flex gap-2 align-items-center mb-2 row-with-trash">
-            <select class="form-select form-select-sm service-select" style="min-width:260px;"
-                    v-model="row.serviceId" @change="onServiceChange(row)">
+          <div v-for="(row, idx) in rows" :key="row.id" class="calc-row">
+            <select
+              class="fld select service-select"
+              v-model="row.serviceId"
+              @change="onServiceChange(row)"
+            >
               <option :value="null">-- válassz szolgáltatást --</option>
-              <option v-for="p in filteredPricesFor(row)" :key="p.id" :value="p.id">{{ p.name }} — {{ p.category }}</option>
+              <option v-for="p in filteredPricesFor(row)" :key="p.id" :value="p.id">
+                {{ p.name }} — {{ p.category }}
+              </option>
             </select>
 
             <!-- Egyetemi fülön nincs külső tarifa -->
             <input type="hidden" v-model="row.rateKey" />
 
             <!-- Dinamikus mezők a mértékegység alapján -->
-            <input v-if="showQuantity(row)" type="number" min="0" step="1" class="form-control form-control-sm" style="width:110px;" v-model="row.quantity" placeholder="db" title="Darabszám" />
-            <input v-if="showOccasions(row)" type="number" min="0" step="1" class="form-control form-control-sm" style="width:110px;" v-model="row.occasions" placeholder="alkalom" title="Alkalom" />
-            <input v-if="showDays(row)" type="number" min="0" step="0.25" class="form-control form-control-sm" style="width:110px;" v-model="row.days" placeholder="nap" title="Napok" />
-            <input v-if="showHours(row)" type="number" min="0" step="0.25" class="form-control form-control-sm" style="width:110px;" v-model="row.hours" placeholder="óra" title="Órák" />
-            <input v-if="showPersons(row)" type="number" min="0" step="1" class="form-control form-control-sm" style="width:90px;" v-model="row.persons" placeholder="fő" title="Fő (létszám)" />
+            <input
+              v-if="showQuantity(row)"
+              type="number"
+              min="0"
+              step="1"
+              class="fld number"
+              v-model="row.quantity"
+              placeholder="db"
+              title="Darabszám"
+            />
+            <input
+              v-if="showOccasions(row)"
+              type="number"
+              min="0"
+              step="1"
+              class="fld number"
+              v-model="row.occasions"
+              placeholder="alkalom"
+              title="Alkalom"
+            />
+            <input
+              v-if="showDays(row)"
+              type="number"
+              min="0"
+              step="0.25"
+              class="fld number"
+              v-model="row.days"
+              placeholder="nap"
+              title="Napok"
+            />
+            <input
+              v-if="showHours(row)"
+              type="number"
+              min="0"
+              step="0.25"
+              class="fld number"
+              v-model="row.hours"
+              placeholder="óra"
+              title="Órák"
+            />
+            <input
+              v-if="showPersons(row)"
+              type="number"
+              min="0"
+              step="1"
+              class="fld number"
+              v-model="row.persons"
+              placeholder="fő"
+              title="Fő (létszám)"
+            />
 
-            <div style="min-width:140px; text-align:right;">
-              <div class="fw-bold">{{ formatMoney(getRowUnitPrice(row)) }}</div>
-              <div class="text-muted small" v-if="getRowUnitText(row)">{{ getRowUnitText(row) }}</div>
-            </div>
-            <div style="min-width:130px; text-align:right;">
-              <div class="fw-bold">{{ formatMoney(getRowTotal(row)) }}</div>
+            <div class="unit-price">
+              <div class="val">{{ formatMoney(getRowUnitPrice(row)) }}</div>
+              <div class="txt" v-if="getRowUnitText(row)">{{ getRowUnitText(row) }}</div>
             </div>
 
-            <button class="btn btn-sm btn-outline-danger trash-out" @click="removeRow(idx)" title="Töröl">
+            <div class="line-total">
+              <div class="val">{{ formatMoney(getRowTotal(row)) }}</div>
+            </div>
+
+            <button class="pill-btn pill-danger pill-sm" @click="removeRow(idx)" title="Törlés">
               <i class="fas fa-trash"></i>
             </button>
           </div>
 
           <div class="d-flex gap-2 mt-3">
-            <button class="btn btn-outline-danger btn-sm" @click="onDeleteClicked" :disabled="saving">Törlés</button>
+            <button class="pill-btn pill-danger pill-sm" @click="onDeleteClicked" :disabled="saving">Törlés</button>
             <div class="flex-grow-1"></div>
-            <button class="btn btn-primary" :disabled="rows.length===0 || saving" @click="commit">Mentés (Egyetemi)</button>
+            <button class="pill-btn pill-primary" :disabled="rows.length===0 || saving" @click="commit">
+              <i v-if="!saving" class="fas fa-save"></i>
+              <i v-else class="fas fa-spinner fa-spin"></i>
+              <span>{{ saving ? 'Mentés...' : 'Mentés (Egyetemi)' }}</span>
+            </button>
           </div>
 
-          <div v-if="error" class="alert alert-danger mt-3">{{ error }}</div>
+          <div v-if="error" class="alert alert-danger rounded-3 mt-3">{{ error }}</div>
         </div>
       </div>
     </div>
@@ -78,7 +142,6 @@ export default {
     const loading = ref(false);
     const error = ref('');
     const prices = ref([]);
-
     const rows = reactive([]);
     const saving = ref(false);
 
@@ -119,8 +182,7 @@ export default {
       return p.unit ? `/ ${p.unit}` : '';
     };
 
-    const normalizeUnit = (s) =>
-      (s ?? '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const normalizeUnit = (s) => (s ?? '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
     const unitFields = (unit) => {
       const u = normalizeUnit(unit);
       if (u.includes('db/alkalom')) return { qty:true, occ:true };
@@ -167,8 +229,7 @@ export default {
         pricingType: 'uni',
         serviceId: null,
         rateKey: 'priceUniversity',
-        hours: '', persons: '',
-        days: '', occasions: '', quantity: ''
+        hours: '', persons: '', days: '', occasions: '', quantity: ''
       });
     };
     const removeRow = (idx) => rows.splice(idx, 1);
@@ -179,7 +240,6 @@ export default {
       if (!p || !isUniCategory(p.category)) row.serviceId = null;
     };
 
-    // localStorage (UNI)
     const saveState = () => {
       try {
         const id = props.event?.id;
@@ -223,7 +283,6 @@ export default {
     };
     watch(rows, saveState, { deep: true });
 
-    // API hívások
     const postWithFallback = async (paths, payload) => {
       let lastErr;
       for (const p of paths) {
@@ -236,7 +295,6 @@ export default {
       throw lastErr || new Error('Ismeretlen hiba');
     };
 
-    // Mentés (UNI)
     const buildBreakdown = () => rows.map(r => {
       const p = findPriceById(r.serviceId);
       return {
@@ -293,18 +351,15 @@ export default {
       }
     };
 
-    // Törlés (UNI)
     const onDeleteClicked = async () => {
       const id = props.event?.id;
       if (!id) { alert('Hiányzó kérelem azonosító.'); return; }
       const ok = confirm('Biztosan törlöd az Egyetemi tételeket? Az adatbázisból is törlődik.');
       if (!ok) return;
-
       try {
         rows.splice(0, rows.length);
         localStorage.removeItem(storageKey(id));
       } catch {}
-
       try {
         await postWithFallback(
           [
@@ -341,11 +396,174 @@ export default {
 </script>
 
 <style scoped>
-.scc-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: 2100; }
-.scc-modal { background: #fff; width: 95%; max-width: 1100px; max-height: 90vh; border-radius: 10px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,.25); display: flex; flex-direction: column; }
-.scc-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; background: #f8f9fa; }
-.scc-body { padding: 16px; overflow: auto; flex: 1; }
-.row-with-trash { position: relative; }
-.trash-out { position: relative; right: -12px; box-shadow: 0 6px 18px rgba(0,0,0,0.08); border-radius: 8px; padding: 0 8px; }
-.service-select { max-width: 340px; }
+/* Overlay + modal keret (magas z-index a Wizard fölé) */
+.scc-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15,25,40,.55);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 6500;
+  padding: 20px;
+}
+.scc-modal {
+  background: #fff;
+  width: 96%;
+  max-width: 1200px;
+  max-height: 92vh;
+  border-radius: 26px;
+  overflow: hidden;
+  box-shadow: 0 18px 40px -18px rgba(0,0,0,.35), 0 8px 18px -10px rgba(0,0,0,.2);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.scc-modal::before {
+  content:'';
+  position:absolute;
+  inset:0;
+  border-radius:26px;
+  pointer-events:none;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.7), inset 0 0 0 2px rgba(0,0,0,.03);
+}
+
+/* Header – kék gradient, pill gomb */
+.scc-header {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:14px 16px;
+  background: linear-gradient(135deg,#5a9cff 0%,#0d6efd 60%,#0b5ed7 100%);
+  color:#fff;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.scc-header .title { font-weight:700; letter-spacing:.2px; }
+
+/* Body */
+.scc-body {
+  padding: 16px;
+  overflow: auto;
+  flex: 1;
+  background:#f7f9ff;
+}
+
+/* Top toolbar */
+.total-chip {
+  display:inline-flex;
+  align-items:center;
+  gap:.5rem;
+  background:#fff;
+  border:1px solid #d7e3f5;
+  border-radius:999px;
+  padding:.35rem .75rem;
+  box-shadow:0 2px 6px -3px rgba(0,0,0,.12);
+}
+.total-chip .label { font-size:.7rem; color:#24415f; font-weight:700; }
+.total-chip .value { font-weight:800; font-size:.8rem; color:#0d6efd; }
+
+/* Sorok – a mezők száma eltérhet az UF-től, de a stílus egyezik */
+.calc-row {
+  display:grid;
+  grid-template-columns: minmax(220px, 1.2fr) repeat(5, 120px) 160px 150px 110px;
+  gap:.55rem;
+  align-items:center;
+  background:#fff;
+  border:1px solid #e8eef9;
+  border-radius:16px;
+  padding:.6rem;
+  margin-bottom:.55rem;
+  box-shadow:0 6px 14px -10px rgba(0,0,0,.15);
+}
+
+/* Mezők – “pill” input/select */
+.fld {
+  width:100%;
+  border:1px solid #c3d6f1;
+  border-radius:999px;
+  padding:.45rem .75rem;
+  font-size:.78rem;
+  font-weight:600;
+  color:#24415f;
+  background:#f5f8ff;
+  outline:none;
+  transition:.18s;
+}
+.fld:focus {
+  border-color:#0d6efd;
+  background:#eef4ff;
+  box-shadow:0 0 0 3px rgba(13,110,253,.15);
+}
+.fld.number { text-align:center; }
+.fld.select { appearance:auto; background:#fff; }
+.service-select { min-width: 260px; }
+
+/* Összeg cellák */
+.unit-price, .line-total { text-align:right; }
+.unit-price .val, .line-total .val { font-weight:800; color:#1c2e46; }
+.unit-price .txt { font-size:.7rem; color:#6b7d92; margin-top:2px; }
+
+/* Pill gombok – egyeznek az UF kalkulátoréval */
+.pill-btn {
+  display:inline-flex;
+  align-items:center;
+  gap:.45rem;
+  padding:.5rem 1rem;
+  font-size:.75rem;
+  font-weight:700;
+  letter-spacing:.3px;
+  border-radius:999px;
+  border:1px solid transparent;
+  background:#fff;
+  color:#24415f;
+  transition:.18s;
+  line-height:1;
+  white-space:nowrap;
+}
+.pill-btn:hover { transform: translateY(-1px); }
+.pill-sm { padding:.35rem .7rem; font-size:.68rem; }
+
+.pill-primary {
+  background: linear-gradient(135deg,#3a8bff 0%,#0d6efd 45%,#0b58d0 100%);
+  color:#fff;
+  border-color:#0d6efd;
+  box-shadow:0 3px 6px -2px rgba(0,0,0,.25), inset 0 0 0 1px rgba(255,255,255,.12);
+}
+.pill-primary:hover { background: linear-gradient(135deg,#5a9cff 0%,#0b5ed7 55%,#0a4fb6 100%); }
+
+.pill-light {
+  background:#fff;
+  color:#0d6efd;
+  border-color:#d7e3f5;
+  box-shadow:0 2px 6px -3px rgba(0,0,0,.12);
+}
+.pill-light:hover { background:#eef4ff; border-color:#b6cff5; }
+
+.pill-danger {
+  background:#d9534f;
+  color:#fff;
+  border-color:#d9534f;
+  box-shadow:0 3px 6px -2px rgba(0,0,0,.25);
+}
+.pill-danger:hover { filter:brightness(1.05); }
+
+/* Reszponzív */
+@media (max-width: 1200px) {
+  .calc-row {
+    grid-template-columns: minmax(220px, 1.2fr) repeat(3, 120px) 160px 150px 110px;
+  }
+}
+@media (max-width: 992px) {
+  .calc-row {
+    grid-template-columns: 1fr 1fr 120px 120px 1fr 1fr 100px;
+  }
+}
+@media (max-width: 576px) {
+  .scc-modal { border-radius:22px; max-height:94vh; }
+  .calc-row { grid-template-columns: 1fr; gap:.4rem; }
+  .unit-price, .line-total { text-align:left; }
+}
 </style>

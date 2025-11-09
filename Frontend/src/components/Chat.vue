@@ -9,7 +9,7 @@
         <button class="btn btn-sm btn-outline-secondary" @click="$emit('toggle')">
           <i class="fas fa-chevron-down"></i>
         </button>
-        <button class="btn btn-sm btn-outline-danger" @click="$emit('close')">
+        <button class="btn btn-sm btn-outline-danger" @click.prevent="handleClose" title="Bezárás">
           <i class="fas fa-times"></i>
         </button>
       </div>
@@ -43,6 +43,7 @@ const chatApi = axiosBase.create({ baseURL: 'http://localhost:3005' });
 
 export default {
   name: 'Chat',
+  emits: ['close','toggle','has-unread'],
   props: {
     isDarkMode: Boolean,
     // opcionális külső azonosító; ensureAuthUser felülírja, ha elérhető
@@ -58,17 +59,27 @@ export default {
       initialLoaded: false,
       poll: null,
       meId: null,
-      meName: null
+      meName: null,
+      lastSeenAt: null,
+      unreadCount: 0,
+      markedInitialSeen: false
     };
   },
   async mounted() {
     await this.initMe();
-    await this.fetchMessages(true);          // teljes lista elsőre
-    this.poll = setInterval(() => this.fetchMessages(false), 5000); // csak új üzenetek
+    await this.fetchMessages(true);
+    this.poll = setInterval(() => this.fetchMessages(false), 5000);
     this.$nextTick(this.scrollToBottom);
+    window.addEventListener('keydown', this.onKeydown);
   },
+  // Vue 2 és 3 kompatibilis takarítás
   beforeUnmount() {
     if (this.poll) clearInterval(this.poll);
+    window.removeEventListener('keydown', this.onKeydown);
+  },
+  beforeDestroy() {
+    if (this.poll) clearInterval(this.poll);
+    window.removeEventListener('keydown', this.onKeydown);
   },
   methods: {
     async initMe() {
@@ -113,37 +124,66 @@ export default {
         const qs = new URLSearchParams();
         if (this.kervenyId != null) qs.set('kervenyId', String(this.kervenyId));
         if (!full && this.lastFetchTs) qs.set('since', String(this.lastFetchTs));
+        // első teljes betöltéskor kérhetjük a markSeen=1-et
+        if (full && !this.markedInitialSeen) qs.set('markSeen','1');
 
         const { data } = await chatApi.get(`/api/chat/messages?${qs.toString()}`, { headers });
-        if (!Array.isArray(data)) return;
+        let incoming = [];
+        if (Array.isArray(data)) {
+          incoming = data;
+        } else if (data && Array.isArray(data.messages)) {
+          incoming = data.messages;
+          this.lastSeenAt = data.lastSeenAt || null;
+          this.unreadCount = data.unreadCount || 0;
+          this.$emit('has-unread', this.unreadCount > 0);
+          if (full && !this.markedInitialSeen) this.markedInitialSeen = true;
+        } else {
+          return;
+        }
 
         if (!this.initialLoaded || full) {
-          // első betöltés: teljes lista
-          this.messages = data;
+          this.messages = incoming;
           this.initialLoaded = true;
-        } else if (data.length) {
-          // inkrementális frissítés: hozzáfűzés
+        } else if (incoming.length) {
           const byId = new Map(this.messages.map(m => [m.id, m]));
-          for (const m of data) byId.set(m.id, m);
+          for (const m of incoming) byId.set(m.id, m);
           this.messages = Array.from(byId.values()).sort((a,b) =>
             new Date(a.created_at) - new Date(b.created_at)
           );
         }
 
-        // lastFetchTs: a legfrissebb üzenet szerver-időpontja (+1 ms)
         const last = this.messages[this.messages.length - 1];
         if (last?.created_at) {
           const ts = Date.parse(last.created_at);
           if (!Number.isNaN(ts)) this.lastFetchTs = ts + 1;
         }
+        // ha új üzenetek jöttek és mi láttuk (komponens nyitva), jelöljük seen-re
+        if (incoming.length && document.hasFocus()) {
+          await this.markSeen();
+        }
+
         this.$nextTick(this.scrollToBottom);
       } catch (e) {
-        // HIBA ESETÉN NE TÖRÖLD A RÉGI ÜZENETEKET
         if (e?.response?.status === 401) {
           console.warn('[chat] auth lejárt, jelentkezz be újra');
         } else {
           console.warn('[chat] fetch error:', e?.message || e);
         }
+      }
+    },
+
+    async markSeen() {
+      const kid = Number(this.kervenyId);
+      if (!Number.isInteger(kid) || kid <= 0) return;
+      const token = localStorage.getItem('authToken');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      try {
+        await chatApi.post('/api/chat/seen', { kervenyId: kid }, { headers });
+        this.lastSeenAt = new Date().toISOString();
+        this.unreadCount = 0;
+        this.$emit('has-unread', false);
+      } catch (e) {
+        console.warn('[chat] markSeen hiba:', e?.message || e);
       }
     },
 
@@ -182,6 +222,8 @@ export default {
         this.messages.push(data);
         const ts = Date.parse(data.created_at);
         if (!Number.isNaN(ts)) this.lastFetchTs = Math.max(this.lastFetchTs || 0, ts + 1);
+        // saját üzenet után nincs unread
+        await this.markSeen();
       } catch (e) {
         console.error('[chat send] error', e?.response?.data || e.message || e);
       } finally {
@@ -227,6 +269,13 @@ export default {
       } catch (e) {
         console.error('[chat] törlés hiba:', e?.response?.data || e.message || e);
       }
+    },
+    onKeydown(e) {
+      if (e.key === 'Escape') this.handleClose();
+    },
+    handleClose() {
+      try { if (this.poll) clearInterval(this.poll); } catch {}
+      this.$emit('close');
     },
   }
 };

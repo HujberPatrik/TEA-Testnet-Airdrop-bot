@@ -5,8 +5,6 @@
 -- Dumped from database version 17.4
 -- Dumped by pg_dump version 17.4
 
--- Started on 2025-11-09 01:01:10
-
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
@@ -19,50 +17,8 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
-ALTER TABLE IF EXISTS ONLY public.kerveny_koltseg DROP CONSTRAINT IF EXISTS kerveny_koltseg_kerveny_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.role_audit DROP CONSTRAINT IF EXISTS fk_role_audit_user;
-ALTER TABLE IF EXISTS ONLY public.chat_messages DROP CONSTRAINT IF EXISTS fk_chat_messages_kerveny;
-DROP TRIGGER IF EXISTS trg_users_set_updated_at ON public.users;
-DROP INDEX IF EXISTS public.idx_users_neptun;
-DROP INDEX IF EXISTS public.idx_users_email;
-DROP INDEX IF EXISTS public.idx_koltseg_service_id;
-DROP INDEX IF EXISTS public.idx_koltseg_kerveny_type;
-DROP INDEX IF EXISTS public.idx_kerveny_koltseg_kerveny_id;
-DROP INDEX IF EXISTS public.idx_chat_messages_kerveny_id;
-DROP INDEX IF EXISTS public.idx_chat_messages_created_at;
-ALTER TABLE IF EXISTS ONLY public.users DROP CONSTRAINT IF EXISTS users_pkey;
-ALTER TABLE IF EXISTS ONLY public.users DROP CONSTRAINT IF EXISTS users_neptun_code_key;
-ALTER TABLE IF EXISTS ONLY public.users DROP CONSTRAINT IF EXISTS users_email_key;
-ALTER TABLE IF EXISTS ONLY public.statusz DROP CONSTRAINT IF EXISTS statusz_pkey;
-ALTER TABLE IF EXISTS ONLY public.statusz DROP CONSTRAINT IF EXISTS statusz_code_key;
-ALTER TABLE IF EXISTS ONLY public.role_audit DROP CONSTRAINT IF EXISTS role_audit_pkey;
-ALTER TABLE IF EXISTS ONLY public.prices DROP CONSTRAINT IF EXISTS prices_pkey;
-ALTER TABLE IF EXISTS ONLY public.kerveny DROP CONSTRAINT IF EXISTS kerveny_pkey;
-ALTER TABLE IF EXISTS ONLY public.kerveny_koltseg DROP CONSTRAINT IF EXISTS kerveny_koltseg_pkey;
-ALTER TABLE IF EXISTS ONLY public.chat_messages DROP CONSTRAINT IF EXISTS chat_messages_pkey;
-ALTER TABLE IF EXISTS public.users ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.statusz ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.role_audit ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.prices ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.kerveny_koltseg ALTER COLUMN id DROP DEFAULT;
-ALTER TABLE IF EXISTS public.chat_messages ALTER COLUMN id DROP DEFAULT;
-DROP SEQUENCE IF EXISTS public.users_id_seq;
-DROP TABLE IF EXISTS public.users;
-DROP SEQUENCE IF EXISTS public.statusz_id_seq;
-DROP TABLE IF EXISTS public.statusz;
-DROP SEQUENCE IF EXISTS public.role_audit_id_seq;
-DROP TABLE IF EXISTS public.role_audit;
-DROP SEQUENCE IF EXISTS public.prices_id_seq;
-DROP TABLE IF EXISTS public.prices;
-DROP SEQUENCE IF EXISTS public.kerveny_koltseg_id_seq;
-DROP TABLE IF EXISTS public.kerveny_koltseg;
-DROP TABLE IF EXISTS public.kerveny;
-DROP SEQUENCE IF EXISTS public.chat_messages_id_seq;
-DROP TABLE IF EXISTS public.chat_messages;
-DROP FUNCTION IF EXISTS public.set_updated_at();
 --
--- TOC entry 231 (class 1255 OID 17002)
--- Name: set_updated_at(); Type: FUNCTION; Schema: public; Owner: -
+-- Name: set_updated_at(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
 CREATE FUNCTION public.set_updated_at() RETURNS trigger
@@ -75,13 +31,27 @@ END;
 $$;
 
 
+ALTER FUNCTION public.set_updated_at() OWNER TO postgres;
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
 
 --
--- TOC entry 230 (class 1259 OID 17104)
--- Name: chat_messages; Type: TABLE; Schema: public; Owner: -
+-- Name: chat_last_seen; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.chat_last_seen (
+    user_id character varying(64) NOT NULL,
+    kerveny_id bigint NOT NULL,
+    last_seen_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.chat_last_seen OWNER TO postgres;
+
+--
+-- Name: chat_messages; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.chat_messages (
@@ -90,13 +60,15 @@ CREATE TABLE public.chat_messages (
     author_name character varying(128) NOT NULL,
     text text NOT NULL,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
-    kerveny_id bigint
+    kerveny_id bigint,
+    last_seen_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
+ALTER TABLE public.chat_messages OWNER TO postgres;
+
 --
--- TOC entry 229 (class 1259 OID 17103)
--- Name: chat_messages_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: chat_messages_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
 CREATE SEQUENCE public.chat_messages_id_seq
@@ -107,18 +79,17 @@ CREATE SEQUENCE public.chat_messages_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.chat_messages_id_seq OWNER TO postgres;
+
 --
--- TOC entry 4900 (class 0 OID 0)
--- Dependencies: 229
--- Name: chat_messages_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: chat_messages_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
 ALTER SEQUENCE public.chat_messages_id_seq OWNED BY public.chat_messages.id;
 
 
 --
--- TOC entry 217 (class 1259 OID 17003)
--- Name: kerveny; Type: TABLE; Schema: public; Owner: -
+-- Name: kerveny; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.kerveny (
@@ -196,9 +167,10 @@ CREATE TABLE public.kerveny (
 );
 
 
+ALTER TABLE public.kerveny OWNER TO postgres;
+
 --
--- TOC entry 218 (class 1259 OID 17009)
--- Name: kerveny_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: kerveny_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
 ALTER TABLE public.kerveny ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
@@ -212,8 +184,7 @@ ALTER TABLE public.kerveny ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 
 
 --
--- TOC entry 219 (class 1259 OID 17010)
--- Name: kerveny_koltseg; Type: TABLE; Schema: public; Owner: -
+-- Name: kerveny_koltseg; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.kerveny_koltseg (
@@ -235,9 +206,10 @@ CREATE TABLE public.kerveny_koltseg (
 );
 
 
+ALTER TABLE public.kerveny_koltseg OWNER TO postgres;
+
 --
--- TOC entry 220 (class 1259 OID 17024)
--- Name: kerveny_koltseg_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: kerveny_koltseg_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
 CREATE SEQUENCE public.kerveny_koltseg_id_seq
@@ -248,18 +220,17 @@ CREATE SEQUENCE public.kerveny_koltseg_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.kerveny_koltseg_id_seq OWNER TO postgres;
+
 --
--- TOC entry 4901 (class 0 OID 0)
--- Dependencies: 220
--- Name: kerveny_koltseg_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: kerveny_koltseg_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
 ALTER SEQUENCE public.kerveny_koltseg_id_seq OWNED BY public.kerveny_koltseg.id;
 
 
 --
--- TOC entry 221 (class 1259 OID 17025)
--- Name: prices; Type: TABLE; Schema: public; Owner: -
+-- Name: prices; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.prices (
@@ -276,9 +247,10 @@ CREATE TABLE public.prices (
 );
 
 
+ALTER TABLE public.prices OWNER TO postgres;
+
 --
--- TOC entry 222 (class 1259 OID 17035)
--- Name: prices_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: prices_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
 CREATE SEQUENCE public.prices_id_seq
@@ -290,18 +262,17 @@ CREATE SEQUENCE public.prices_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.prices_id_seq OWNER TO postgres;
+
 --
--- TOC entry 4902 (class 0 OID 0)
--- Dependencies: 222
--- Name: prices_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: prices_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
 ALTER SEQUENCE public.prices_id_seq OWNED BY public.prices.id;
 
 
 --
--- TOC entry 223 (class 1259 OID 17036)
--- Name: role_audit; Type: TABLE; Schema: public; Owner: -
+-- Name: role_audit; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.role_audit (
@@ -316,9 +287,10 @@ CREATE TABLE public.role_audit (
 );
 
 
+ALTER TABLE public.role_audit OWNER TO postgres;
+
 --
--- TOC entry 224 (class 1259 OID 17042)
--- Name: role_audit_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: role_audit_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
 CREATE SEQUENCE public.role_audit_id_seq
@@ -330,18 +302,17 @@ CREATE SEQUENCE public.role_audit_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.role_audit_id_seq OWNER TO postgres;
+
 --
--- TOC entry 4903 (class 0 OID 0)
--- Dependencies: 224
--- Name: role_audit_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: role_audit_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
 ALTER SEQUENCE public.role_audit_id_seq OWNED BY public.role_audit.id;
 
 
 --
--- TOC entry 225 (class 1259 OID 17043)
--- Name: statusz; Type: TABLE; Schema: public; Owner: -
+-- Name: statusz; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.statusz (
@@ -357,9 +328,10 @@ CREATE TABLE public.statusz (
 );
 
 
+ALTER TABLE public.statusz OWNER TO postgres;
+
 --
--- TOC entry 226 (class 1259 OID 17050)
--- Name: statusz_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: statusz_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
 CREATE SEQUENCE public.statusz_id_seq
@@ -371,18 +343,17 @@ CREATE SEQUENCE public.statusz_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.statusz_id_seq OWNER TO postgres;
+
 --
--- TOC entry 4904 (class 0 OID 0)
--- Dependencies: 226
--- Name: statusz_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: statusz_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
 ALTER SEQUENCE public.statusz_id_seq OWNED BY public.statusz.id;
 
 
 --
--- TOC entry 227 (class 1259 OID 17051)
--- Name: users; Type: TABLE; Schema: public; Owner: -
+-- Name: users; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.users (
@@ -403,9 +374,10 @@ CREATE TABLE public.users (
 );
 
 
+ALTER TABLE public.users OWNER TO postgres;
+
 --
--- TOC entry 228 (class 1259 OID 17062)
--- Name: users_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: users_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
 CREATE SEQUENCE public.users_id_seq
@@ -416,92 +388,96 @@ CREATE SEQUENCE public.users_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.users_id_seq OWNER TO postgres;
+
 --
--- TOC entry 4905 (class 0 OID 0)
--- Dependencies: 228
--- Name: users_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: users_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
 ALTER SEQUENCE public.users_id_seq OWNED BY public.users.id;
 
 
 --
--- TOC entry 4701 (class 2604 OID 17107)
--- Name: chat_messages id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: chat_messages id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.chat_messages ALTER COLUMN id SET DEFAULT nextval('public.chat_messages_id_seq'::regclass);
 
 
 --
--- TOC entry 4673 (class 2604 OID 17063)
--- Name: kerveny_koltseg id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: kerveny_koltseg id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.kerveny_koltseg ALTER COLUMN id SET DEFAULT nextval('public.kerveny_koltseg_id_seq'::regclass);
 
 
 --
--- TOC entry 4683 (class 2604 OID 17064)
--- Name: prices id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: prices id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.prices ALTER COLUMN id SET DEFAULT nextval('public.prices_id_seq'::regclass);
 
 
 --
--- TOC entry 4689 (class 2604 OID 17065)
--- Name: role_audit id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: role_audit id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.role_audit ALTER COLUMN id SET DEFAULT nextval('public.role_audit_id_seq'::regclass);
 
 
 --
--- TOC entry 4691 (class 2604 OID 17066)
--- Name: statusz id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: statusz id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.statusz ALTER COLUMN id SET DEFAULT nextval('public.statusz_id_seq'::regclass);
 
 
 --
--- TOC entry 4696 (class 2604 OID 17067)
--- Name: users id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: users id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.users ALTER COLUMN id SET DEFAULT nextval('public.users_id_seq'::regclass);
 
 
 --
--- TOC entry 4894 (class 0 OID 17104)
--- Dependencies: 230
--- Data for Name: chat_messages; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: chat_last_seen; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.chat_messages (id, author_id, author_name, text, created_at, kerveny_id) FROM stdin;
-13	14	Rendezvény János	Szuper üzenet	2025-11-09 00:50:58.116542	4
-14	5	John Winchester	szopd ki a faszomat	2025-11-09 00:52:28.891763	4
-15	14	Rendezvény János	te büdös köcsög	2025-11-09 00:52:42.851664	4
+COPY public.chat_last_seen (user_id, kerveny_id, last_seen_at) FROM stdin;
+5	8	2025-11-09 20:27:12.242776+01
+14	8	2025-11-09 20:27:30.78586+01
+5	4	2025-11-09 20:40:22.909592+01
+14	4	2025-11-09 20:40:33.585393+01
 \.
 
 
 --
--- TOC entry 4881 (class 0 OID 17003)
--- Dependencies: 217
--- Data for Name: kerveny; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: chat_messages; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.chat_messages (id, author_id, author_name, text, created_at, kerveny_id, last_seen_at) FROM stdin;
+13	14	Rendezvény János	Szuper üzenet	2025-11-09 00:50:58.116542	4	2025-11-09 18:36:22.268627+01
+15	14	Rendezvény János	te büdös köcsög	2025-11-09 00:52:42.851664	4	2025-11-09 18:36:22.268627+01
+18	14	Rendezvény János	damn daniel	2025-11-09 18:51:26.058371	4	2025-11-09 18:51:26.058371+01
+19	5	John Winchester	ciganycigany	2025-11-09 20:27:12.237261	8	2025-11-09 20:27:12.237261+01
+20	14	Rendezvény János	szopjaki	2025-11-09 20:40:17.882189	4	2025-11-09 20:40:17.882189+01
+\.
+
+
+--
+-- Data for Name: kerveny; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
 COPY public.kerveny (id, nev, leiras, helyszin, cim, kezdo_datum, veg_datum, kezdo_idopont, veg_idopont, tipus, minosites, sajto, jelleg, programterv, berendezesi_mod, szallasigeny, szallasigeny_letszam, parkolo, parkolo_reszletek, internet, hulladek, hulladek_elszallitas_modja, hulladek_elszallitas_felelos, letszam, email, telefon, oktatastechnika, oktatas_eszkozok, korlatozott_mozgas, korlatozott_mozgas_reszletek, foto, foto_reszletek, cater, catering_tipus, epites, epites_kezdet, epites_veg, epites_vallalkozok, epites_magas, epites_allvany, epites_kezi, epites_gepi, takaritas, takaritas_alatt, villanyszerelo, aramigeny, leg_szennyezes, egyeb_tevekenyseg, vegyi_anyag, vegyi_anyag_leiras, tuzveszelyes_tevekenyseg, tuzveszelyes_tevekenyseg_leiras, dekoracio, dekoracio_leiras, felelos, lakcim, tovabbi_szervezo, tovabbi_telefon, tovabbi_email, tovabbi_neptun, tovabbi_lakcim, megrendelo_nev, megrendelo_cim, megrendelo_ado, megrendelo_telefon, megrendelo_email, portaszolgalat, portaszolgalat_leiras, statusz, koltseg_osszesen, modositasi_indok) FROM stdin;
 11	asdasdasdasdsa	dasdasdasd	dasdsad	9026 Győr Egyetem tér 1	2025-04-17 00:00:00	2025-04-18 00:00:00	20:48:00	21:49:00	Egyetemi szervezésű hallgatói rendezvény	Nyilvános	f	adasdas	dsadsa	dsadasad	f	\N	f	\N	f	f	\N	\N	20	example@gmail.com	+36 20 123 4567	f	\N	f	\N	f	\N	f	[]	f	\N	\N	\N	\N	\N	\N	\N	f	f	rendezvény közben	false	páraképződés	\N	f	\N	f	\N	f	\N	adsad	1061 Budapest, Andrássy út 1.	\N	\N	\N	\N	\N	adasdas	1061 Budapest, Andrássy út 1.	12345678-1-23	+36 20 123 4567	pelda@email.hu	f	\N	UF_TIG_JOVAHAGYASRA_VAR	\N	\N
 10	asdasdasdasdsa	dasdasdasd	dasdsad	9026 Győr Egyetem tér 1	2025-04-17 00:00:00	2025-04-18 00:00:00	20:48:00	21:49:00	Egyetemi szervezésű hallgatói rendezvény	Nyilvános	f	adasdas	dsadsa	dsadasad	f	\N	f	\N	f	f	\N	\N	20	example@gmail.com	+36 20 123 4567	f	\N	f	\N	f	\N	f	[]	f	\N	\N	\N	\N	\N	\N	\N	f	f	rendezvény közben	false	páraképződés	\N	f	\N	f	\N	f	\N	adsad	1061 Budapest, Andrássy út 1.	\N	\N	\N	\N	\N	adasdas	1061 Budapest, Andrássy út 1.	12345678-1-23	+36 20 123 4567	pelda@email.hu	f	\N	LEZARVA	\N	\N
 12	gfgdfgfdg	fdgdfgdf	gfdgfd	4028 Debrecen Kassai út 26	2025-04-15 00:00:00	2025-04-15 00:00:00	21:29:00	22:30:00	Külső szervezésű sportrendezvény	Nyilvános	f	dasd	asdasdas	dasdadsa	f	\N	f	\N	f	f	\N	\N	30	example@gmail.com	+36 20 123 4567	f	\N	f	\N	f	\N	f	[]	f	\N	\N	\N	\N	\N	\N	\N	f	f	rendezvény közben	false	páraképződés	\N	f	\N	f	\N	f	\N	dsadasdasdasd	1061 Budapest, Andrássy út 1.	\N	\N	\N	\N	\N	adasdas	1061 Budapest, Andrássy út 1.	12345678-1-23	+36 20 123 4567	pelda@email.hu	f	\N	SZERZODES_ALAIRVA	\N	\N
+8	AAAAAAAAAAA	Teszt leírás	Szobám	Otthon	2025-04-08 00:00:00	2025-12-11 00:00:00	13:23:00	12:12:00	Egyetemi szervezésű hallgatói rendezvény	Nyilvános	\N	1dqsedq	qdqwdqwdqw	dwqdqwdqw	\N	\N	\N	\N	\N	\N	\N	\N	21	souris20013@gmail.com	06705672345	\N	\N	\N	\N	\N	dasdasd	\N	"[\\"hideg étel\\",\\"meleg étel\\"]"	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	rendezvény előtt	\N	páraképződés	\N	\N	\N	\N	\N	\N	\N	John Doe	Mosonmagyaróvár	\N	\N	\N	\N	\N	inc	Mosonmagyaróvár	102120120	06304563478	example@gmail.com	\N	\N	ARAJANLAT_ELFOGADASRA_VAR	997000.00	szopja ki
 14	John Rendezvény	asdasdsadadasdasdasd	asdasdasasasda	9026 Győr Egyetem tér 1	2025-09-18 00:00:00	2025-09-16 00:00:00	21:22:00	21:22:00	Egyetemi szervezésű sportrendezvény	Nyilvános	t	adwdwadwadawd	dwdawdawdwad	awdawdawdawdaw	t	30	t	szex	t	t	sajat	Pisti	400	example@sze.hu	+36 20 123 4567	f	\N	f	\N	f	\N	f	[]	f	\N	\N	\N	\N	\N	\N	\N	f	f	rendezvény közben	false	füst	\N	f	\N	f	\N	f	\N	Cigány Cigány	1061 Budapest Andrássy út 1	\N	\N	\N	\N	\N	sadsa	1061 Budapest Andrássy út 1	12345678-1-23	+36 20 123 4567	pelda@email.hu	f	\N	ARAJANLAT_ELFOGADASRA_VAR	2890000.00	\N
 3	nevnev	Megváltoztatott leírás	Miklós	qdqwdwdqwdqwd	2025-03-29 00:00:00	2025-04-01 00:00:00	02:31:00	18:52:00	Egyetemi szervezésű rendezvény	Nyilvános	\N	valamivalami	kjosdafpjkdspfoarqa	qewrtgerqgqeg	\N	5	\N	RENDSZAM	\N	\N	sajat	Pisti	30	souris20013@gmail.com	06302345687	\N	LAPTOP	\N	SADAS	\N	GOPRO	\N	"\\"[\\\\\\"kávé, tea, üdítő\\\\\\",\\\\\\"hideg étel\\\\\\"]\\""	\N	2025-12-10 00:00:00	2025-02-12 00:00:00	DOKTOR BÉLA	\N	\N	\N	\N	\N	\N	rendezvény előtt	\N	egyik sem várható	\N	\N	EFGDFGDFG	\N	NEMTOM	\N	LSDFLSDFL	TESZT PISTA	Győr,Egyetem K0	\N	\N	\N	\N	\N	wdqw	qdq	1231232	frwfwrf	akssdkakdasd	\N	WREGWRGWR	LEMONDVA	1300000.00	\N
 9	asdasdasdasdsa	dasdasdasd	dasdsad	9026 Győr Egyetem tér 1	2025-04-17 00:00:00	2025-04-18 00:00:00	20:48:00	21:49:00	Egyetemi szervezésű hallgatói rendezvény	Nyilvános	f	adasdas	dsadsa	dsadasad	f	\N	f	\N	f	f	\N	\N	20	example@gmail.com	+36 20 123 4567	f	\N	f	\N	f	\N	f	[]	f	\N	\N	\N	\N	\N	\N	\N	f	f	rendezvény közben	false	páraképződés	\N	f	\N	f	\N	f	\N	adsad	1061 Budapest, Andrássy út 1.	\N	\N	\N	\N	\N	adasdas	1061 Budapest, Andrássy út 1.	12345678-1-23	+36 20 123 4567	pelda@email.hu	f	\N	ARAJANLAT_KESZITESERE_VAR	100000.00	Nem tetszik
 7	Egyetemi Sportnap	Hallgatói sportverseny több sportágban	Egyetemi Sportcsarnok	9026 Győr, Egyetem tér 1.	2025-04-21 00:00:00	2025-02-27 00:00:00	10:00:00	18:00:00	Egyetemi szervezésű sportrendezvény	Zártkörű	\N	sportverseny	Megnyitó, csapatversenyek, egyéni versenyek, eredményhirdetés	Versenyállomások, bírói asztalok	\N	\N	\N	Kb. 30 parkolóhely szükséges	\N	\N	egyetem	\N	200	sport@sze.hu	+36309876543	\N	\N	\N	Akadálymentes megközelítés biztosított	\N	Sport fotózás, videókészítés	\N	"[\\"hideg étel\\",\\"kávé, tea, üdítő\\"]"	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	nem szükséges	\N	egyik sem várható	\N	\N	\N	\N	\N	\N	Egyetemi zászlók, molinók	Kovács Tamás	9024 Győr, Ikva utca 8.	\N	\N	\N	\N	\N	Széchenyi Egyetem Sportegyesület	9026 Győr, Egyetem tér 1.	18308344-2-41	+3696503450	sport@sze.hu	\N	Teljes időtartam alatt	UF_ARAJANLAT_ELFOGADASARA_VAR	890000.00	Túl sok
-8	AAAAAAAAAAA	Teszt leírás	Szobám	Otthon	2025-04-08 00:00:00	2025-12-11 00:00:00	13:23:00	12:12:00	Egyetemi szervezésű hallgatói rendezvény	Nyilvános	\N	1dqsedq	qdqwdqwdqw	dwqdqwdqw	\N	\N	\N	\N	\N	\N	\N	\N	21	souris20013@gmail.com	06705672345	\N	\N	\N	\N	\N	dasdasd	\N	"[\\"hideg étel\\",\\"meleg étel\\"]"	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	rendezvény előtt	\N	páraképződés	\N	\N	\N	\N	\N	\N	\N	John Doe	Mosonmagyaróvár	\N	\N	\N	\N	\N	inc	Mosonmagyaróvár	102120120	06304563478	example@gmail.com	\N	\N	UF_ARAJANLAT_ELFOGADASARA_VAR	997000.00	Nem tetszik
-4	Teszt Rendezveny	\N	Otthonasd	\N	2025-04-05 00:00:00	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	UF_ARAJANLAT_ELFOGADASARA_VAR	5000000.00	\N
+4	Teszt Rendezveny	\N	Otthonasd	\N	2025-04-05 00:00:00	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	UF_ARAJANLATRA_VAR	6000000.00	szopjaki
 13	valami valami	ASDASDASDASD	sadada	4028 Debrecen Kassai út 26	2025-08-06 00:00:00	2025-08-06 00:00:00	14:24:00	14:24:00	Egyetemi szervezésű hallgatói rendezvény	Nyilvános	\N	Workshop	SZEX	\N	\N	\N	\N	\N	\N	\N	\N	\N	300	asdsadsad@szex.hu	+36 20 123 4567	\N	\N	\N	\N	\N	\N	\N	"[]"	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	nem szükséges	\N	por	\N	\N	\N	\N	\N	\N	\N	szex	1061 Budapest, Andrássy út 1.	\N	\N	\N	\N	\N	asd	1061 Budapest, Andrássy út 1.	12345678-1-23	+36 20 123 4567	pelda@email.hu	\N	\N	ARAJANLAT_KESZITESERE_VAR	390000.00	\N
 6	Egyetemi Tavaszi Fesztivál	Hallgatói rendezvény koncertekkel, programokkal	Campus szabadtéri terület	9026 Győr, Egyetem tér 1.	2025-04-20 00:00:00	2025-04-22 00:00:00	14:00:00	23:00:00	Egyetemi szervezésű hallgatói rendezvény	Nyilvános	t	fesztivál	Zenei programok, táncbemutatók, versenyek, játékok	Színpad, nézőtér, standok	f	\N	t	Campus és környéki parkolók, kb. 200 autó	t	t	sajat	ABC Hulladékkezelő Kft.	800	fesztival@ehok.sze.hu	+36203456789	f	\N	t	Kerekesszékes bejárat és mosdó biztosítva	t	kamerák, drón	t	["meleg étel", "hideg étel", "kávé, tea, üdítő"]	t	2025-04-19 08:00:00	2025-04-23 12:00:00	XYZ Színpadtechnika, Food Truck szolgáltatók	\N	\N	\N	\N	t	t	rendezvény közben	igen	egyik sem várható	\N	f	\N	t	Tűzijáték, az engedélyek beszerzésre kerültek	t	Fényfüzérek, léggömbök, zászlók	Kiss Péter	9022 Győr, Árpád út 12.	igen	+36701234567	kiss.peter@ehok.sze.hu	\N	\N	Széchenyi Egyetem Hallgatói Önkormányzat	9026 Győr, Egyetem tér 1.	18308344-2-41	+3696503500	ehok@sze.hu	t	Este 22:00 után fokozott portaszolgálat	UF_ARAJANLAT_ELFOGADASARA_VAR	93000.00	Nem jo
 5	Digitális Átalakulás Konferencib	Digitális transzformáció és innovációs lehetőségek az iparban	Auditorium Maximum	9026 Győr, Egyetem tér 1.	2025-05-12 00:00:00	2025-05-13 00:00:00	09:00:00	17:00:00	Egyetemi szervezésű rendezvény	Nyilvános	\N	konferencia	Megnyitó beszéd, szakmai előadások, workshop, kerekasztal beszélgetés, zárszó	Színpad, széksorok, vetítővászon, előadói asztalok	\N	15	\N	Kb. 50 gépkocsi, egyetemi parkolóban	\N	\N	egyetem	\N	150	souris20013@gmail.com	+36301234567	\N	projektor, laptop, hangosítás, mikrofonok	\N	\N	\N	professzionális fotós	\N	"[\\"kávé, tea, üdítő\\",\\"hideg étel\\"]"	\N	2025-05-12 00:00:00	2025-05-14 00:00:00	Technikai csapat, AV szolgáltató	\N	\N	\N	\N	\N	\N	rendezvény előtt	\N	egyik sem várható	\N	\N	\N	\N	\N	\N	Roll-up bannerek, virágdekoráció	Dr. Nagy János	9024 Győr, Budai út 5.	\N	+36207654321	nagy.janos@sze.hu	\N	\N	Széchenyi István Egyetem	9026 Győr, Egyetem tér 1.	18308344-2-41	+3696503400	info@sze.hu	\N	Teljes nyitvatartás alatt portaszolgálat szükséges	BEERKEZETT	940000.00	\N
@@ -509,21 +485,16 @@ COPY public.kerveny (id, nev, leiras, helyszin, cim, kezdo_datum, veg_datum, kez
 
 
 --
--- TOC entry 4883 (class 0 OID 17010)
--- Dependencies: 219
--- Data for Name: kerveny_koltseg; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: kerveny_koltseg; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
 COPY public.kerveny_koltseg (id, kerveny_id, service_id, service_name, rate_key, unit, hours, persons, unit_price, line_total, created_at, pricing_type, occasions, days, quantity) FROM stdin;
 13	3	\N	\N	priceUniversity	\N	0.00	0.00	0.00	0.00	2025-10-01 09:54:07.402246	famulus	0.00	0.00	0.00
 23	7	18	MC 001 és 002 bérleti díja	priceUniversity	nap	0.00	0.00	10000.00	50000.00	2025-10-07 16:49:20.401352	famulus	0.00	5.00	0.00
-113	8	29	Háló leszedése alpintechnikával	priceUniversity	alkalom	0.00	0.00	10000.00	100000.00	2025-11-04 21:59:42.221717	famulus	10.00	0.00	0.00
 29	3	29	Háló leszedése alpintechnikával	priceUniversity	alkalom	0.00	0.00	10000.00	100000.00	2025-10-15 17:53:55.306954	famulus	10.00	0.00	0.00
 30	3	30	Székek bérlése	priceUniversity	db/alkalom	0.00	0.00	10000.00	1000000.00	2025-10-15 17:53:55.306954	famulus	10.00	0.00	10.00
 31	3	26	Portaszolgálat	priceUniversity	óra	10.00	0.00	10000.00	100000.00	2025-10-15 17:53:55.306954	famulus	0.00	0.00	0.00
 32	3	18	MC 001 és 002 bérleti díja	priceUniversity	nap	0.00	0.00	10000.00	100000.00	2025-10-15 17:53:55.306954	famulus	0.00	10.00	0.00
-114	8	29	Háló leszedése alpintechnikával	priceUniversity	alkalom	0.00	0.00	10000.00	100000.00	2025-11-04 21:59:42.221717	famulus	10.00	0.00	0.00
-115	8	27	Biztonsági terv, bejelentéshez szükséges dokumentáció elkészítése	priceUniversity	alkalom	0.00	0.00	10000.00	100000.00	2025-11-04 21:59:42.221717	famulus	10.00	0.00	0.00
 116	9	29	Háló leszedése alpintechnikával	priceUniversity	alkalom	0.00	0.00	10000.00	100000.00	2025-11-05 19:45:06.984745	famulus	10.00	0.00	0.00
 40	6	29	Háló leszedése alpintechnikával	priceUniversity	alkalom	0.00	0.00	10000.00	40000.00	2025-10-15 19:01:41.910539	famulus	4.00	0.00	0.00
 41	6	22	Takarítás	priceUniversity	fő/óra	2.00	2.00	10000.00	40000.00	2025-10-15 19:01:41.910539	famulus	0.00	0.00	0.00
@@ -535,25 +506,26 @@ COPY public.kerveny_koltseg (id, kerveny_id, service_id, service_name, rate_key,
 47	14	15	Győr Városi Egyetemi Csarnok takarítás	priceUniversity	alkalom	0.00	0.00	40000.00	400000.00	2025-10-15 19:43:07.42346	famulus	10.00	0.00	0.00
 48	14	27	Biztonsági terv, bejelentéshez szükséges dokumentáció elkészítése	priceUniversity	alkalom	0.00	0.00	10000.00	100000.00	2025-10-15 19:43:07.42346	famulus	10.00	0.00	0.00
 49	14	18	MC 001 és 002 bérleti díja	priceUniversity	nap	0.00	0.00	10000.00	90000.00	2025-10-15 19:43:07.42346	famulus	0.00	9.00	0.00
-119	4	30	Székek bérlése	priceUniversity	db/alkalom	10.00	10.00	10000.00	0.00	2025-11-05 20:05:05.10011	famulus	0.00	0.00	0.00
 122	6	4	Eseti kültéri takarítás óradíja	priceUniversity	fő/óra	1.00	1.00	3000.00	3000.00	2025-11-05 20:47:15.581246	famulus	0.00	0.00	0.00
-55	4	8	Rendezvény biztonságszervezés, biztonsági dokumentáció díja, általános helyszín	priceUniversity	\N	10.00	10.00	50000.00	5000000.00	2025-10-15 21:22:10.744873	famulus	0.00	0.00	0.00
 57	13	6	Eseti gondnoksági feladatok óradíja	priceUniversity	fő/óra	10.00	10.00	3900.00	390000.00	2025-10-15 21:22:32.293547	famulus	0.00	0.00	0.00
 127	7	5	Eseti karbantartási feladatok óradíja	priceUniversity	fő/óra	10.00	10.00	3900.00	390000.00	2025-11-05 21:31:28.401211	famulus	0.00	0.00	0.00
 128	7	5	Eseti karbantartási feladatok óradíja	priceUniversityWeekend	fő/óra	10.00	10.00	4500.00	450000.00	2025-11-05 21:31:28.401211	famulus	0.00	0.00	0.00
-129	8	10	Rendezvényeken, indokolt esetben egyéb helyszíneken biztonsági személyzet díja (min. 4 óra)	priceUniversity	fő/óra	21.00	2.00	3500.00	147000.00	2025-11-05 21:34:06.421341	famulus	0.00	0.00	0.00
 64	5	10	Rendezvényeken, indokolt esetben egyéb helyszíneken biztonsági személyzet díja (min. 4 óra)	priceUniversity	fő/óra	10.00	10.00	3500.00	350000.00	2025-10-15 21:48:31.649121	famulus	0.00	0.00	0.00
 65	5	10	Rendezvényeken, indokolt esetben egyéb helyszíneken biztonsági személyzet díja (min. 4 óra)	priceExternal	fő/óra	10.00	10.00	3900.00	390000.00	2025-10-15 21:48:31.649121	famulus	0.00	0.00	0.00
 66	5	26	Portaszolgálat	priceUniversity	óra	10.00	0.00	10000.00	100000.00	2025-10-15 21:48:40.084332	famulus	0.00	0.00	0.00
 67	5	18	MC 001 és 002 bérleti díja	priceUniversity	nap	0.00	0.00	10000.00	100000.00	2025-10-15 21:48:40.084332	famulus	0.00	10.00	0.00
-130	8	9	Rendezvénybiztos szolgáltatás díja (rendezvényeken femerülő biztonsági feladatok koordinálása, min. 4 óra)	priceUniversity	fő/óra	10.00	10.00	5500.00	550000.00	2025-11-05 21:34:06.421341	famulus	0.00	0.00	0.00
+131	8	10	Rendezvényeken, indokolt esetben egyéb helyszíneken biztonsági személyzet díja (min. 4 óra)	priceUniversity	fő/óra	21.00	2.00	3500.00	147000.00	2025-11-09 19:54:15.99168	famulus	0.00	0.00	0.00
+132	8	9	Rendezvénybiztos szolgáltatás díja (rendezvényeken femerülő biztonsági feladatok koordinálása, min. 4 óra)	priceUniversity	fő/óra	10.00	10.00	5500.00	550000.00	2025-11-09 19:54:15.99168	famulus	0.00	0.00	0.00
+142	8	29	Háló leszedése alpintechnikával	priceUniversity	alkalom	0.00	0.00	10000.00	100000.00	2025-11-09 20:26:56.815337	famulus	10.00	0.00	0.00
+143	8	29	Háló leszedése alpintechnikával	priceUniversity	alkalom	0.00	0.00	10000.00	100000.00	2025-11-09 20:26:56.815337	famulus	10.00	0.00	0.00
+144	8	27	Biztonsági terv, bejelentéshez szükséges dokumentáció elkészítése	priceUniversity	alkalom	0.00	0.00	10000.00	100000.00	2025-11-09 20:26:56.815337	famulus	10.00	0.00	0.00
+145	4	8	Rendezvény biztonságszervezés, biztonsági dokumentáció díja, általános helyszín	priceUniversity	\N	10.00	10.00	50000.00	5000000.00	2025-11-09 20:37:36.815628	famulus	0.00	0.00	0.00
+146	4	30	Székek bérlése	priceUniversity	db/alkalom	10.00	10.00	10000.00	1000000.00	2025-11-09 20:37:47.370058	famulus	10.00	0.00	10.00
 \.
 
 
 --
--- TOC entry 4885 (class 0 OID 17025)
--- Dependencies: 221
--- Data for Name: prices; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: prices; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
 COPY public.prices (id, megnevezes, kategoria, mertekegyseg, ar_egyetem, ar_egyetem_hetvege, ar_kulso, ar_kulso_hetvege, megjegyzes, afa) FROM stdin;
@@ -591,9 +563,7 @@ COPY public.prices (id, megnevezes, kategoria, mertekegyseg, ar_egyetem, ar_egye
 
 
 --
--- TOC entry 4887 (class 0 OID 17036)
--- Dependencies: 223
--- Data for Name: role_audit; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: role_audit; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
 COPY public.role_audit (id, user_id, neptun_code, old_role, new_role, changed_by, reason, changed_at) FROM stdin;
@@ -611,9 +581,7 @@ COPY public.role_audit (id, user_id, neptun_code, old_role, new_role, changed_by
 
 
 --
--- TOC entry 4889 (class 0 OID 17043)
--- Dependencies: 225
--- Data for Name: statusz; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: statusz; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
 COPY public.statusz (id, code, label, phase, terminal, sort_order, active, created_at, updated_at) FROM stdin;
@@ -641,9 +609,7 @@ COPY public.statusz (id, code, label, phase, terminal, sort_order, active, creat
 
 
 --
--- TOC entry 4891 (class 0 OID 17051)
--- Dependencies: 227
--- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: -
+-- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
 COPY public.users (id, email, password_hash, full_name, neptun_code, role, role_assigned_at, is_active, last_login, created_at, updated_at, avatar_url) FROM stdin;
@@ -656,71 +622,64 @@ COPY public.users (id, email, password_hash, full_name, neptun_code, role, role_
 
 
 --
--- TOC entry 4906 (class 0 OID 0)
--- Dependencies: 229
--- Name: chat_messages_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: chat_messages_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.chat_messages_id_seq', 15, true);
+SELECT pg_catalog.setval('public.chat_messages_id_seq', 20, true);
 
 
 --
--- TOC entry 4907 (class 0 OID 0)
--- Dependencies: 218
--- Name: kerveny_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: kerveny_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
 SELECT pg_catalog.setval('public.kerveny_id_seq', 14, true);
 
 
 --
--- TOC entry 4908 (class 0 OID 0)
--- Dependencies: 220
--- Name: kerveny_koltseg_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: kerveny_koltseg_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.kerveny_koltseg_id_seq', 130, true);
+SELECT pg_catalog.setval('public.kerveny_koltseg_id_seq', 146, true);
 
 
 --
--- TOC entry 4909 (class 0 OID 0)
--- Dependencies: 222
--- Name: prices_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: prices_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
 SELECT pg_catalog.setval('public.prices_id_seq', 13, true);
 
 
 --
--- TOC entry 4910 (class 0 OID 0)
--- Dependencies: 224
--- Name: role_audit_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: role_audit_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
 SELECT pg_catalog.setval('public.role_audit_id_seq', 10, true);
 
 
 --
--- TOC entry 4911 (class 0 OID 0)
--- Dependencies: 226
--- Name: statusz_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: statusz_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
 SELECT pg_catalog.setval('public.statusz_id_seq', 20, true);
 
 
 --
--- TOC entry 4912 (class 0 OID 0)
--- Dependencies: 228
--- Name: users_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+-- Name: users_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
 SELECT pg_catalog.setval('public.users_id_seq', 14, true);
 
 
 --
--- TOC entry 4729 (class 2606 OID 17112)
--- Name: chat_messages chat_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: chat_last_seen chat_last_seen_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.chat_last_seen
+    ADD CONSTRAINT chat_last_seen_pkey PRIMARY KEY (user_id, kerveny_id);
+
+
+--
+-- Name: chat_messages chat_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.chat_messages
@@ -728,8 +687,7 @@ ALTER TABLE ONLY public.chat_messages
 
 
 --
--- TOC entry 4711 (class 2606 OID 17069)
--- Name: kerveny_koltseg kerveny_koltseg_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: kerveny_koltseg kerveny_koltseg_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.kerveny_koltseg
@@ -737,8 +695,7 @@ ALTER TABLE ONLY public.kerveny_koltseg
 
 
 --
--- TOC entry 4706 (class 2606 OID 17071)
--- Name: kerveny kerveny_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: kerveny kerveny_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.kerveny
@@ -746,8 +703,7 @@ ALTER TABLE ONLY public.kerveny
 
 
 --
--- TOC entry 4713 (class 2606 OID 17073)
--- Name: prices prices_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: prices prices_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.prices
@@ -755,8 +711,7 @@ ALTER TABLE ONLY public.prices
 
 
 --
--- TOC entry 4715 (class 2606 OID 17075)
--- Name: role_audit role_audit_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: role_audit role_audit_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.role_audit
@@ -764,8 +719,7 @@ ALTER TABLE ONLY public.role_audit
 
 
 --
--- TOC entry 4717 (class 2606 OID 17077)
--- Name: statusz statusz_code_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: statusz statusz_code_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.statusz
@@ -773,8 +727,7 @@ ALTER TABLE ONLY public.statusz
 
 
 --
--- TOC entry 4719 (class 2606 OID 17079)
--- Name: statusz statusz_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: statusz statusz_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.statusz
@@ -782,8 +735,7 @@ ALTER TABLE ONLY public.statusz
 
 
 --
--- TOC entry 4723 (class 2606 OID 17081)
--- Name: users users_email_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: users users_email_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.users
@@ -791,8 +743,7 @@ ALTER TABLE ONLY public.users
 
 
 --
--- TOC entry 4725 (class 2606 OID 17083)
--- Name: users users_neptun_code_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: users users_neptun_code_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.users
@@ -800,8 +751,7 @@ ALTER TABLE ONLY public.users
 
 
 --
--- TOC entry 4727 (class 2606 OID 17085)
--- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.users
@@ -809,72 +759,70 @@ ALTER TABLE ONLY public.users
 
 
 --
--- TOC entry 4730 (class 1259 OID 17113)
--- Name: idx_chat_messages_created_at; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_chat_last_seen_kerveny; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_chat_last_seen_kerveny ON public.chat_last_seen USING btree (kerveny_id);
+
+
+--
+-- Name: idx_chat_messages_created_at; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_chat_messages_created_at ON public.chat_messages USING btree (created_at);
 
 
 --
--- TOC entry 4731 (class 1259 OID 17119)
--- Name: idx_chat_messages_kerveny_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_chat_messages_kerveny_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_chat_messages_kerveny_id ON public.chat_messages USING btree (kerveny_id);
 
 
 --
--- TOC entry 4707 (class 1259 OID 17086)
--- Name: idx_kerveny_koltseg_kerveny_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_kerveny_koltseg_kerveny_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_kerveny_koltseg_kerveny_id ON public.kerveny_koltseg USING btree (kerveny_id);
 
 
 --
--- TOC entry 4708 (class 1259 OID 17087)
--- Name: idx_koltseg_kerveny_type; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_koltseg_kerveny_type; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_koltseg_kerveny_type ON public.kerveny_koltseg USING btree (kerveny_id, pricing_type);
 
 
 --
--- TOC entry 4709 (class 1259 OID 17088)
--- Name: idx_koltseg_service_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_koltseg_service_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_koltseg_service_id ON public.kerveny_koltseg USING btree (service_id);
 
 
 --
--- TOC entry 4720 (class 1259 OID 17089)
--- Name: idx_users_email; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_users_email; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_users_email ON public.users USING btree (email);
 
 
 --
--- TOC entry 4721 (class 1259 OID 17090)
--- Name: idx_users_neptun; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_users_neptun; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_users_neptun ON public.users USING btree (neptun_code);
 
 
 --
--- TOC entry 4735 (class 2620 OID 17091)
--- Name: users trg_users_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+-- Name: users trg_users_set_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
 CREATE TRIGGER trg_users_set_updated_at BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 
 --
--- TOC entry 4734 (class 2606 OID 17114)
--- Name: chat_messages fk_chat_messages_kerveny; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: chat_messages fk_chat_messages_kerveny; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.chat_messages
@@ -882,8 +830,7 @@ ALTER TABLE ONLY public.chat_messages
 
 
 --
--- TOC entry 4733 (class 2606 OID 17092)
--- Name: role_audit fk_role_audit_user; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: role_audit fk_role_audit_user; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.role_audit
@@ -891,15 +838,12 @@ ALTER TABLE ONLY public.role_audit
 
 
 --
--- TOC entry 4732 (class 2606 OID 17097)
--- Name: kerveny_koltseg kerveny_koltseg_kerveny_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: kerveny_koltseg kerveny_koltseg_kerveny_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.kerveny_koltseg
     ADD CONSTRAINT kerveny_koltseg_kerveny_id_fkey FOREIGN KEY (kerveny_id) REFERENCES public.kerveny(id) ON DELETE CASCADE;
 
-
--- Completed on 2025-11-09 01:01:14
 
 --
 -- PostgreSQL database dump complete

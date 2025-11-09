@@ -57,6 +57,17 @@ async function ensureChatTable() {
     }
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_chat_messages_created_at ON chat_messages(created_at);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_chat_messages_kerveny_id ON chat_messages(kerveny_id);`);
+
+    // last_seen tábla
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS chat_last_seen (
+        user_id      VARCHAR(64) NOT NULL,
+        kerveny_id   BIGINT      NOT NULL,
+        last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (user_id, kerveny_id)
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_chat_last_seen_kerveny ON chat_last_seen(kerveny_id);`);
   } catch (e) {
     console.error('[chat] ensureChatTable error:', e.message);
   }
@@ -114,7 +125,7 @@ router.post('/messages', ensureAuth, async (req, res) => {
     if (exists.rowCount === 0) return res.status(404).json({ error: 'kerveny not found' });
 
     const u = req.user || {};
-    const author_id = String(u.id || u.sub || u.neptun || u.username || 'anon');
+    const author_id = getUserId(u);
     const author_name = authorNameRaw; // kizárólag a küldött név
 
     const { rows } = await pool.query(
@@ -122,6 +133,8 @@ router.post('/messages', ensureAuth, async (req, res) => {
        VALUES($1,$2,$3,$4) RETURNING *`,
       [author_id, author_name, text, kervenyId]
     );
+    // saját üzenet küldése után frissítsük a last_seen-t (látja azonnal)
+    try { await markSeen(author_id, kervenyId); } catch {}
     return res.status(201).json(rows[0]);
   } catch (e) {
     console.error('[chat POST /messages] DB error:', e);
@@ -146,7 +159,29 @@ router.get('/messages', ensureAuth, async (req, res) => {
       `SELECT * FROM chat_messages ${where} ORDER BY created_at ASC LIMIT 500`,
       params
     );
-    return res.json(rows);
+    const userId = getUserId(req.user || {});
+    // lekérjük last_seen
+    const lsRes = await pool.query(
+      `SELECT last_seen_at FROM chat_last_seen WHERE user_id=$1 AND kerveny_id=$2`,
+      [userId, kervenyId]
+    );
+    const lastSeenAt = lsRes.rows[0]?.last_seen_at || null;
+    // unread count
+    const unreadRes = await pool.query(
+      `SELECT COUNT(*)::int AS c FROM chat_messages
+       WHERE kerveny_id=$1 AND ($2::timestamptz IS NULL OR created_at > $2)`,
+      [kervenyId, lastSeenAt]
+    );
+    const unreadCount = unreadRes.rows[0]?.c || 0;
+    // opcionális frissítés (ha param: markSeen=1)
+    if (req.query.markSeen === '1') {
+      try { await markSeen(userId, kervenyId); } catch {}
+    }
+    return res.json({
+      messages: rows,
+      lastSeenAt,
+      unreadCount
+    });
   } catch (e) {
     console.error('[chat GET /messages] DB error:', e);
     return res.status(500).json({ error: 'db error', detail: e.message });
@@ -165,7 +200,7 @@ router.delete('/messages', ensureAuth, async (req, res) => {
     if (exists.rowCount === 0) return res.status(404).json({ error: 'kerveny not found' });
 
     const u = req.user || {};
-    const author_id = String(u.id || u.sub || u.neptun || u.username || 'anon');
+    const author_id = getUserId(u);
 
     let sql = 'DELETE FROM chat_messages WHERE kerveny_id = $1 AND author_id = $2 RETURNING id';
     let params = [kervenyId, author_id];
@@ -176,9 +211,27 @@ router.delete('/messages', ensureAuth, async (req, res) => {
     }
 
     const { rowCount } = await pool.query(sql, params);
+    // törlés után frissítsük az utolsó látást (nem számítanak unread-nek)
+    try { await markSeen(author_id, kervenyId); } catch {}
     return res.json({ deleted: rowCount });
   } catch (e) {
     console.error('[chat DELETE /messages] DB error:', e);
+    return res.status(500).json({ error: 'db error', detail: e.message });
+  }
+});
+
+// explicit last_seen frissítés
+router.post('/seen', ensureAuth, async (req, res) => {
+  try {
+    const kervenyId = Number(req.body?.kervenyId);
+    if (!Number.isInteger(kervenyId) || kervenyId <= 0) {
+      return res.status(400).json({ error: 'invalid kervenyId' });
+    }
+    const userId = getUserId(req.user || {});
+    await markSeen(userId, kervenyId);
+    return res.json({ ok: true, kervenyId });
+  } catch (e) {
+    console.error('[chat POST /seen] error', e);
     return res.status(500).json({ error: 'db error', detail: e.message });
   }
 });
@@ -193,3 +246,15 @@ function initChatController(app, basePath = '/api/chat') {
 module.exports = {
   initChatController
 };
+
+function getUserId(u = {}) {
+  return String(u.id || u.sub || u.neptun || u.username || 'anon');
+}
+
+async function markSeen(userId, kervenyId) {
+  await pool.query(`
+    INSERT INTO chat_last_seen(user_id, kerveny_id, last_seen_at)
+    VALUES($1,$2,NOW())
+    ON CONFLICT (user_id, kerveny_id) DO UPDATE SET last_seen_at = EXCLUDED.last_seen_at
+  `, [userId, kervenyId]);
+}

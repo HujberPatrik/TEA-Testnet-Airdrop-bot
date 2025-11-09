@@ -2,46 +2,60 @@
   <div class="wizard-modal" @click.self="$emit('close')">
     <div class="wizard-content" :key="viewKey">
       <div class="wizard-header">
-        <h4 class="mb-0">Jóváhagyási folyamat</h4>
-        <div class="d-flex align-items-center gap-2">
+        <h4 class="mb-0 d-flex align-items-center gap-2">
+          <i class="fas fa-route"></i>
+          <span>Jóváhagyási folyamat</span>
+        </h4>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
           <span class="status-badge" :class="statusClass" :title="statusCode">{{ statusLabel }}</span>
-          <button class="btn btn-sm btn-outline-secondary" @click="$emit('close')">Bezárás</button>
+          <button class="pill-btn pill-secondary pill-sm" @click="$emit('close')" title="Bezárás">
+            <i class="fas fa-times"></i><span class="label d-none d-sm-inline">Bezárás</span>
+          </button>
         </div>
       </div>
 
       <div class="wizard-body">
-        <!-- 1) Beérkezett: csak elfogadás/elutasítás -->
-        <section v-if="isStatus('BEERKEZETT')" class="mb-4">
-          <h6>Első lépés</h6>
-          <p>Ebben a státuszban csak az Elfogadás és Elutasítás érhető el.</p>
-          <div class="d-flex gap-2">
-            <button class="btn btn-success" :disabled="busy" @click="acceptUfQuote">Elfogadás</button>
-            <button class="btn btn-danger" :disabled="busy" @click="rejectEvent">Elutasítás</button>
+        <!-- BEERKEZETT -->
+        <section v-if="isStatus('BEERKEZETT')" class="flow-card">
+          <h6 class="flow-title"><i class="fas fa-flag-checkered me-1"></i>Első lépés</h6>
+          <p class="flow-note">Ebben a státuszban csak az Elfogadás és Elutasítás érhető el.</p>
+          <div class="d-flex flex-wrap gap-2">
+            <button class="pill-btn pill-success" :disabled="busy" @click="acceptUfQuote">
+              <i class="fas fa-check-circle"></i><span>Elfogadás</span>
+            </button>
+            <button class="pill-btn pill-danger" :disabled="busy" @click="rejectEvent">
+              <i class="fas fa-times-circle"></i><span>Elutasítás</span>
+            </button>
           </div>
         </section>
 
-        <!-- 2) UF_ARAJANLATRA_VAR: UF kalkulátor -->
-        <section v-if="isStatus('UF_ARAJANLATRA_VAR')" class="mb-4">
-          <h6>Uni‑Famulus árajánlat készítése</h6>
-          <button class="btn btn-outline-primary" :disabled="busy || !canModifyUfInThisStatus" @click="openCalculator('famulus')">
-            Kalkulátor megnyitása (Uni‑Famulus)
+        <!-- UF_ARAJANLATRA_VAR -->
+        <section v-if="isStatus('UF_ARAJANLATRA_VAR')" class="flow-card">
+          <h6 class="flow-title"><i class="fas fa-calculator me-1"></i>Uni‑Famulus árajánlat készítése</h6>
+          <button
+            class="pill-btn pill-primary"
+            :disabled="busy || !canModifyUfInThisStatus"
+            @click="openCalculator('famulus')">
+            <i class="fas fa-play"></i><span>Kalkulátor (UF)</span>
           </button>
-          <p v-if="!canModifyUfInThisStatus" class="text-danger mt-2">
+          <p v-if="!canModifyUfInThisStatus" class="text-danger mt-2 small">
             Ebben a státuszban Rendezvényszervező szerepkörrel nem módosítható.
           </p>
         </section>
 
-        <!-- 2/b) UF Árajánlat elfogadásra vár: az UF előnézeti tábla IDE került -->
-        <section v-if="isStatus('UF_ARAJANLAT_ELFOGADASARA_VAR')" class="mb-4">
-          <h6>Uni‑Famulus árajánlat ellenőrzése</h6>
-          <div class="d-flex align-items-center gap-2">
-            <span>Mentett UF ajánlat</span>
-            <button class="btn btn-sm btn-outline-secondary" @click="fetchUfBreakdown" :disabled="loading.uf">Frissítés</button>
+        <!-- UF_ARAJANLAT_ELFOGADASARA_VAR -->
+        <section v-if="isStatus('UF_ARAJANLAT_ELFOGADASARA_VAR')" class="flow-card">
+          <h6 class="flow-title"><i class="fas fa-search-dollar me-1"></i>UF árajánlat ellenőrzése</h6>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="small text-muted">Mentett UF ajánlat</span>
+            <button class="pill-btn pill-light pill-sm" @click="fetchUfBreakdown" :disabled="loading.uf">
+              <i class="fas fa-sync-alt" :class="{ 'fa-spin': loading.uf }"></i><span>Frissítés</span>
+            </button>
           </div>
-          <div v-if="loading.uf" class="text-muted mt-2">Betöltés…</div>
-          <div v-else-if="ufItems.length === 0" class="text-muted mt-2">Még nincs mentett UF ajánlat.</div>
+          <div v-if="loading.uf" class="text-muted small">Betöltés…</div>
+          <div v-else-if="ufItems.length === 0" class="text-muted small">Még nincs mentett UF ajánlat.</div>
           <div v-else class="table-responsive mt-2">
-            <table class="table table-sm table-bordered">
+            <table class="fancy-inner-table table-sm">
               <thead>
                 <tr>
                   <th>Megnevezés</th>
@@ -69,35 +83,40 @@
                 </tr>
               </tbody>
             </table>
-            <div class="text-end fw-bold">UF összesen: {{ money(sum(ufItems)) }}</div>
+            <div class="text-end fw-bold total-line">UF összesen: {{ money(sum(ufItems)) }}</div>
           </div>
 
-          <div class="d-flex gap-2 mt-3">
-            <!-- Indok megadása modálon keresztül (UF) -->
-            <button class="btn btn-warning" :disabled="busy" @click="onModifyChoice('uf')">Módosítás kérése</button>
-            <button class="btn btn-success" :disabled="busy" @click="acceptOfferFromFamulus">UF árajánlat elfogadása</button>
+          <div class="d-flex flex-wrap gap-2 mt-3">
+            <button class="pill-btn pill-warning" :disabled="busy" @click="onModifyChoice('uf')">
+              <i class="fas fa-edit"></i><span>Módosítás kérése</span>
+            </button>
+            <button class="pill-btn pill-success" :disabled="busy" @click="acceptOfferFromFamulus">
+              <i class="fas fa-check-double"></i><span>UF ajánlat elfogadása</span>
+            </button>
           </div>
         </section>
 
-        <!-- 3) Árajánlat készítésére vár: Egyetemi kalkulátor -->
-        <section v-if="isStatus('ARAJANLAT_KESZITESERE_VAR')" class="mb-4">
-          <h6>Egyetemi árajánlat készítése</h6>
-          <button class="btn btn-outline-primary" :disabled="busy" @click="openCalculator('uni')">
-            Kalkulátor megnyitása (Egyetem)
+        <!-- ARAJANLAT_KESZITESERE_VAR -->
+        <section v-if="isStatus('ARAJANLAT_KESZITESERE_VAR')" class="flow-card">
+          <h6 class="flow-title"><i class="fas fa-calculator me-1"></i>Egyetemi árajánlat készítése</h6>
+          <button class="pill-btn pill-primary" :disabled="busy" @click="openCalculator('uni')">
+            <i class="fas fa-play"></i><span>Kalkulátor (Egyetem)</span>
           </button>
         </section>
 
-        <!-- 4) Árajánlat elfogadásra vár: egyetemi ajánlat áttekintése -->
-        <section v-if="isStatus('ARAJANLAT_ELFOGADASRA_VAR')" class="mb-4">
-          <h6>Egyetemi árajánlat ellenőrzése</h6>
-          <div class="d-flex align-items-center gap-2">
-            <span>Mentett Egyetemi ajánlat</span>
-            <button class="btn btn-sm btn-outline-secondary" @click="fetchUniBreakdown" :disabled="loading.uni">Frissítés</button>
+        <!-- ARAJANLAT_ELFOGADASRA_VAR -->
+        <section v-if="isStatus('ARAJANLAT_ELFOGADASRA_VAR')" class="flow-card">
+          <h6 class="flow-title"><i class="fas fa-search-dollar me-1"></i>Egyetemi ajánlat ellenőrzése</h6>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="small text-muted">Mentett Egyetemi ajánlat</span>
+            <button class="pill-btn pill-light pill-sm" @click="fetchUniBreakdown" :disabled="loading.uni">
+              <i class="fas fa-sync-alt" :class="{ 'fa-spin': loading.uni }"></i><span>Frissítés</span>
+            </button>
           </div>
-          <div v-if="loading.uni" class="text-muted mt-2">Betöltés…</div>
-          <div v-else-if="uniItems.length === 0" class="text-muted mt-2">Még nincs mentett Egyetemi ajánlat.</div>
+          <div v-if="loading.uni" class="text-muted small">Betöltés…</div>
+          <div v-else-if="uniItems.length === 0" class="text-muted small">Még nincs mentett Egyetemi ajánlat.</div>
           <div v-else class="table-responsive mt-2">
-            <table class="table table-sm table-bordered">
+            <table class="fancy-inner-table table-sm">
               <thead>
                 <tr>
                   <th>Megnevezés</th>
@@ -125,19 +144,22 @@
                 </tr>
               </tbody>
             </table>
-            <div class="text-end fw-bold">Egyetemi összesen: {{ money(sum(uniItems)) }}</div>
+            <div class="text-end fw-bold total-line">Egyetemi összesen: {{ money(sum(uniItems)) }}</div>
           </div>
 
           <hr class="my-4" />
-          <h6>Uni‑Famulus árajánlat ellenőrzése</h6>
-          <div class="d-flex align-items-center gap-2">
-            <span>Mentett UF ajánlat</span>
-            <button class="btn btn-sm btn-outline-secondary" @click="fetchUfBreakdown" :disabled="loading.uf">Frissítés</button>
+
+          <h6 class="flow-title"><i class="fas fa-search-dollar me-1"></i>UF ajánlat ellenőrzése</h6>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="small text-muted">Mentett UF ajánlat</span>
+            <button class="pill-btn pill-light pill-sm" @click="fetchUfBreakdown" :disabled="loading.uf">
+              <i class="fas fa-sync-alt" :class="{ 'fa-spin': loading.uf }"></i><span>Frissítés</span>
+            </button>
           </div>
-          <div v-if="loading.uf" class="text-muted mt-2">Betöltés…</div>
-          <div v-else-if="ufItems.length === 0" class="text-muted mt-2">Még nincs mentett UF ajánlat.</div>
+          <div v-if="loading.uf" class="text-muted small">Betöltés…</div>
+          <div v-else-if="ufItems.length === 0" class="text-muted small">Még nincs mentett UF ajánlat.</div>
           <div v-else class="table-responsive mt-2">
-            <table class="table table-sm table-bordered">
+            <table class="fancy-inner-table table-sm">
               <thead>
                 <tr>
                   <th>Megnevezés</th>
@@ -165,43 +187,63 @@
                 </tr>
               </tbody>
             </table>
-            <div class="text-end fw-bold">UF összesen: {{ money(sum(ufItems)) }}</div>
+            <div class="text-end fw-bold total-line">UF összesen: {{ money(sum(ufItems)) }}</div>
           </div>
 
-          <div class="d-flex gap-2 mt-3 align-items-center">
-            <div class="position-relative d-inline-block">
-              <button class="btn btn-warning" :disabled="busy" @click.stop="toggleModifyChoice($event)">
-                Módosítás kérése
+          <div class="d-flex flex-wrap gap-2 mt-3 align-items-center">
+            <div class="d-inline-block">
+              <button
+                ref="modifyTrigger"
+                class="pill-btn pill-warning"
+                :disabled="busy"
+                @click.stop="toggleModifyChoice">
+                <i class="fas fa-edit"></i><span>Módosítás kérése</span>
               </button>
-              <!-- lenyíló választó -->
-              <div v-show="showModifyChoice" class="dropdown-menu show p-2 shadow-sm" style="display:block; min-width: 220px;" @click.stop>
-                <button class="dropdown-item" :disabled="busy" @click="onModifyChoice('uni')">
-                  Egyetemi módosítása
-                </button>
-                <button class="dropdown-item" :disabled="busy" @click="onModifyChoice('uf')">
-                  UF módosítása
-                </button>
-              </div>
             </div>
-            <button class="btn btn-success" :disabled="busy" @click="downloadUniversityDocx">Árajánlat generálása (DOCX)</button>
-            <button class="btn btn-primary" :disabled="busy" @click="acceptUniversityQuote">
-              Árajánlat elfogadása
+            <button class="pill-btn pill-primary" :disabled="busy" @click="downloadUniversityDocx">
+              <i class="fas fa-file-word"></i><span>DOCX generálása</span>
+            </button>
+            <button class="pill-btn pill-success" :disabled="busy" @click="acceptUniversityQuote">
+              <i class="fas fa-check-double"></i><span>Árajánlat elfogadása</span>
             </button>
           </div>
         </section>
       </div>
 
       <div class="wizard-footer">
-        <button class="btn btn-danger" @click="cancelEvent" :disabled="cancelling" title="Rendezvény lemondása (státusz: Lemondva)">
-          <i v-if="!cancelling" class="fas fa-ban me-1"></i>
-          <i v-else class="fas fa-spinner fa-spin me-1"></i>
-          Lemondás
+        <button
+          class="pill-btn pill-danger"
+          @click="cancelEvent"
+          :disabled="cancelling"
+          title="Rendezvény lemondása">
+          <i v-if="!cancelling" class="fas fa-ban"></i>
+          <i v-else class="fas fa-spinner fa-spin"></i>
+          <span>Lemondás</span>
         </button>
       </div>
-
+      <!-- Kalkulátor teleportok + indok modal változatlan -->
       <!-- ServiceCostCalculator eltávolítva -->
     </div>
   </div>
+
+  <!-- Módosítás kérése – dropdown popover (teleportálva a body-ba) -->
+  <teleport to="body">
+    <div
+      v-if="showModifyChoice"
+      class="modify-popover"
+      :style="modifyPopoverStyle"
+      @click.stop
+    >
+      <div class="modify-popover-inner">
+        <button class="pill-btn pill-light w-100 mb-1" :disabled="busy" @click="onModifyChoice('uni')">
+          <i class="fas fa-university"></i><span>Egyetemi módosítása</span>
+        </button>
+        <button class="pill-btn pill-light w-100" :disabled="busy" @click="onModifyChoice('uf')">
+          <i class="fas fa-users-cog"></i><span>UF módosítása</span>
+        </button>
+      </div>
+    </div>
+  </teleport>
 
   <!-- ÚJ: külön-külön kalkulátor modálok -->
   <teleport to="body">
@@ -225,15 +267,41 @@
 
   <!-- Módosítás indok modal -->
   <teleport to="body">
-    <div v-if="showReasonModal" class="modal-backdrop">
-      <div class="modal-dialog">
-        <div class="modal-content p-3">
-          <h5 class="mb-3">Módosítás indoklása</h5>
-          <textarea v-model="modositasiIndok" rows="4" class="form-control mb-3" placeholder="Írd be a módosítás indokát..."></textarea>
-          <div class="d-flex gap-2 justify-content-end">
-            <button class="btn btn-secondary" @click="showReasonModal = false">Mégse</button>
-            <button class="btn btn-primary" :disabled="!modositasiIndok.trim()" @click="saveReasonAndModify">Mentés</button>
-          </div>
+    <div v-if="showReasonModal" class="reason-modal-overlay" @click.self="closeReasonModal">
+      <div class="reason-modal" role="dialog" aria-modal="true">
+        <div class="reason-header">
+          <h5 class="mb-0 d-flex align-items-center gap-2">
+            <i class="fas fa-edit"></i><span>Módosítás indoklása</span>
+          </h5>
+          <button class="pill-btn pill-light pill-sm" @click="closeReasonModal" title="Bezárás">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="reason-body">
+          <p class="small text-muted mb-2">
+            Írd le röviden, miért kérsz módosítást. Az indok naplózásra kerül.
+          </p>
+          <textarea
+            v-model="modositasiIndok"
+            rows="5"
+            class="reason-textarea"
+            placeholder="Indok részletezése..."
+            autofocus
+          ></textarea>
+        </div>
+        <div class="reason-footer">
+          <button class="pill-btn pill-light" @click="closeReasonModal">
+            <i class="fas fa-arrow-left"></i><span>Mégse</span>
+          </button>
+          <button
+            class="pill-btn pill-primary"
+            :disabled="!modositasiIndok.trim() || busy"
+            @click="saveReasonAndModify"
+          >
+            <i v-if="!busy" class="fas fa-save"></i>
+            <i v-else class="fas fa-spinner fa-spin"></i>
+            <span>{{ busy ? 'Mentés...' : 'Mentés' }}</span>
+          </button>
         </div>
       </div>
     </div>
@@ -248,6 +316,7 @@ import auth from '@/services/auth';
 
 export default {
   name: 'PricingFlowWizard',
+  emits: ['close','refresh-events','status-updated'],
   components: { UniFamulusCostCalculator, UniversityCostCalculator },
   props: { event: { type: Object, required: true } },
   data() {
@@ -264,6 +333,7 @@ export default {
       showUfCalc: false,
       showUniCalc: false,
       showModifyChoice: false,
+     modifyPos: { top: 0, left: 0, width: 240, below: true },
       showReasonModal: false,
       modositasiIndok: '',
       pendingModifyType: null,
@@ -355,6 +425,26 @@ export default {
     },
     statusClass() {
       return `phase-${this.statusPhase}`;
+    },
+   modifyPopoverStyle() {
+     const { top, left, width } = this.modifyPos || {};
+     return {
+       position: 'fixed',
+       top: `${top}px`,
+       left: `${left}px`,
+       minWidth: `${Math.max(220, width)}px`,
+       zIndex: 5000
+     };
+   }
+  },
+  async created() {
+    try {
+      const user = await auth.ensureAuthUser();
+      this.isEventOrganizer = this.isRoleEventOrganizer(user?.role);
+      this.isUniFamulus = this.isRoleUniFamulus(user?.role);
+    } catch {
+      this.isEventOrganizer = false;
+      this.isUniFamulus = false;
     }
   },
   methods: {
@@ -369,12 +459,35 @@ export default {
     isStatus(code) { return this.statusCode === code; },
 
     // Dropdown megnyitás/bezárás a "Módosítás kérése" gombhoz
-    toggleModifyChoice(e) {
-      if (e?.stopPropagation) e.stopPropagation();
-      this.showModifyChoice = !this.showModifyChoice;
+    toggleModifyChoice() {
+      if (this.showModifyChoice) {
+        this.showModifyChoice = false;
+        return;
+      }
+      this.positionModifyPopover();
+      this.showModifyChoice = true;
     },
     hideModifyChoice() {
       this.showModifyChoice = false;
+    },
+    positionModifyPopover() {
+      const el = this.$refs.modifyTrigger;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const margin = 6;
+      const desiredWidth = Math.max(220, r.width);
+      // Alap pozíció: gomb alá
+      let top = r.bottom + margin;
+      let left = r.left;
+      // Jobb szélre igazítás, ha kilógna
+      const maxLeft = window.innerWidth - desiredWidth - 8;
+      if (left > maxLeft) left = Math.max(8, maxLeft);
+      // Ha alul kilóg, nyissuk a gomb fölé
+      const estimatedHeight = 94; // ~2 sor gomb + padding
+      if (top + estimatedHeight > window.innerHeight) {
+        top = Math.max(8, r.top - estimatedHeight - margin);
+      }
+      this.modifyPos = { top, left, width: r.width, below: top > r.top };
     },
     async onModifyChoice(type) {
       this.pendingModifyType = type;
@@ -655,6 +768,12 @@ export default {
         quantity:  c.quantity  ? this.getNumField(r, ['quantity', 'darab', 'db']) : 0
       };
     },
+    closeReasonModal() {
+    this.showReasonModal = false;
+    this.modositasiIndok = '';
+    this.pendingModifyType = null;
+    this.showModifyChoice = false;
+  },
 
     // UF sor derivált értékei – ugyanaz az elv
     derivedUf(r) {
@@ -694,93 +813,391 @@ export default {
     }
   },
   mounted() {
-    // kívülre kattintásra zárjuk a választót
     document.addEventListener('click', this.hideModifyChoice);
-  },
-  async mounted() {
-    // kívülre kattintásra zárjuk a választót
-    document.addEventListener('click', this.hideModifyChoice);
-    // ensureAuthUser alapján szerepkör beállítása
-    try {
-      const user = await auth.ensureAuthUser();
-      this.isEventOrganizer = this.isRoleEventOrganizer(user?.role);
-      this.isUniFamulus = this.isRoleUniFamulus(user?.role);
-    } catch { this.isEventOrganizer = false; }
+    window.addEventListener('resize', this.positionModifyPopover);
+    window.addEventListener('scroll', this.hideModifyChoice, true);
++   window.addEventListener('keydown', this.onGlobalKeydown);
   },
   beforeUnmount() {
     document.removeEventListener('click', this.hideModifyChoice);
+    window.removeEventListener('resize', this.positionModifyPopover);
+    window.removeEventListener('scroll', this.hideModifyChoice, true);
++   window.removeEventListener('keydown', this.onGlobalKeydown);
   }
 };
 </script>
 
 <style scoped>
+/* --- Modal keret --- */
 .wizard-modal {
-  position: fixed; inset: 0; background: rgba(0,0,0,.55);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 2000;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 4000; /* magasabb, hogy minden felett legyen */
 }
 .wizard-content {
-  background: #fff; width: 96%; max-width: 1400px; max-height: 92vh;
-  border-radius: 10px; display: flex; flex-direction: column; overflow: hidden;
-  box-shadow: 0 10px 30px rgba(0,0,0,.25);
+  background: #fff;
+  width: 96%;
+  max-width: 1400px;
+  max-height: 92vh;
+  border-radius: 26px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 18px 40px -18px rgba(0,0,0,.35), 0 8px 18px -10px rgba(0,0,0,.2);
+  position: relative;
+}
+.wizard-content::before {
+  content:'';
+  position:absolute;
+  inset:0;
+  border-radius:26px;
+  pointer-events:none;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.7), inset 0 0 0 2px rgba(0,0,0,.03);
 }
 .wizard-header {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 12px 16px; border-bottom: 1px solid #e5e7eb; background: #f8f9fa;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:14px 20px;
+  background: linear-gradient(135deg,#5a9cff 0%,#0d6efd 60%,#0b5ed7 100%);
+  color:#fff;
+  position:sticky;
+  top:0;
+  z-index:5;
 }
-.wizard-body { padding: 12px 16px; overflow: auto; }
-/* ÚJ: lábléc a jobb alsó sarokhoz igazítva */
-.wizard-footer {
+.wizard-body {
+  padding:18px 20px 24px;
+  overflow:auto;
+  background:#f7f9ff;
+}
+
+/* --- Flow kártyák --- */
+.flow-card {
+  background:#fff;
+  border:1px solid #e3ebf7;
+  border-radius:22px;
+  padding:16px 18px;
+  margin-bottom:18px;
+  box-shadow:0 6px 14px -8px rgba(0,0,0,.18);
+  transition:.18s;
+}
+.flow-card:hover {
+  transform:translateY(-2px);
+  box-shadow:0 10px 22px -10px rgba(0,0,0,.25);
+}
+.flow-title {
+  font-size:.9rem;
+  font-weight:700;
+  letter-spacing:.3px;
+  margin:0 0 .35rem;
+  display:flex;
+  align-items:center;
+}
+.flow-note {
+  font-size:.7rem;
+  margin:0 0 .75rem;
+  color:#536274;
+}
+
+/* --- Inner tables --- */
+.fancy-inner-table {
+  width:100%;
+  border-collapse:separate;
+  border-spacing:0;
+  font-size:.7rem;
+  background:#fff;
+  border-radius:16px;
+  overflow:hidden;
+}
+.fancy-inner-table thead th {
+  background:#eef4ff;
+  color:#24415f;
+  font-weight:700;
+  padding:.45rem .55rem;
+  border:none;
+  border-bottom:1px solid #d7e3f5;
+  text-transform:uppercase;
+  font-size:.6rem;
+  letter-spacing:.4px;
+}
+.fancy-inner-table tbody td {
+  padding:.45rem .55rem;
+  border-bottom:1px solid #eef2f7;
+  background:#fff;
+}
+.fancy-inner-table tbody tr:last-child td { border-bottom:none; }
+.total-line { font-size:.65rem; margin-top:.35rem; }
+
+/* --- “Módosítás kérése” popover (új dizájn, mindig felül) --- */
+.modify-popover {
+  position: fixed;
+  z-index: 5000;
+  padding: 6px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid #d7e3f5;
+  box-shadow: 0 12px 28px -10px rgba(0,0,0,.25), 0 6px 14px -10px rgba(0,0,0,.12);
+}
+.modify-popover-inner {
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 16px;
-  border-top: 1px solid #e5e7eb;
-  background: #fff;
+  flex-direction: column;
+}
+.modify-popover .pill-btn {
+  justify-content: flex-start;
+}
+.modify-popover .pill-btn i {
+  width: 1rem;
+  text-align: center;
+}
+:deep(.dark) .modify-popover {
+  background:#1f2431;
+  border-color:#303a49;
+  box-shadow: 0 14px 30px -12px rgba(0,0,0,.6);
 }
 
-/* egyszerű dropdown stílus, ha nincs Bootstrap JS */
-.dropdown-menu {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  z-index: 2050;
-  background: #fff;
-  border: 1px solid rgba(0,0,0,.15);
-  border-radius: .25rem;
+/* ===== Módosítás indok modal (új dizájn) ===== */
+.reason-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15,25,40,.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 6000;
+  padding: 24px 18px;
 }
-.dropdown-item {
-  display: block;
+.reason-modal {
+  background: #fff;
   width: 100%;
-  text-align: left;
-  background: transparent;
-  border: 0;
-  padding: .375rem .5rem;
+  max-width: 520px;
+  border-radius: 26px;
+  box-shadow: 0 18px 40px -18px rgba(0,0,0,.4), 0 8px 20px -10px rgba(0,0,0,.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
 }
-.dropdown-item:hover { background: #f8f9fa; }
+.reason-modal::before {
+  content:'';
+  position:absolute;
+  inset:0;
+  border-radius:26px;
+  pointer-events:none;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.65), inset 0 0 0 2px rgba(0,0,0,.04);
+}
+.reason-header {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:14px 16px;
+  background: linear-gradient(135deg,#5a9cff 0%,#0d6efd 60%,#0b5ed7 100%);
+  color:#fff;
+}
+.reason-header h5 {
+  font-size:1rem;
+  font-weight:700;
+  margin:0;
+  letter-spacing:.3px;
+}
+.reason-body {
+  padding:16px 16px 6px;
+  background:#f7f9ff;
+}
+.reason-textarea {
+  width:100%;
+  resize:vertical;
+  border:1px solid #c3d6f1;
+  border-radius:18px;
+  padding:.75rem .9rem;
+  font-size:.78rem;
+  font-weight:500;
+  letter-spacing:.25px;
+  background:#fff;
+  outline:none;
+  transition:.18s;
+  min-height:150px;
+}
+.reason-textarea:focus {
+  border-color:#0d6efd;
+  box-shadow:0 0 0 3px rgba(13,110,253,.15);
+}
+.reason-footer {
+  display:flex;
+  justify-content:flex-end;
+  gap:.55rem;
+  padding:12px 16px 16px;
+  background:#fff;
+}
+@media (max-width: 576px) {
+  .reason-modal { max-width:100%; border-radius:22px; }
+  .reason-textarea { font-size:.72rem; }
+  .reason-header h5 { font-size:.9rem; }
+}
+:deep(.dark) .reason-modal {
+  background:#1f2330;
+}
+:deep(.dark) .reason-body { background:#242c3b; }
+:deep(.dark) .reason-textarea {
+  background:#1f2431;
+  border-color:#394454;
+  color:#dbe6f4;
+}
+:deep(.dark) .reason-textarea:focus {
+  border-color:#3a8bff;
+  box-shadow:0 0 0 3px rgba(58,139,255,.25);
+}
+:deep(.dark) .reason-header {
+  background: linear-gradient(135deg,#3a4d9d 0%,#273b84 60%,#1d2e6c 100%);
+}
 
-.modal-backdrop {
-  position: fixed; inset: 0; background: rgba(0,0,0,.45);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 3000;
+/* --- Pill gombok --- */
+.pill-btn {
+  --base:#0d6efd;
+  display:inline-flex;
+  align-items:center;
+  gap:.45rem;
+  padding:.5rem 1rem;
+  font-size:.7rem;
+  font-weight:700;
+  letter-spacing:.3px;
+  border-radius:999px;
+  border:1px solid transparent;
+  background:#fff;
+  color:#24415f;
+  transition:.18s;
+  line-height:1;
+  text-transform:none;
+  white-space:nowrap;
 }
-.modal-dialog {
-  background: #fff;
-  border-radius: 8px;
-  max-width: 400px;
-  width: 96vw;
-  box-shadow: 0 8px 32px rgba(0,0,0,.18);
+.pill-btn i { font-size:.9rem; }
+.pill-btn:hover { transform:translateY(-1px); }
+.pill-btn:active { transform:translateY(0); }
+.pill-btn[disabled] { opacity:.55; cursor:not-allowed; }
+
+.pill-sm { padding:.35rem .7rem; font-size:.62rem; }
+.pill-sm i { font-size:.75rem; }
+
+.pill-primary {
+  background: linear-gradient(135deg,#3a8bff 0%,#0d6efd 45%,#0b58d0 100%);
+  color:#fff;
+  border-color:#0d6efd;
+  box-shadow:0 3px 6px -2px rgba(0,0,0,.25), inset 0 0 0 1px rgba(255,255,255,.12);
+}
+.pill-primary:hover {
+  background: linear-gradient(135deg,#5a9cff 0%,#0b5ed7 55%,#0a4fb6 100%);
+  box-shadow:0 4px 10px -3px rgba(0,0,0,.35);
 }
 
-/* Egységes státusz jelvény stílus (Table komponenssel azonos színek) */
+.pill-secondary {
+  background:#6c757d;
+  color:#fff;
+  border-color:#6c757d;
+  box-shadow:0 3px 6px -2px rgba(0,0,0,.25);
+}
+.pill-secondary:hover { filter:brightness(.95); }
+
+.pill-success {
+  background:#37b457;
+  color:#fff;
+  border-color:#37b457;
+  box-shadow:0 3px 6px -2px rgba(0,0,0,.25);
+}
+.pill-success:hover { filter:brightness(1.05); }
+
+.pill-danger {
+  background:#d9534f;
+  color:#fff;
+  border-color:#d9534f;
+  box-shadow:0 3px 6px -2px rgba(0,0,0,.25);
+}
+.pill-danger:hover { filter:brightness(1.05); }
+
+.pill-warning {
+  background:#ffb23a;
+  color:#5d4100;
+  border-color:#ffb23a;
+  box-shadow:0 3px 6px -2px rgba(0,0,0,.25);
+}
+.pill-warning:hover { filter:brightness(1.07); }
+
+.pill-light {
+  background:#f5f8ff;
+  color:#0d6efd;
+  border-color:#d7e3f5;
+  box-shadow:0 2px 6px -3px rgba(0,0,0,.12);
+}
+.pill-light:hover {
+  background:#eef4ff;
+  border-color:#b6cff5;
+}
+
+.pill-btn.pill-danger:disabled,
+.pill-btn.pill-success:disabled,
+.pill-btn.pill-warning:disabled,
+.pill-btn.pill-primary:disabled { filter:grayscale(.3); }
+
 .status-badge {
-  display: inline-flex; align-items: center; gap: .35rem;
-  padding: .25rem .55rem; border-radius: 12px; font-size: .75rem;
-  font-weight: 600; letter-spacing: .3px; line-height: 1.1; white-space: nowrap;
+  display:inline-flex;
+  align-items:center;
+  gap:.4rem;
+  padding:.35rem .65rem;
+  border-radius:14px;
+  font-size:.6rem;
+  font-weight:700;
+  letter-spacing:.4px;
+  background:rgba(255,255,255,.18);
+  color:#fff;
 }
+
 .phase-beerkezett   { background:#ffe0e3; color:#9d1d30; }
 .phase-szerzodes    { background:#fde8cc; color:#a65f00; }
 .phase-megvalositas { background:#d8eefc; color:#05537a; }
 .phase-elszamolas   { background:#e1f5e8; color:#1f6d3f; }
 .phase-lezart       { background:#e0e0e0; color:#555; }
+
+.wizard-footer {
+  display:flex;
+  justify-content:flex-end;
+  padding:12px 18px;
+  border-top:1px solid #e3ebf7;
+  background:#fff;
+  position:sticky;
+  bottom:0;
+  z-index:4;
+}
+
+/* Módosítás indok modal gombok */
+.modal-dialog { border-radius:20px; }
+.modal-dialog .btn,
+.modal-dialog .pill-btn { font-size:.65rem; }
+
+/* Sötét mód */
+.dark-mode .wizard-content { background:#1f2330; }
+.dark-mode .wizard-content::before { box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), inset 0 0 0 2px rgba(255,255,255,.03); }
+.dark-mode .wizard-header {
+  background: linear-gradient(135deg,#3a4d9d 0%,#273b84 60%,#1d2e6c 100%);
+}
+.dark-mode .wizard-body { background:#242c3b; }
+.dark-mode .flow-card { background:#1f2431; border-color:#303a49; box-shadow:0 6px 16px -8px rgba(0,0,0,.55); }
+.dark-mode .flow-card:hover { box-shadow:0 10px 24px -10px rgba(0,0,0,.65); }
+.dark-mode .fancy-inner-table thead th { background:#2a3242; color:#cdd9e6; border-bottom-color:#3a4455; }
+.dark-mode .fancy-inner-table tbody td { background:#1f2431; border-bottom-color:#2d3645; color:#dbe6f4; }
+.dark-mode .pill-light { background:#262d3d; border-color:#394454; color:#aecdff; }
+.dark-mode .pill-light:hover { background:#2d3647; border-color:#4a5669; }
+.dark-mode .wizard-footer { background:#1f2330; border-top-color:#303a49; }
+.dark-mode .status-badge { background:rgba(255,255,255,.15); }
+
+/* Reszponzív */
+@media (max-width: 768px) {
+  .wizard-header { flex-wrap:wrap; gap:.6rem; }
+  .flow-card { padding:14px 14px; border-radius:18px; }
+  .pill-btn { font-size:.63rem; padding:.42rem .75rem; }
+  .pill-sm { padding:.3rem .55rem; font-size:.55rem; }
+  .wizard-body { padding:14px 14px 18px; }
+}
 </style>
