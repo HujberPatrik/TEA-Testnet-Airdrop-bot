@@ -1,5 +1,11 @@
 const express = require('express');
-const bcrypt = require('bcrypt');
+let bcrypt;
+try {
+  bcrypt = require('bcrypt');
+} catch (e) {
+  console.warn('[auth] bcrypt native load failed, falling back to bcryptjs:', e.message);
+  bcrypt = require('bcryptjs');
+}
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const pool = require('./config/db'); // csatlakozás a projekt DB configjához
@@ -58,7 +64,8 @@ async function handleLogin(req, res) {
     const hash = user.password_hash;
     if (!hash) return res.status(401).json({ error: 'Jelszó nincs beállítva' });
 
-    const ok = await bcrypt.compare(password, hash);
+    // const ok = await bcrypt.compare(password, hash);
+    const ok = bcrypt.compareSync(password, hash);
     if (!ok) return res.status(401).json({ error: 'Hibás email vagy jelszó' });
 
     const payload = {
