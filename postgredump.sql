@@ -370,7 +370,7 @@ CREATE TABLE public.users (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     avatar_url character varying(255),
     CONSTRAINT users_neptun_format CHECK (((neptun_code IS NULL) OR ((neptun_code)::text ~ '^[A-Za-z0-9]{6}$'::text))),
-    CONSTRAINT users_role_check CHECK (((role)::text = ANY ((ARRAY['Admin'::character varying, 'Főadmin'::character varying, 'Uni-Famulus'::character varying, 'Rendezvényszervező'::character varying])::text[])))
+    CONSTRAINT users_role_check CHECK (((role)::text = ANY (ARRAY[('Admin'::character varying)::text, ('Főadmin'::character varying)::text, ('Uni-Famulus'::character varying)::text, ('Rendezvényszervező'::character varying)::text])))
 );
 
 
@@ -447,7 +447,9 @@ COPY public.chat_last_seen (user_id, kerveny_id, last_seen_at) FROM stdin;
 5	8	2025-11-09 20:27:12.242776+01
 14	8	2025-11-09 20:27:30.78586+01
 5	4	2025-11-09 20:40:22.909592+01
-14	4	2025-11-09 20:40:33.585393+01
+14	4	2025-11-10 15:39:11.51455+01
+15	8	2025-11-10 15:46:07.068931+01
+15	4	2025-11-10 15:46:15.451961+01
 \.
 
 
@@ -461,6 +463,7 @@ COPY public.chat_messages (id, author_id, author_name, text, created_at, kerveny
 18	14	Rendezvény János	damn daniel	2025-11-09 18:51:26.058371	4	2025-11-09 18:51:26.058371+01
 19	5	John Winchester	ciganycigany	2025-11-09 20:27:12.237261	8	2025-11-09 20:27:12.237261+01
 20	14	Rendezvény János	szopjaki	2025-11-09 20:40:17.882189	4	2025-11-09 20:40:17.882189+01
+21	14	Rendezvény János	valami	2025-11-10 15:39:11.505809	4	2025-11-10 15:39:11.505809+01
 \.
 
 
@@ -477,10 +480,10 @@ COPY public.kerveny (id, nev, leiras, helyszin, cim, kezdo_datum, veg_datum, kez
 3	nevnev	Megváltoztatott leírás	Miklós	qdqwdwdqwdqwd	2025-03-29 00:00:00	2025-04-01 00:00:00	02:31:00	18:52:00	Egyetemi szervezésű rendezvény	Nyilvános	\N	valamivalami	kjosdafpjkdspfoarqa	qewrtgerqgqeg	\N	5	\N	RENDSZAM	\N	\N	sajat	Pisti	30	souris20013@gmail.com	06302345687	\N	LAPTOP	\N	SADAS	\N	GOPRO	\N	"\\"[\\\\\\"kávé, tea, üdítő\\\\\\",\\\\\\"hideg étel\\\\\\"]\\""	\N	2025-12-10 00:00:00	2025-02-12 00:00:00	DOKTOR BÉLA	\N	\N	\N	\N	\N	\N	rendezvény előtt	\N	egyik sem várható	\N	\N	EFGDFGDFG	\N	NEMTOM	\N	LSDFLSDFL	TESZT PISTA	Győr,Egyetem K0	\N	\N	\N	\N	\N	wdqw	qdq	1231232	frwfwrf	akssdkakdasd	\N	WREGWRGWR	LEMONDVA	1300000.00	\N
 9	asdasdasdasdsa	dasdasdasd	dasdsad	9026 Győr Egyetem tér 1	2025-04-17 00:00:00	2025-04-18 00:00:00	20:48:00	21:49:00	Egyetemi szervezésű hallgatói rendezvény	Nyilvános	f	adasdas	dsadsa	dsadasad	f	\N	f	\N	f	f	\N	\N	20	example@gmail.com	+36 20 123 4567	f	\N	f	\N	f	\N	f	[]	f	\N	\N	\N	\N	\N	\N	\N	f	f	rendezvény közben	false	páraképződés	\N	f	\N	f	\N	f	\N	adsad	1061 Budapest, Andrássy út 1.	\N	\N	\N	\N	\N	adasdas	1061 Budapest, Andrássy út 1.	12345678-1-23	+36 20 123 4567	pelda@email.hu	f	\N	ARAJANLAT_KESZITESERE_VAR	100000.00	Nem tetszik
 7	Egyetemi Sportnap	Hallgatói sportverseny több sportágban	Egyetemi Sportcsarnok	9026 Győr, Egyetem tér 1.	2025-04-21 00:00:00	2025-02-27 00:00:00	10:00:00	18:00:00	Egyetemi szervezésű sportrendezvény	Zártkörű	\N	sportverseny	Megnyitó, csapatversenyek, egyéni versenyek, eredményhirdetés	Versenyállomások, bírói asztalok	\N	\N	\N	Kb. 30 parkolóhely szükséges	\N	\N	egyetem	\N	200	sport@sze.hu	+36309876543	\N	\N	\N	Akadálymentes megközelítés biztosított	\N	Sport fotózás, videókészítés	\N	"[\\"hideg étel\\",\\"kávé, tea, üdítő\\"]"	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	nem szükséges	\N	egyik sem várható	\N	\N	\N	\N	\N	\N	Egyetemi zászlók, molinók	Kovács Tamás	9024 Győr, Ikva utca 8.	\N	\N	\N	\N	\N	Széchenyi Egyetem Sportegyesület	9026 Győr, Egyetem tér 1.	18308344-2-41	+3696503450	sport@sze.hu	\N	Teljes időtartam alatt	UF_ARAJANLAT_ELFOGADASARA_VAR	890000.00	Túl sok
-4	Teszt Rendezveny	\N	Otthonasd	\N	2025-04-05 00:00:00	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	UF_ARAJANLATRA_VAR	6000000.00	szopjaki
 13	valami valami	ASDASDASDASD	sadada	4028 Debrecen Kassai út 26	2025-08-06 00:00:00	2025-08-06 00:00:00	14:24:00	14:24:00	Egyetemi szervezésű hallgatói rendezvény	Nyilvános	\N	Workshop	SZEX	\N	\N	\N	\N	\N	\N	\N	\N	\N	300	asdsadsad@szex.hu	+36 20 123 4567	\N	\N	\N	\N	\N	\N	\N	"[]"	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	nem szükséges	\N	por	\N	\N	\N	\N	\N	\N	\N	szex	1061 Budapest, Andrássy út 1.	\N	\N	\N	\N	\N	asd	1061 Budapest, Andrássy út 1.	12345678-1-23	+36 20 123 4567	pelda@email.hu	\N	\N	ARAJANLAT_KESZITESERE_VAR	390000.00	\N
 6	Egyetemi Tavaszi Fesztivál	Hallgatói rendezvény koncertekkel, programokkal	Campus szabadtéri terület	9026 Győr, Egyetem tér 1.	2025-04-20 00:00:00	2025-04-22 00:00:00	14:00:00	23:00:00	Egyetemi szervezésű hallgatói rendezvény	Nyilvános	t	fesztivál	Zenei programok, táncbemutatók, versenyek, játékok	Színpad, nézőtér, standok	f	\N	t	Campus és környéki parkolók, kb. 200 autó	t	t	sajat	ABC Hulladékkezelő Kft.	800	fesztival@ehok.sze.hu	+36203456789	f	\N	t	Kerekesszékes bejárat és mosdó biztosítva	t	kamerák, drón	t	["meleg étel", "hideg étel", "kávé, tea, üdítő"]	t	2025-04-19 08:00:00	2025-04-23 12:00:00	XYZ Színpadtechnika, Food Truck szolgáltatók	\N	\N	\N	\N	t	t	rendezvény közben	igen	egyik sem várható	\N	f	\N	t	Tűzijáték, az engedélyek beszerzésre kerültek	t	Fényfüzérek, léggömbök, zászlók	Kiss Péter	9022 Győr, Árpád út 12.	igen	+36701234567	kiss.peter@ehok.sze.hu	\N	\N	Széchenyi Egyetem Hallgatói Önkormányzat	9026 Győr, Egyetem tér 1.	18308344-2-41	+3696503500	ehok@sze.hu	t	Este 22:00 után fokozott portaszolgálat	UF_ARAJANLAT_ELFOGADASARA_VAR	93000.00	Nem jo
 5	Digitális Átalakulás Konferencib	Digitális transzformáció és innovációs lehetőségek az iparban	Auditorium Maximum	9026 Győr, Egyetem tér 1.	2025-05-12 00:00:00	2025-05-13 00:00:00	09:00:00	17:00:00	Egyetemi szervezésű rendezvény	Nyilvános	\N	konferencia	Megnyitó beszéd, szakmai előadások, workshop, kerekasztal beszélgetés, zárszó	Színpad, széksorok, vetítővászon, előadói asztalok	\N	15	\N	Kb. 50 gépkocsi, egyetemi parkolóban	\N	\N	egyetem	\N	150	souris20013@gmail.com	+36301234567	\N	projektor, laptop, hangosítás, mikrofonok	\N	\N	\N	professzionális fotós	\N	"[\\"kávé, tea, üdítő\\",\\"hideg étel\\"]"	\N	2025-05-12 00:00:00	2025-05-14 00:00:00	Technikai csapat, AV szolgáltató	\N	\N	\N	\N	\N	\N	rendezvény előtt	\N	egyik sem várható	\N	\N	\N	\N	\N	\N	Roll-up bannerek, virágdekoráció	Dr. Nagy János	9024 Győr, Budai út 5.	\N	+36207654321	nagy.janos@sze.hu	\N	\N	Széchenyi István Egyetem	9026 Győr, Egyetem tér 1.	18308344-2-41	+3696503400	info@sze.hu	\N	Teljes nyitvatartás alatt portaszolgálat szükséges	BEERKEZETT	940000.00	\N
+4	Teszt Rendezveny	\N	Otthonasd	\N	2025-04-05 00:00:00	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	UF_ARAJANLATRA_VAR	1014625.00	imni9kmi
 \.
 
 
@@ -519,8 +522,8 @@ COPY public.kerveny_koltseg (id, kerveny_id, service_id, service_name, rate_key,
 142	8	29	Háló leszedése alpintechnikával	priceUniversity	alkalom	0.00	0.00	10000.00	100000.00	2025-11-09 20:26:56.815337	famulus	10.00	0.00	0.00
 143	8	29	Háló leszedése alpintechnikával	priceUniversity	alkalom	0.00	0.00	10000.00	100000.00	2025-11-09 20:26:56.815337	famulus	10.00	0.00	0.00
 144	8	27	Biztonsági terv, bejelentéshez szükséges dokumentáció elkészítése	priceUniversity	alkalom	0.00	0.00	10000.00	100000.00	2025-11-09 20:26:56.815337	famulus	10.00	0.00	0.00
-145	4	8	Rendezvény biztonságszervezés, biztonsági dokumentáció díja, általános helyszín	priceUniversity	\N	10.00	10.00	50000.00	5000000.00	2025-11-09 20:37:36.815628	famulus	0.00	0.00	0.00
 146	4	30	Székek bérlése	priceUniversity	db/alkalom	10.00	10.00	10000.00	1000000.00	2025-11-09 20:37:47.370058	famulus	10.00	0.00	10.00
+147	4	5	Eseti karbantartási feladatok óradíja	priceUniversity	fő/óra	0.75	5.00	3900.00	14625.00	2025-11-10 15:36:27.629202	famulus	0.00	0.00	0.00
 \.
 
 
@@ -618,6 +621,7 @@ COPY public.users (id, email, password_hash, full_name, neptun_code, role, role_
 13	21peti21@gmail.com	$2b$10$YXqiT0xK.Z/S54gaDlByqOL1pKPfl7fSGMtdDSsTBVOTaLp.5rabm	Halász Péter	ENPL82	Admin	2025-09-28 22:34:27.825694+02	t	\N	2025-09-28 22:34:17.162382+02	2025-09-28 22:35:10.672849+02	\N
 1	souris20013@gmail.com	$2b$10$vkynwDelsRU5c7q7cFdoTe5TqmDqZ6P6g.wGhpx/lhZ1PkDAy/wPy	Haselberger Viktor	C5YIYQ	Uni-Famulus	2025-09-16 23:13:52.786389+02	t	\N	2025-09-05 00:04:03.165597+02	2025-11-04 22:01:40.282425+01	/uploads/anon-1762290100141.png
 14	email@example.com	$2b$10$JQE1ZabQSL4/DJkwKO2Yk.1xADvTrCl0lonezwpSMr5yh8u4pnAnm	Rendezvény János	ABCD12	Rendezvényszervező	2025-11-05 19:59:17.935965+01	t	\N	2025-11-04 21:22:53.595375+01	2025-11-05 19:59:27.018403+01	/uploads/anon-1762290061150.jpg
+15	kishujbi@gmail.com	$2b$10$CVEUF3AHAvOQ2mjmx3lDnuIcBR57A.b7Vbkh/TnNSvVyxSZTDikBO	Hujber Patrik	DCDG6G	Admin	\N	t	\N	2025-11-10 15:35:07.466081+01	2025-11-10 15:45:17.186421+01	\N
 \.
 
 
@@ -625,7 +629,7 @@ COPY public.users (id, email, password_hash, full_name, neptun_code, role, role_
 -- Name: chat_messages_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.chat_messages_id_seq', 20, true);
+SELECT pg_catalog.setval('public.chat_messages_id_seq', 21, true);
 
 
 --
@@ -639,7 +643,7 @@ SELECT pg_catalog.setval('public.kerveny_id_seq', 14, true);
 -- Name: kerveny_koltseg_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.kerveny_koltseg_id_seq', 146, true);
+SELECT pg_catalog.setval('public.kerveny_koltseg_id_seq', 147, true);
 
 
 --
@@ -667,7 +671,7 @@ SELECT pg_catalog.setval('public.statusz_id_seq', 20, true);
 -- Name: users_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.users_id_seq', 14, true);
+SELECT pg_catalog.setval('public.users_id_seq', 15, true);
 
 
 --
