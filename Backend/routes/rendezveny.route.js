@@ -12,6 +12,7 @@ router.post('/kerveny', ctrl.insertKerveny);
 router.put('/kerveny/:id', ctrl.updateKerveny);
 router.patch('/kerveny/:id/status', ctrl.updateKervenyStatus);
 router.post('/kerveny/:id/costs/commit', ctrl.saveCostsAndAdvance);
+router.post('/kerveny/offer-providers', ctrl.getOfferProvidersForEvents);
 
 // PATCH csak modositasi_indok és/vagy statusz frissítéshez
 router.patch('/kerveny/:id', ctrl.patchKervenyFields);

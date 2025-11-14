@@ -92,26 +92,105 @@
 
 <script>
 import { ref, reactive, computed, watch, onMounted } from 'vue';
+import auth, { ensureAuthUser } from '@/services/auth'; // ensureAuthUser használata
 
 export default {
   name: 'UniFamulusCostCalculator',
   props: { event: { type: Object, default: null } },
   emits: ['status-updated', 'refresh-events', 'close', 'calculated'],
   setup(props, { emit }) {
+    console.debug('[UniFamulusCostCalculator] mount init for event', props.event?.id);
+    onMounted(async () => {
+      try {
+        const u = await ensureAuthUser();
+        state.userId = toInt(u?.id ?? u?.user_id ?? u?.userId) || fallbackExtract();
+      } catch { state.userId = fallbackExtract(); }
+      await fetchPrices();
+      const had = loadState();
+      if (!had && rows.length === 0) addRow?.();
+     console.debug('[UniFamulusCostCalculator] ready, rows:', rows.length);
+    });
+    const API_BASE = (import.meta.env.VITE_API_BASE || 'http://localhost:3000').replace(/\/$/, '');
+    const state = reactive({
+      token: (auth?.getToken?.() || localStorage.getItem('token') || '').trim(),
+      userId: null
+    });
+    const toInt = (v) => {
+      const n = parseInt(v, 10);
+      return Number.isInteger(n) && n > 0 ? n : null;
+    };
+
+    // ensureAuthUser elsődleges, fallback a localStorage / auth objektumok
+    const fallbackExtract = () => {
+      const candidates = [];
+      try {
+        const uObj = auth?.getUser?.() ?? auth?.currentUser ?? auth?.user;
+        if (uObj) candidates.push(uObj.id, uObj.user_id, uObj.userId);
+      } catch {}
+      try {
+        const raw = localStorage.getItem('user');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          candidates.push(parsed.id, parsed.user_id, parsed.userId);
+        }
+      } catch {}
+      candidates.push(localStorage.getItem('user_id'));
+      for (const c of candidates) {
+        const n = toInt(c);
+        if (n) return n;
+      }
+      return null;
+    };
+
+    const defaultHeaders = () => ({
+      'Content-Type': 'application/json',
+      ...(state.token ? { Authorization: `Bearer ${state.token}` } : {}),
+      ...(toInt(state.userId) ? { 'X-User-Id': String(toInt(state.userId)) } : {})
+    });
+
     const TARGET_STATUS = 'UF_ARAJANLAT_ELFOGADASARA_VAR';
     const loading = ref(false);
     const error = ref('');
     const prices = ref([]);
     const rows = reactive([]);
     const saving = ref(false);
-
+    // Állapot mentése/betöltése – esemény-specifikus kulcs
     const storageKey = (eventId) => `serviceCalc:${eventId ?? 'global'}:famulus`;
+
+    const saveState = () => {
+      try {
+        if (!props.event?.id) return;
+        const payload = {
+          rows: JSON.parse(JSON.stringify(rows)),
+          ts: Date.now()
+        };
+        localStorage.setItem(storageKey(props.event.id), JSON.stringify(payload));
+      } catch {}
+    };
+
+    const loadState = () => {
+      try {
+        if (!props.event?.id) return false;
+        const raw = localStorage.getItem(storageKey(props.event.id));
+        if (!raw) return false;
+        const data = JSON.parse(raw);
+        if (Array.isArray(data?.rows)) {
+          rows.splice(0, rows.length, ...data.rows);
+          return true;
+        }
+        return false;
+      } catch { return false; }
+    };
+
+    // Mély figyelő: bármelyik sor változására ment
+    watch(rows, saveState, { deep: true });
+
     const fetchPrices = async () => {
       loading.value = true; error.value = '';
       try {
-        let res = await fetch('/api/prices/famulus');
+        let res = await fetch(`${API_BASE}/api/prices/famulus`, { headers: defaultHeaders() });
         if (!res.ok) {
-          res = await fetch('/api/prices');
+          res = await fetch(`${API_BASE}/api/prices`, { headers: defaultHeaders() });
           if (!res.ok) throw new Error('Árak betöltése sikertelen');
         }
         const data = await res.json();
@@ -182,63 +261,27 @@ export default {
       const p = findPriceById(row.serviceId);
       if (!p || !isUfCategory(p.category)) row.serviceId = null;
     };
-    const saveState = () => {
-      try {
-        const id = props.event?.id;
-        const key = storageKey(id);
-        const payload = {
-          rows: rows.map(r => ({
-            id: r.id, pricingType: 'famulus', serviceId: r.serviceId, rateKey: r.rateKey,
-            hours: r.hours === '' ? null : r.hours,
-            persons: r.persons === '' ? null : r.persons,
-            days: r.days === '' ? null : r.days,
-            occasions: r.occasions === '' ? null : r.occasions,
-            quantity: r.quantity === '' ? null : r.quantity
-          })),
-          savedAt: Date.now()
-        };
-        localStorage.setItem(key, JSON.stringify(payload));
-      } catch {}
-    };
-    const loadState = () => {
-      try {
-        const id = props.event?.id;
-        const key = storageKey(id);
-        const raw = localStorage.getItem(key);
-        if (!raw) return false;
-        const parsed = JSON.parse(raw);
-        if (!parsed || !Array.isArray(parsed.rows)) return false;
-        rows.splice(0, rows.length);
-        parsed.rows.forEach(r => rows.push({
-          id: r.id ?? (Date.now() + Math.random()),
-          pricingType: 'famulus',
-          serviceId: r.serviceId ?? null,
-          rateKey: r.rateKey ?? 'priceUniversity',
-          hours: (r.hours == null) ? '' : r.hours,
-          persons: (r.persons == null) ? '' : r.persons,
-          days: (r.days == null) ? '' : r.days,
-          occasions: (r.occasions == null) ? '' : r.occasions,
-          quantity: (r.quantity == null) ? '' : r.quantity
-        }));
-        return true;
-      } catch { return false; }
-    };
-    watch(rows, saveState, { deep: true });
     const postWithFallback = async (paths, payload) => {
       let lastErr;
       for (const p of paths) {
         try {
-          const res = await fetch(p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          const res = await fetch(p, {
+            method: 'POST',
+            headers: defaultHeaders(),
+            body: JSON.stringify(payload)
+          });
           if (res.ok) return await res.json();
           lastErr = new Error(`HTTP ${res.status}`);
         } catch (e) { lastErr = e; }
       }
       throw lastErr || new Error('Ismeretlen hiba');
     };
+
     const setStatusUFOfferPending = async () => {
       if (!props.event?.id) return;
-      const res = await fetch(`/api/kerveny/${props.event.id}/status`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      const res = await fetch(`${API_BASE}/api/kerveny/${props.event.id}/status`, {
+        method: 'PATCH',
+        headers: defaultHeaders(),
         body: JSON.stringify({ statusz: TARGET_STATUS })
       });
       if (!res.ok) throw new Error('Státusz váltás hiba');
@@ -265,13 +308,18 @@ export default {
       saving.value = true;
       const id = props.event.id;
       const breakdown = buildBreakdown();
-      const payload = { breakdown, total: total.value, pricingType: 'famulus' };
+      const payload = {
+        breakdown,
+        total: total.value,
+        pricingType: 'famulus',
+        user_id: toInt(state.userId) // ensureAuthUser által meghatározott integer
+      };
       try {
         await postWithFallback(
           [
-            `/api/kerveny/${id}/costs/commit-uf`,
-            `/api/kerveny/${id}/costs/commit?type=famulus`,
-            `/api/kerveny/${id}/costs/commit`
+            `${API_BASE}/api/kerveny/${id}/costs/commit-uf`,
+            `${API_BASE}/api/kerveny/${id}/costs/commit?type=famulus`,
+            `${API_BASE}/api/kerveny/${id}/costs/commit`
           ],
           payload
         );
@@ -296,9 +344,9 @@ export default {
       try {
         await postWithFallback(
           [
-            `/api/kerveny/${id}/costs/commit-uf`,
-            `/api/kerveny/${id}/costs/commit?type=famulus`,
-            `/api/kerveny/${id}/costs/commit`
+            `${API_BASE}/api/kerveny/${id}/costs/commit-uf`,
+            `${API_BASE}/api/kerveny/${id}/costs/commit?type=famulus`,
+            `${API_BASE}/api/kerveny/${id}/costs/commit`
           ],
           { pricingType: 'famulus', breakdown: [], total: 0 }
         );
@@ -308,11 +356,6 @@ export default {
         alert('A törlés a szerveren nem sikerült.');
       }
     };
-    onMounted(async () => {
-      await fetchPrices();
-      const had = loadState();
-      if (!had && rows.length === 0) addRow();
-    });
     return {
       loading, error, prices,
       rows, saving,

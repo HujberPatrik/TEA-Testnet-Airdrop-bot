@@ -34,13 +34,10 @@
           <h6 class="flow-title"><i class="fas fa-calculator me-1"></i>Uni‑Famulus árajánlat készítése</h6>
           <button
             class="pill-btn pill-primary"
-            :disabled="busy || !canModifyUfInThisStatus"
+            :disabled="busy"
             @click="openCalculator('famulus')">
             <i class="fas fa-play"></i><span>Kalkulátor (UF)</span>
           </button>
-          <p v-if="!canModifyUfInThisStatus" class="text-danger mt-2 small">
-            Ebben a státuszban Rendezvényszervező szerepkörrel nem módosítható.
-          </p>
         </section>
 
         <!-- UF_ARAJANLAT_ELFOGADASARA_VAR -->
@@ -208,6 +205,53 @@
             </button>
           </div>
         </section>
+
+        <!-- MEGVALOSITASRA_VAR -->
+        <section v-if="isStatus('MEGVALOSITASRA_VAR')" class="flow-card">
+          <h6 class="flow-title">
+            <i class="fas fa-user-check me-1"></i>Rendezvény jellege
+          </h6>
+          <p class="flow-note">Kérjük jelöld, hogy a rendezvény belsős (egyetemi) vagy külsős.</p>
+          <div class="d-flex flex-wrap gap-2 align-items-center">
+            <button
+              class="pill-btn"
+              :class="isExternal === false ? 'pill-success' : 'pill-light'"
+              :disabled="busy"
+              @click="isExternal = false">
+              <i class="fas fa-university"></i><span>Belsős</span>
+            </button>
+            <button
+              class="pill-btn"
+              :class="isExternal === true ? 'pill-danger' : 'pill-light'"
+              :disabled="busy"
+              @click="isExternal = true">
+              <i class="fas fa-briefcase"></i><span>Külsős</span>
+            </button>
+
+            <button
+              class="pill-btn pill-primary"
+              :disabled="busy || isExternal === null || !event?.id"
+              @click="saveExternalFlag">
+              <i v-if="!busy" class="fas fa-save"></i>
+              <i v-else class="fas fa-spinner fa-spin"></i>
+              <span>Mentés</span>
+            </button>
+
+            <!-- ÚJ: Tovább gomb (jelleg alapján léptet) -->
+            <button
+              class="pill-btn pill-primary"
+              :disabled="busy || isExternal === null || !event?.id"
+              @click="continueFromImplementation">
+              <i v-if="!busy" class="fas fa-arrow-right"></i>
+              <i v-else class="fas fa-spinner fa-spin"></i>
+              <span>Tovább</span>
+            </button>
+
+            <span v-if="isExternal !== null" class="small text-muted ms-2">
+              Jelenlegi: {{ isExternal ? 'Külsős' : 'Belsős' }}
+            </span>
+          </div>
+        </section>
       </div>
 
       <div class="wizard-footer">
@@ -245,10 +289,11 @@
     </div>
   </teleport>
 
-  <!-- ÚJ: külön-külön kalkulátor modálok -->
+  <!-- Kalkulátorok modálként -->
   <teleport to="body">
     <UniFamulusCostCalculator
       v-if="showUfCalc"
+      :key="'uf-'+(event?.id||0)+'-'+ufCalcKey"
       :event="event"
       @close="showUfCalc = false"
       @status-updated="onChildStatusUpdated"
@@ -258,10 +303,11 @@
   <teleport to="body">
     <UniversityCostCalculator
       v-if="showUniCalc"
+      :key="'uni-'+(event?.id||0)+'-'+uniCalcKey"
       :event="event"
       @close="showUniCalc = false"
-      @refresh-events="$emit('refresh-events')"
       @status-updated="onChildStatusUpdated"
+      @refresh-events="$emit('refresh-events')"
     />
   </teleport>
 
@@ -309,16 +355,17 @@
 </template>
 
 <script>
-import axios from 'axios';
-import UniFamulusCostCalculator from '@/components/UniFamulusCostCalculator.vue';
-import UniversityCostCalculator from '@/components/UniversityCostCalculator.vue';
-import auth from '@/services/auth';
+import axios from 'axios'
+import UniFamulusCostCalculator from '@/components/UniFamulusCostCalculator.vue'
+import UniversityCostCalculator from '@/components/UniversityCostCalculator.vue'
+import auth, { ensureAuthUser } from '@/services/auth'
+import { getStatusLabel, getStatusPhase, normalizeStatusCode as normStatus } from '@/constants/statuses.js'
 
 export default {
   name: 'PricingFlowWizard',
-  emits: ['close','refresh-events','status-updated'],
   components: { UniFamulusCostCalculator, UniversityCostCalculator },
-  props: { event: { type: Object, required: true } },
+  props: { event: { type: Object, default: null } },
+  emits: ['close','refresh-events','status-updated'],
   data() {
     return {
       busy: false,
@@ -332,6 +379,8 @@ export default {
       // ÚJ: külön kalkulátor modálok láthatósága
       showUfCalc: false,
       showUniCalc: false,
+      ufCalcKey: 0,
+      uniCalcKey: 0,
       showModifyChoice: false,
      modifyPos: { top: 0, left: 0, width: 240, below: true },
       showReasonModal: false,
@@ -340,7 +389,8 @@ export default {
       localEvent: { ...this.event },
       // Role flags
       isEventOrganizer: false,
-      isUniFamulus: false
+      isUniFamulus: false,
+      isExternal: null
     };
   },
   watch: {
@@ -349,6 +399,7 @@ export default {
       immediate: true,
       handler(val) {
         this.localEvent = { ...val };
+        this.isExternal = this.readExternalFromEvent(val);
       }
     },
     statusCode: {
@@ -368,18 +419,10 @@ export default {
   computed: {
     statusCode() {
       const raw = this.statusOverride ?? (this.localEvent?.statusz ?? this.localEvent?.status ?? 'BEERKEZETT');
-      return this.normalizeStatusCode(raw);
+      return normStatus(raw);
     },
     statusLabel() {
-      const map = {
-        BEERKEZETT: 'Beérkezett',
-        UF_ARAJANLATRA_VAR: 'UF árajánlatra vár',
-        UF_ARAJANLAT_ELFOGADASARA_VAR: 'UF árajánlat elfogadására vár',
-        ARAJANLAT_KESZITESERE_VAR: 'Árajánlat készítésére vár',
-        ARAJANLAT_ELFOGADASRA_VAR: 'Árajánlat elfogadásra vár',
-        MEGVALOSITASRA_VAR: 'Megvalósításra vár'
-      };
-      return map[this.statusCode] || this.statusCode;
+      return getStatusLabel(this.statusCode);
     },
     // Oszlopláthatóság a mértékegység alapján (nem az érték alapján)
     visibleUfCols() {
@@ -414,14 +457,7 @@ export default {
     },
     // Színezés: a korábbi logikához illeszkedő fázis és class
     statusPhase() {
-      const s = this.statusCode;
-      if (['UF_ARAJANLATRA_VAR', 'UF_ARAJANLAT_ELFOGADASARA_VAR', 'ARAJANLAT_KESZITESERE_VAR', 'ARAJANLAT_ELFOGADASRA_VAR'].includes(s)) {
-        return 'szerzodes';
-      }
-      if (['MEGVALOSITASRA_VAR', 'MEGVALOSULASRA_VAR'].includes(s)) return 'megvalositas';
-      if (['ELSZAMOLASRA_VAR'].includes(s)) return 'elszamolas';
-      if (['LEZART', 'LEZARVA', 'ELUTASITVA', 'LEMONDVA'].includes(s)) return 'lezart';
-      return 'beerkezett';
+      return getStatusPhase(this.statusCode);
     },
     statusClass() {
       return `phase-${this.statusPhase}`;
@@ -439,25 +475,73 @@ export default {
   },
   async created() {
     try {
-      const user = await auth.ensureAuthUser();
-      this.isEventOrganizer = this.isRoleEventOrganizer(user?.role);
-      this.isUniFamulus = this.isRoleUniFamulus(user?.role);
+      const user = await (ensureAuthUser?.() ?? auth.ensureAuthUser?.())
+     this.setRoleFlags(user)
     } catch {
-      this.isEventOrganizer = false;
-      this.isUniFamulus = false;
+      this.isEventOrganizer = false
+      this.isUniFamulus = false
     }
   },
   methods: {
-    normalizeStatusCode(code) {
-      const c = String(code || '').trim().toUpperCase();
-      const aliases = {
-        // backend alias -> front-end canonical
-        MEGVALOSULASRA_VAR: 'MEGVALOSITASRA_VAR'
-      };
-      return aliases[c] || c;
-    },
     isStatus(code) { return this.statusCode === code; },
-
+   // --- Szerepkörök robusztus beolvasása ---
+   extractRoleStrings(user) {
+     const out = [];
+     const push = (v) => { if (!v) return; if (Array.isArray(v)) v.forEach(push); else out.push(String(v)); };
+     push(user?.role);
+     push(user?.roles);
+     push(user?.jogosultsag);
+     push(user?.jogosultsagok);
+     push(user?.authorities);
+     return out.filter(Boolean);
+   },
+   normRole(s) {
+     return String(s || '')
+       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+       .toUpperCase().replace(/[_-]/g, ' ').trim();
+   },
+   isRoleEventOrganizerStr(s) {
+     const r = this.normRole(s);
+     return r === 'RENDEZVENYSZERVEZO' || r === 'RENDEZVENY SZERVEZO' || r === 'EVENT ORGANIZER';
+   },
+   isRoleUniFamulusStr(s) {
+     const r = this.normRole(s);
+     return r === 'UF' || r === 'UNI FAMULUS' || r === 'UNIFAMULUS' || r === 'FAMULUS';
+   },
+   setRoleFlags(user) {
+     const roles = this.extractRoleStrings(user);
+     const isOrg = roles.some(this.isRoleEventOrganizerStr);
+     const isUf = roles.some(this.isRoleUniFamulusStr);
+     this.isEventOrganizer = !!isOrg;
+     this.isUniFamulus = !!isUf;
+     console.debug('[Wizard] roles:', roles, { isEventOrganizer: this.isEventOrganizer, isUniFamulus: this.isUniFamulus });
+   },
+    // Kalkulátor komponens újramount kulcs növelése
+    forceRecreate(type) {
+      if (type === 'famulus') this.ufCalcKey++;
+      else this.uniCalcKey++;
+    },
+    // Kalkulátor megnyitása
+    openCalculator(type) {
+     // Mindkét kalkulátor ugyanazzal a mintával nyílik
+     this.showUfCalc = false;
+     this.showUniCalc = false;
+     this.$nextTick(() => {
+       if (type === 'famulus') {
+         this.ufCalcKey++;
+         this.showUfCalc = true;
+       } else {
+         this.uniCalcKey++;
+         this.showUniCalc = true;
+       }
+     });
+    },
+    // Újranyitás fallback (pl. ha mount hiba volt)
+    reopenCalculator(type) {
+      this.showUfCalc = false;
+      this.showUniCalc = false;
+      setTimeout(() => this.openCalculator(type), 60);
+    },
     // Dropdown megnyitás/bezárás a "Módosítás kérése" gombhoz
     toggleModifyChoice() {
       if (this.showModifyChoice) {
@@ -669,16 +753,10 @@ export default {
       return r === 'UF' || r === 'UNI FAMULUS' || r === 'UNIFAMULUS';
     },
 
-    // ÚJ: a megfelelő kalkulátor modál megnyitása
-    openCalculator(type) {
-      // Rendezvényszervező nem nyithat UF kalkulátort ebben a státuszban
-      if (type === 'famulus' && !this.canModifyUfInThisStatus) return;
-      if (type === 'famulus') {
-        this.showUfCalc = true;
-      } else {
-        this.showUniCalc = true;
-      }
-    },
+    // === Normalizáló wraperek (hiányoztak) ===
+    normalizeStatusCode(code) { return normStatus(code); },
+    statusPhase(code) { return getStatusPhase(normStatus(code)); },
+    statusLabelFor(code) { return getStatusLabel(normStatus(code)); },
 
     // Formázók
     z(v) { const n = Number(v); return Number.isFinite(n) ? (Number.isInteger(n) ? n : n.toFixed(2)) : ''; },
@@ -686,9 +764,8 @@ export default {
     sum(arr) { return (arr || []).reduce((s, r) => s + (Number(r.line_total) || 0), 0); },
 
     onChildStatusUpdated(updated) {
-      // mentsük el a VÁLTÁS ELŐTTI státuszt
       const prev = this.statusCode;
-      const next = this.normalizeStatusCode(updated?.statusz || updated?.status || '');
+      const next = normStatus(updated?.statusz || updated?.status || '');
 
       // azonnali UI frissítés a wizardban
       this.statusOverride = updated?.statusz || updated?.status || null;
@@ -810,19 +887,65 @@ export default {
         link.click();
         link.remove();
       } finally { this.busy = false; }
-    }
-  },
-  mounted() {
-    document.addEventListener('click', this.hideModifyChoice);
-    window.addEventListener('resize', this.positionModifyPopover);
-    window.addEventListener('scroll', this.hideModifyChoice, true);
-+   window.addEventListener('keydown', this.onGlobalKeydown);
-  },
-  beforeUnmount() {
-    document.removeEventListener('click', this.hideModifyChoice);
-    window.removeEventListener('resize', this.positionModifyPopover);
-    window.removeEventListener('scroll', this.hideModifyChoice, true);
-+   window.removeEventListener('keydown', this.onGlobalKeydown);
+    },
+    readExternalFromEvent(e) {
+      const v = e?.kulso_e ?? e?.is_external ?? e?.external ?? e?.kulsoVagyBelso ?? e?.jelleg;
+      if (typeof v === 'boolean') return v;
+      if (typeof v === 'number') return v === 1;
+      if (typeof v === 'string') {
+        const s = v.toLowerCase().trim();
+        if (['kulso','kulsos','külsős','external','extern','kulso_szervezet'].includes(s)) return true;
+        if (['belso','belsos','belső','egyetemi','internal','intern'].includes(s)) return false;
+      }
+      return null;
+    },
+    async saveExternalFlag() {
+      if (!this.event?.id || this.isExternal === null) return;
+      this.busy = true;
+      try {
+        const r = await axios.patch(`http://localhost:3000/api/kerveny/${this.event.id}`, {
+          kulso_e: !!this.isExternal
+        });
+        if (r?.data) {
+          this.localEvent = { ...r.data };
+          this.isExternal = this.readExternalFromEvent(r.data);
+          this.$emit('status-updated', r.data);
+          this.$emit('refresh-events');
+        }
+      } finally {
+        this.busy = false;
+      }
+    },
+    async continueFromImplementation() {
+      // kell legyen kiválasztva a jelleg
+      if (!this.event?.id || this.isExternal === null || this.busy) return;
+      this.busy = true;
+      try {
+        const targetStatus = this.isExternal
+          ? 'SZERZODES_ADATOKRA_VAR'            // külsős
+          : 'MEGVALOSULT_UF_IGAZOLASRA_VAR';    // belsős
+
+        // egy PATCH-ben mentsük a kulso_e-t és a státuszt
+        const r = await axios.patch(`http://localhost:3000/api/kerveny/${this.event.id}`, {
+          kulso_e: !!this.isExternal,
+          statusz: targetStatus
+        });
+
+        if (r.status === 200 && r.data) {
+          const returned = r.data?.statusz || r.data?.status || targetStatus;
+          const normalized = this.normalizeStatusCode(returned);
+          this.localEvent = { ...r.data };
+          this.isExternal = this.readExternalFromEvent(r.data);
+          this.statusOverride = normalized;
+          this.$emit('status-updated', r.data);
+          this.$emit('refresh-events');
+        }
+      } finally {
+        this.busy = false;
+      }
+    },
+    // Távolítható: prettyStatus lokális duplikátum (központi helper használatban)
+    prettyStatus(code) { return getStatusLabel(code); }
   }
 };
 </script>

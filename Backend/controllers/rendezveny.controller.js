@@ -294,41 +294,43 @@ async function saveCostsAndAdvance(req, res) {
   try {
     const { id } = req.params;
     const { breakdown, total } = req.body || {};
+    // A kliens által jelzett típus csak a takarításhoz kell; a soroknál mindig a prices.kategoria dönt.
     const rawType = (req.body?.pricingType || req.body?.type || '').toString().toLowerCase();
     const pricingType = ['uni', 'egyetemi', 'university'].includes(rawType) ? 'uni' : 'famulus';
 
+    // user_id: szigorú egész szám (body → header → auth)
+    const parseIntStrict = (v) => {
+      const n = Number.parseInt(v, 10);
+      return Number.isInteger(n) && n > 0 ? n : null;
+    };
+    const userId =
+      parseIntStrict(req.body?.user_id ?? req.body?.userId) ??
+      parseIntStrict(req.headers['x-user-id']) ??
+      parseIntStrict(req.user?.id ?? req.user?.user_id ?? req.user?.userId) ??
+      null;
+
     if (!id) return res.status(400).json({ error: 'Missing id' });
     if (!Array.isArray(breakdown)) return res.status(400).json({ error: 'Invalid breakdown' });
+    if (userId === null) return res.status(400).json({ error: 'Missing or invalid user_id (integer required)' });
 
-    const UF_WHERE = `
-      kategoria IS NOT NULL AND (
-        lower(kategoria) IN ('uf','uni-famulus','uni famulus')
-        OR kategoria ILIKE '%famulus%'
-      )`;
     const isUniCategory = (cat) => (cat || '').trim().toLowerCase() === 'egyetemi';
-    const isUfCategory  = (cat) => {
-      const c = (cat || '').trim().toLowerCase();
-      return c === 'uf' || c === 'uni-famulus' || c === 'uni famulus' || c.includes('famulus');
-    };
 
     const RATE_KEYS = new Set(['priceUniversity','priceUniversityWeekend','priceExternal','priceExternalWeekend']);
 
     await client.query('BEGIN');
 
-    // csak az adott kategóriájú régi sorok törlése
+    // csak az adott pricing_type-ú régi sorok törlése
     const deleteSql = pricingType === 'uni'
-      ? `DELETE FROM kerveny_koltseg WHERE kerveny_id = $1
-           AND service_id IN (SELECT id FROM prices WHERE lower(kategoria) = 'egyetemi')`
-      : `DELETE FROM kerveny_koltseg WHERE kerveny_id = $1
-           AND service_id IN (SELECT id FROM prices WHERE ${UF_WHERE})`;
+      ? `DELETE FROM kerveny_koltseg WHERE kerveny_id = $1 AND lower(pricing_type) = 'uni'`
+      : `DELETE FROM kerveny_koltseg WHERE kerveny_id = $1 AND lower(pricing_type) = 'famulus'`;
     await client.query(deleteSql, [id]);
 
     const insertSql = `
       INSERT INTO kerveny_koltseg
         (kerveny_id, service_id, service_name, rate_key, unit,
          hours, persons, days, occasions, quantity,
-         unit_price, line_total)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`;
+         unit_price, line_total, user_id, pricing_type)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`;
 
     let inserted = 0;
 
@@ -352,8 +354,10 @@ async function saveCostsAndAdvance(req, res) {
       if (pr.rowCount === 0) continue;
 
       const p = pr.rows[0];
-      if (pricingType === 'uni' && !isUniCategory(p.kategoria)) continue;
-      if (pricingType === 'famulus' && !isUfCategory(p.kategoria)) continue;
+      // A sor pricing_type-je mindig a prices.kategoria alapján dől el.
+      const rowPricingType = isUniCategory(p.kategoria) ? 'uni' : 'famulus';
+      // Csak azokat szúrjuk most, amelyik a kért csoportba tartozik (törlés is aszerint történt).
+      if (pricingType !== rowPricingType) continue;
 
       const unitPriceMap = {
         priceUniversity: Number(p.ar_egyetem) || 0,
@@ -368,7 +372,7 @@ async function saveCostsAndAdvance(req, res) {
       await client.query(insertSql, [
         id, p.id, p.megnevezes || null, rateKey, p.mertekegyseg || null,
         hours, persons, days, occasions, quantity,
-        unit_price, line_total
+        unit_price, line_total, userId, rowPricingType
       ]);
       inserted++;
     }
@@ -405,14 +409,10 @@ const getFamulusPricesByKervenyId = async (req, res) => {
       kk.id, kk.kerveny_id, kk.service_id, kk.service_name,
       kk.rate_key, kk.unit,
       kk.hours, kk.persons, kk.days, kk.occasions, kk.quantity,
-      kk.unit_price, kk.line_total
+      kk.unit_price, kk.line_total, kk.user_id
     FROM kerveny_koltseg kk
-    INNER JOIN prices p ON kk.service_id = p.id
     WHERE kk.kerveny_id = $1
-      AND (
-        lower(p.kategoria) IN ('uf','uni-famulus','uni famulus')
-        OR p.kategoria ILIKE '%famulus%'
-      )
+      AND lower(kk.pricing_type) = 'famulus'
     ORDER BY kk.id ASC`;
   pool.query(sql, [id], (error, results) => {
     if (error) {
@@ -430,11 +430,10 @@ const getUniversityPricesByKervenyId = async (req, res) => {
       kk.id, kk.kerveny_id, kk.service_id, kk.service_name,
       kk.rate_key, kk.unit,
       kk.hours, kk.persons, kk.days, kk.occasions, kk.quantity,
-      kk.unit_price, kk.line_total
+      kk.unit_price, kk.line_total, kk.user_id
     FROM kerveny_koltseg kk
-    INNER JOIN prices p ON kk.service_id = p.id
     WHERE kk.kerveny_id = $1
-      AND lower(p.kategoria) = 'egyetemi'
+      AND lower(kk.pricing_type) = 'uni'
     ORDER BY kk.id ASC`;
   pool.query(sql, [id], (error, results) => {
     if (error) {
@@ -448,19 +447,10 @@ const getUniversityPricesByKervenyId = async (req, res) => {
 async function clearCostsForType(kervenyId, type) {
   const client = await pool.connect();
   try {
-    const UF_WHERE = `
-      kategoria IS NOT NULL AND (
-        lower(kategoria) IN ('uf','uni-famulus','uni famulus')
-        OR kategoria ILIKE '%famulus%'
-      )`;
     await client.query('BEGIN');
     const sql = (type === 'uni')
-      ? `DELETE FROM kerveny_koltseg
-           WHERE kerveny_id = $1
-             AND service_id IN (SELECT id FROM prices WHERE lower(kategoria) = 'egyetemi')`
-      : `DELETE FROM kerveny_koltseg
-           WHERE kerveny_id = $1
-             AND service_id IN (SELECT id FROM prices WHERE ${UF_WHERE})`;
+      ? `DELETE FROM kerveny_koltseg WHERE kerveny_id = $1 AND lower(pricing_type) = 'uni'`
+      : `DELETE FROM kerveny_koltseg WHERE kerveny_id = $1 AND lower(pricing_type) = 'famulus'`;
     await client.query(sql, [kervenyId]);
     // összeg frissítése
     const sumRes = await client.query(
@@ -521,34 +511,124 @@ async function sendCancelMail(req, res) {
   }
 }
 
-// ÚJ: PATCH csak modositasi_indok és/vagy statusz frissítéshez (rugalmas, nem írja felül a többi mezőt)
-const patchKervenyFields = async (req, res) => {
-  const { id } = req.params;
-  const fields = req.body;
-  if (!id || !fields || typeof fields !== 'object') {
-    return res.status(400).json({ message: 'Hiányzó adatok.' });
+// ÚJ: laza bool konverzió
+function coerceBoolLoose(v) {
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'number') return v === 1;
+  if (typeof v === 'string') {
+    const s = v.trim().toLowerCase();
+    if (['1','true','t','yes','y','on','igen','kulso','kulsos','külsős','external','extern'].includes(s)) return true;
+    if (['0','false','f','no','n','off','nem','belso','belsos','belső','internal','intern'].includes(s)) return false;
   }
-  // Csak engedélyezett mezők frissítése
-  const allowed = ['modositasi_indok', 'statusz'];
-  const updates = [];
-  const values = [];
-  let idx = 1;
+  return null; // hagyjuk NULL-ra, ha nincs értelmezhető input
+}
+
+// ÚJ: részleges frissítés – kulso_e (és opcionálisan statusz, modositasi_indok)
+async function patchKervenyFields(req, res) {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'Érvénytelen azonosító' });
+
+  const allowed = ['kulso_e', 'statusz', 'modositasi_indok'];
+  const fields = req.body || {};
+
+  const sets = [];
+  const vals = [];
+  let i = 1;
+
   for (const key of allowed) {
-    if (fields[key] !== undefined) {
-      updates.push(`${key} = $${idx++}`);
-      values.push(fields[key]);
+    if (fields[key] === undefined) continue;
+    if (key === 'kulso_e') {
+      const b = coerceBoolLoose(fields[key]);
+      if (b === null && fields[key] !== null) {
+        return res.status(400).json({ error: 'Érvénytelen kulso_e érték' });
+      }
+      sets.push(`kulso_e = $${i++}`);
+      vals.push(b);
+    } else {
+      sets.push(`${key} = $${i++}`);
+      vals.push(fields[key]);
     }
   }
-  if (!updates.length) return res.status(400).json({ message: 'Nincs frissítendő mező.' });
-  values.push(id);
-  const sql = `UPDATE kerveny SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`;
+
+  if (sets.length === 0) return res.status(400).json({ error: 'Nincs frissítendő mező' });
+
+  vals.push(id);
+
+  const sql = `UPDATE kerveny SET ${sets.join(', ')} WHERE id = $${i} RETURNING *`;
+
   try {
-    const { rows } = await pool.query(sql, values);
-    res.json(rows[0]);
-  } catch (e) {
-    res.status(500).json({ message: 'Adatbázis hiba.' });
+    const { rows } = await pool.query(sql, vals);
+    if (!rows.length) return res.status(404).json({ error: 'Nem található kérvény' });
+    return res.json(rows[0]);
+  } catch (err) {
+    console.error('patchKervenyFields error:', { code: err.code, detail: err.detail, message: err.message, sql, vals });
+    // tipikus ok: oszlop nem létezik -> futtasd a migrációt
+    return res.status(500).json({ error: err.detail || err.message });
   }
 };
+
+// Kervényenként az ajánlatot adó neve + ajánlat összege (pricing_type: famulus / uni)
+async function getOfferProvidersForEvents(req, res) {
+  const client = await pool.connect();
+  try {
+    const raw = req.body?.ids || req.query?.ids || [];
+    const ids = Array.isArray(raw) ? raw.map(x => parseInt(x, 10)).filter(Number.isInteger) : [];
+    if (!ids.length) return res.json([]);
+
+    const sql = `
+      WITH last_famulus AS (
+        SELECT DISTINCT ON (kk.kerveny_id)
+               kk.kerveny_id, kk.user_id
+        FROM kerveny_koltseg kk
+        WHERE kk.user_id IS NOT NULL
+          AND lower(kk.pricing_type) = 'famulus'
+        ORDER BY kk.kerveny_id, kk.id DESC
+      ),
+      last_uni AS (
+        SELECT DISTINCT ON (kk.kerveny_id)
+               kk.kerveny_id, kk.user_id
+        FROM kerveny_koltseg kk
+        WHERE kk.user_id IS NOT NULL
+          AND lower(kk.pricing_type) = 'uni'
+        ORDER BY kk.kerveny_id, kk.id DESC
+      ),
+      famulus_tot AS (
+        SELECT kk.kerveny_id, SUM(COALESCE(kk.line_total,0))::bigint AS total
+        FROM kerveny_koltseg kk
+        WHERE lower(kk.pricing_type) = 'famulus'
+        GROUP BY kk.kerveny_id
+      ),
+      uni_tot AS (
+        SELECT kk.kerveny_id, SUM(COALESCE(kk.line_total,0))::bigint AS total
+        FROM kerveny_koltseg kk
+        WHERE lower(kk.pricing_type) = 'uni'
+        GROUP BY kk.kerveny_id
+      )
+      SELECT
+        k.id AS kerveny_id,
+        ufu.full_name AS uf_offer_by_name,
+        ft.total       AS uf_total,
+        uuni.full_name AS uni_offer_by_name,
+        ut.total       AS uni_total
+      FROM kerveny k
+      LEFT JOIN last_famulus luf ON luf.kerveny_id = k.id
+      LEFT JOIN users ufu        ON ufu.id = luf.user_id
+      LEFT JOIN famulus_tot ft   ON ft.kerveny_id = k.id
+      LEFT JOIN last_uni luni    ON luni.kerveny_id = k.id
+      LEFT JOIN users uuni       ON uuni.id = luni.user_id
+      LEFT JOIN uni_tot ut       ON ut.kerveny_id = k.id
+      WHERE k.id = ANY($1::int[])
+      ORDER BY k.id ASC
+    `;
+    const { rows } = await client.query(sql, [ids]);
+    return res.json(rows);
+  } catch (e) {
+    console.error('getOfferProvidersForEvents error', e);
+    return res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
+  }
+}
 
 // export bővítése – semmit ne törölj
 module.exports.sendCancelMail = module.exports.sendCancelMail || sendCancelMail;
@@ -567,5 +647,6 @@ module.exports = {
   downloadUniversityDocx,
   listUniversityDocxTags,
   sendCancelMail,
-  patchKervenyFields
+  patchKervenyFields,
+  getOfferProvidersForEvents,
 };

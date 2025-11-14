@@ -561,14 +561,18 @@ export default {
     groupedStatuses() {
       const groups = {};
       STATUSES.forEach(s => {
-        if (!groups[s.phase]) groups[s.phase] = [];
-        groups[s.phase].push(s);
+        const phaseKey = String(s.phase || '').toUpperCase(); // normalizálás
+        if (!groups[phaseKey]) groups[phaseKey] = [];
+        // ne módosítsuk az eredeti objektumot
+        groups[phaseKey].push({ ...s, phase: phaseKey });
       });
       return PHASE_ORDER
         .filter(p => groups[p])
         .map(phase => ({
           phase,
-          items: groups[phase].sort((a,b)=>a.sort_order - b.sort_order)
+          items: groups[phase].sort(
+            (a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999)
+          )
         }));
     },
     effectiveUserRole() {
@@ -673,7 +677,7 @@ export default {
           { statusz: newStatus }
         );
         if (resp.status === 200) {
-          // Lokális állapot frissítése (azonnali UI visszajelzés)
+          // Lokális állapot frissítése (azonnali UI visszaigazolás)
           this.event.statusz = newStatus;
           // Szülő értesítése + lista frissítés
           this.$emit('status-updated', { ...this.event, statusz: newStatus });
@@ -1213,13 +1217,67 @@ export default {
 }
 .btn-secondary:hover { filter: brightness(0.95); }
 
+/* Light/ghost (fehér háttér, kék keret) */
+.pill-light {
+  background: #fff;
+  color: #0d6efd;
+  border-color: #d7e3f5;
+  box-shadow: 0 2px 6px -3px rgba(0,0,0,.12);
+}
+.pill-light:hover {
+  background: #eef4ff;
+  border-color: #b6cff5;
+  transform: translateY(-1px);
+}
+
+/* Sötét mód finomítások */
+.dark-mode .pill-light {
+  background: #242943;
+  color: #aecdff;
+  border-color: #3d4366;
+}
+.dark-mode .pill-light:hover {
+  background: #273b84;
+  border-color: #4256a1;
+}
+.dark-mode .pill-secondary {
+  background: #505a65;
+  border-color: #505a65;
+}
+
+/* Meglévő státusz színek (test) – változatlanok, csak fentebb a headerhez igazítva már fehér a text */
+.phase-beerkezett { background:#fde8cc; color:#a65f00; }
+.phase-szerzodes { background:#ffe0e3; color:#9d1d30; }
+.phase-megvalositas { background:#d8eefc; color:#05537a; }
+.phase-elszamolas { background:#e1f5e8; color:#1f6d3f; }
+.phase-lezart { background:#e0e0e0; color:#555; }
+.event-status.terminal { box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+.status-unknown { background:#ccc; color:#333; }
+
+/* Reszponzív igazítások */
+@media (max-width: 768px) {
+  .event-details-content { max-height: 95vh; max-width: 95%; }
+  .event-details-header h3 { font-size: 1.05rem; }
+  .nav-tabs .nav-link { padding: .4rem .75rem; font-size: .74rem; }
+}
+
 /* Status modal (belső popup) – lekerekített */
+.status-modal {
+  position: fixed;        /* overlay a teljes képernyőn */
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1300;          /* nagyobb mint .event-details-modal (1200) */
+}
+
 .status-modal-content {
   background-color: white;
   border-radius: 20px;
-   padding: 20px;
-   max-width: 500px;
-   width: 100%;
+  padding: 20px;
+  max-width: 500px;
+  width: 100%;
   box-shadow: 0 18px 40px -18px rgba(0,0,0,.35), 0 8px 18px -10px rgba(0,0,0,.2);
 }
 
@@ -1275,50 +1333,6 @@ export default {
 .pill-secondary:hover {
   filter: brightness(0.95);
   transform: translateY(-1px);
-}
-
-/* Light/ghost (fehér háttér, kék keret) */
-.pill-light {
-  background: #fff;
-  color: #0d6efd;
-  border-color: #d7e3f5;
-  box-shadow: 0 2px 6px -3px rgba(0,0,0,.12);
-}
-.pill-light:hover {
-  background: #eef4ff;
-  border-color: #b6cff5;
-  transform: translateY(-1px);
-}
-
-/* Sötét mód finomítások */
-.dark-mode .pill-light {
-  background: #242943;
-  color: #aecdff;
-  border-color: #3d4366;
-}
-.dark-mode .pill-light:hover {
-  background: #273b84;
-  border-color: #4256a1;
-}
-.dark-mode .pill-secondary {
-  background: #505a65;
-  border-color: #505a65;
-}
-
-/* Meglévő státusz színek (test) – változatlanok, csak fentebb a headerhez igazítva már fehér a text */
-.phase-beerkezett { background:#fde8cc; color:#a65f00; }
-.phase-szerzodes { background:#ffe0e3; color:#9d1d30; }
-.phase-megvalositas { background:#d8eefc; color:#05537a; }
-.phase-elszamolas { background:#e1f5e8; color:#1f6d3f; }
-.phase-lezart { background:#e0e0e0; color:#555; }
-.event-status.terminal { box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
-.status-unknown { background:#ccc; color:#333; }
-
-/* Reszponzív igazítások */
-@media (max-width: 768px) {
-  .event-details-content { max-height: 95vh; max-width: 95%; }
-  .event-details-header h3 { font-size: 1.05rem; }
-  .nav-tabs .nav-link { padding: .4rem .75rem; font-size: .74rem; }
 }
 
 /* Meglévő (változatlan) részletek és animációk... */

@@ -48,6 +48,14 @@ function normalizeBody(body = {}) {
   };
 }
 
+// szekvencia újraszinkronizálása (prices.id)
+async function resyncPricesIdSequence() {
+  const { rows } = await pool.query(`SELECT pg_get_serial_sequence('prices','id') AS seq`);
+  const seq = rows[0]?.seq;
+  if (!seq) return;
+  await pool.query(`SELECT setval($1, COALESCE((SELECT MAX(id) FROM prices), 0))`, [seq]);
+}
+
 router.get('/famulus', async (req, res) => {
   try {
     const q = `SELECT * FROM prices WHERE kategoria LIKE 'UF'`
@@ -89,30 +97,47 @@ router.get('/', async (req, res) => {
 
 // POST /api/prices
 router.post('/', async (req, res) => {
+  // id mezőt ignoráljuk, DB generálja
+  // eslint-disable-next-line no-unused-vars
+  const { id: _ignoreId, ...body } = req.body || {};
+  const b = normalizeBody(body);
+
+  const q = `
+    INSERT INTO prices
+      (megnevezes, kategoria, mertekegyseg,
+       ar_egyetem, ar_egyetem_hetvege,
+       ar_kulso, ar_kulso_hetvege, megjegyzes, afa)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+    RETURNING *
+  `;
+  const params = [
+    b.megnevezes, b.kategoria, b.mertekegyseg,
+    Number(b.ar_egyetem) || 0,
+    Number(b.ar_egyetem_hetvege) || 0,
+    Number(b.ar_kulso) || 0,
+    Number(b.ar_kulso_hetvege) || 0,
+    b.megjegyzes,
+    !!b.afa
+  ];
+
   try {
-    const b = normalizeBody(req.body);
-    const q = `
-      INSERT INTO prices
-        (megnevezes, kategoria, mertekegyseg,
-         ar_egyetem, ar_egyetem_hetvege,
-         ar_kulso, ar_kulso_hetvege, megjegyzes, afa)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-      RETURNING *
-    `;
-    const params = [
-      b.megnevezes, b.kategoria, b.mertekegyseg,
-      Number(b.ar_egyetem) || 0,
-      Number(b.ar_egyetem_hetvege) || 0,
-      Number(b.ar_kulso) || 0,
-      Number(b.ar_kulso_hetvege) || 0,
-      b.megjegyzes,
-      !!b.afa
-    ];
     const { rows } = await pool.query(q, params);
-    res.status(201).json(rows[0]);
+    return res.status(201).json(rows[0]);
   } catch (err) {
+    // duplikált PK esetén (prices_pkey) szekvencia resync + 1 retry
+    const isDupPk = err.code === '23505' && (err.constraint === 'prices_pkey' || /prices_pkey/i.test(err.detail || ''));
+    if (isDupPk) {
+      try {
+        await resyncPricesIdSequence();
+        const { rows } = await pool.query(q, params);
+        return res.status(201).json(rows[0]);
+      } catch (e2) {
+        console.error('POST /api/prices retry after seq resync failed:', e2);
+        return res.status(500).json({ error: e2.detail || e2.message });
+      }
+    }
     console.error('POST /api/prices error:', err);
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.detail || err.message });
   }
 });
 

@@ -132,35 +132,85 @@
 
 <script>
 import { ref, reactive, computed, watch, onMounted } from 'vue';
+import auth, { ensureAuthUser } from '@/services/auth';
 
 export default {
   name: 'UniversityCostCalculator',
   props: { event: { type: Object, default: null } },
-  emits: ['refresh-events', 'status-updated', 'close', 'calculated'],
+  emits: ['status-updated','refresh-events','close','calculated'],
   setup(props, { emit }) {
+    const API_BASE = (import.meta.env.VITE_API_BASE || 'http://localhost:3000').replace(/\/$/, '');
     const TARGET_STATUS = 'ARAJANLAT_ELFOGADASRA_VAR';
+    const state = reactive({
+      token: (auth?.getToken?.() || localStorage.getItem('token') || '').trim(),
+      userId: null
+    });
+    const toInt = (v) => { const n = parseInt(v, 10); return Number.isInteger(n) && n > 0 ? n : null; };
+    const fallbackExtract = () => {
+      const c = [];
+      try { const u = auth?.getUser?.() ?? auth?.currentUser ?? auth?.user; if (u) c.push(u.id,u.user_id,u.userId); } catch {}
+      try { const raw = localStorage.getItem('user'); if (raw) { const p = JSON.parse(raw); c.push(p.id,p.user_id,p.userId); } } catch {}
+      c.push(localStorage.getItem('user_id'));
+      for (const v of c) { const n = toInt(v); if (n) return n; }
+      return null;
+    };
+    const defaultHeaders = () => ({
+      'Content-Type': 'application/json',
+      ...(state.token ? { Authorization: `Bearer ${state.token}` } : {}),
+      ...(toInt(state.userId) ? { 'X-User-Id': String(toInt(state.userId)) } : {})
+    });
+
     const loading = ref(false);
     const error = ref('');
     const prices = ref([]);
     const rows = reactive([]);
     const saving = ref(false);
 
+    // Állapot mentése/betöltése – esemény-specifikus kulcs
     const storageKey = (eventId) => `serviceCalc:${eventId ?? 'global'}:uni`;
+
+    const saveState = () => {
+      try {
+        if (!props.event?.id) return;
+        const payload = {
+          rows: JSON.parse(JSON.stringify(rows)),
+          ts: Date.now()
+        };
+        localStorage.setItem(storageKey(props.event.id), JSON.stringify(payload));
+      } catch {}
+    };
+
+    const loadState = () => {
+      try {
+        if (!props.event?.id) return false;
+        const raw = localStorage.getItem(storageKey(props.event.id));
+        if (!raw) return false;
+        const data = JSON.parse(raw);
+        if (Array.isArray(data?.rows)) {
+          rows.splice(0, rows.length, ...data.rows);
+          return true;
+        }
+        return false;
+      } catch { return false; }
+    };
+
+    // Mély figyelő a sorokra
+    watch(rows, saveState, { deep: true });
 
     const fetchPrices = async () => {
       loading.value = true; error.value = '';
       try {
-        let res = await fetch('/api/prices/university');
+        const res = await fetch(`${API_BASE}/api/prices/university`, { headers: defaultHeaders() });
         if (!res.ok) throw new Error('Árak betöltése sikertelen');
         const data = await res.json();
         prices.value = Array.isArray(data) ? data.map(p => ({
           id: p.id,
           name: p.megnevezes ?? p.name ?? '',
           category: p.kategoria ?? p.category ?? '',
-          priceUniversity: Number(p.ar_egyetem ?? p.priceUniversity ?? 0) || 0,
-          priceUniversityWeekend: Number(p.ar_egyetem_hetvege ?? p.priceUniversityWeekend ?? 0) || 0,
-          priceExternal: Number(p.ar_kulso ?? p.priceExternal ?? 0) || 0,
-          priceExternalWeekend: Number(p.ar_kulso_hetvege ?? p.priceExternalWeekend ?? 0) || 0,
+          priceUniversity: Number(p.ar_egyetem ?? 0) || 0,
+          priceUniversityWeekend: Number(p.ar_egyetem_hetvege ?? 0) || 0,
+          priceExternal: Number(p.ar_kulso ?? 0) || 0,
+          priceExternalWeekend: Number(p.ar_kulso_hetvege ?? 0) || 0,
           unit: p.mertekegyseg ?? p.unit ?? ''
         })) : [];
       } catch (e) { error.value = e.message || String(e); }
@@ -221,7 +271,10 @@ export default {
     };
     const getRowTotal = (row) => getRowUnitPrice(row) * getMultiplier(row);
     const total = computed(() => rows.reduce((s, r) => s + getRowTotal(r), 0));
-    const formatMoney = (v) => (Number(v) || 0).toLocaleString('hu-HU') + ' Ft';
+    const formatMoney = (v) => {
+      const num = (v && typeof v === 'object' && 'value' in v) ? v.value : v;
+      return (Number(num) || 0).toLocaleString('hu-HU') + ' Ft';
+    };
 
     const addRow = () => {
       rows.push({
@@ -240,54 +293,11 @@ export default {
       if (!p || !isUniCategory(p.category)) row.serviceId = null;
     };
 
-    const saveState = () => {
-      try {
-        const id = props.event?.id;
-        const key = storageKey(id);
-        const payload = {
-          rows: rows.map(r => ({
-            id: r.id, pricingType: 'uni', serviceId: r.serviceId, rateKey: r.rateKey,
-            hours: r.hours === '' ? null : r.hours,
-            persons: r.persons === '' ? null : r.persons,
-            days: r.days === '' ? null : r.days,
-            occasions: r.occasions === '' ? null : r.occasions,
-            quantity: r.quantity === '' ? null : r.quantity
-          })),
-          savedAt: Date.now()
-        };
-        localStorage.setItem(key, JSON.stringify(payload));
-      } catch {}
-    };
-    const loadState = () => {
-      try {
-        const id = props.event?.id;
-        const key = storageKey(id);
-        const raw = localStorage.getItem(key);
-        if (!raw) return false;
-        const parsed = JSON.parse(raw);
-        if (!parsed || !Array.isArray(parsed.rows)) return false;
-        rows.splice(0, rows.length);
-        parsed.rows.forEach(r => rows.push({
-          id: r.id ?? (Date.now() + Math.random()),
-          pricingType: 'uni',
-          serviceId: r.serviceId ?? null,
-          rateKey: r.rateKey ?? 'priceUniversity',
-          hours: (r.hours == null) ? '' : r.hours,
-          persons: (r.persons == null) ? '' : r.persons,
-          days: (r.days == null) ? '' : r.days,
-          occasions: (r.occasions == null) ? '' : r.occasions,
-          quantity: (r.quantity == null) ? '' : r.quantity
-        }));
-        return true;
-      } catch { return false; }
-    };
-    watch(rows, saveState, { deep: true });
-
     const postWithFallback = async (paths, payload) => {
       let lastErr;
       for (const p of paths) {
         try {
-          const res = await fetch(p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          const res = await fetch(p, { method: 'POST', headers: defaultHeaders(), body: JSON.stringify(payload) });
           if (res.ok) return await res.json();
           lastErr = new Error(`HTTP ${res.status}`);
         } catch (e) { lastErr = e; }
@@ -313,14 +323,15 @@ export default {
       };
     });
 
-    const setStatusUniversityOfferPending = async () => {
+    // UF mintájára: külön státusz PATCH a következő egyetemi státuszra
+    const setStatusUniOfferPending = async () => {
       if (!props.event?.id) return;
-      const res = await fetch(`/api/kerveny/${props.event.id}/status`, {
+      const res = await fetch(`${API_BASE}/api/kerveny/${props.event.id}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: defaultHeaders(),
         body: JSON.stringify({ statusz: TARGET_STATUS })
       });
-      if (!res.ok) throw new Error('Státusz váltás hiba');
+      if (!res.ok) throw new Error('Státusz váltás hiba (Egyetemi)');
     };
 
     const commit = async () => {
@@ -328,22 +339,27 @@ export default {
       saving.value = true;
       const id = props.event.id;
       const breakdown = buildBreakdown();
-      const payload = { breakdown, total: total.value, pricingType: 'uni' };
+      const payload = {
+        breakdown,
+        total: total.value,
+        pricingType: 'uni',
+        user_id: toInt(state.userId)
+      };
       try {
         await postWithFallback(
           [
-            `/api/kerveny/${id}/costs/commit-uni`,
-            `/api/kerveny/${id}/costs/commit?type=uni`,
-            `/api/kerveny/${id}/costs/commit`
+            `${API_BASE}/api/kerveny/${id}/costs/commit-uni`,
+            `${API_BASE}/api/kerveny/${id}/costs/commit?type=uni`,
+            `${API_BASE}/api/kerveny/${id}/costs/commit`
           ],
           payload
         );
-        await setStatusUniversityOfferPending();
-        saveState();
-        emit('status-updated', { id, statusz: TARGET_STATUS });
-        emit('refresh-events');
-        emit('calculated', { event: props.event, breakdown, total: total.value, pricingType: 'uni' });
-        emit('close');
+         await setStatusUniOfferPending();
+         saveState();
+         emit('status-updated', { id, statusz: TARGET_STATUS });
+          emit('refresh-events');
+          emit('calculated', { event: props.event, breakdown, total: total.value, pricingType: 'uni' });
+          emit('close');
       } catch (e) {
         error.value = e.message || 'Mentési hiba (Egyetemi)';
       } finally {
@@ -377,19 +393,44 @@ export default {
     };
 
     onMounted(async () => {
+      try {
+        const u = await ensureAuthUser();
+        state.userId = toInt(u?.id ?? u?.user_id ?? u?.userId) || fallbackExtract();
+      } catch { state.userId = fallbackExtract(); }
       await fetchPrices();
       const had = loadState();
-      if (!had && rows.length === 0) addRow();
+      if (!had && rows.length === 0) addRow?.();
     });
 
     return {
-      loading, error, prices,
-      rows, saving,
-      addRow, removeRow, onServiceChange,
-      filteredPricesFor, getRowUnitPrice, getRowUnitText, getRowTotal,
-      showQuantity, showOccasions, showDays, showHours, showPersons,
-      total, formatMoney,
-      commit, onDeleteClicked
+      loading,
+      error,
+      prices,
+      rows,
+      saving,
+      // sor műveletek
+      addRow,
+      removeRow,
+      onServiceChange,
+      // listák / szűrés
+      filteredPricesFor,
+      // megjelenítési logika
+      showQuantity,
+      showOccasions,
+      showDays,
+      showHours,
+      showPersons,
+      // számítások
+      getRowUnitPrice,
+      getRowUnitText,
+      getRowTotal,
+      total,
+      formatMoney,
+      // mentés / törlés
+      commit,
+      onDeleteClicked,
+      saveState,
+      loadState
     };
   }
 };
@@ -469,7 +510,9 @@ export default {
 .calc-row {
   display:grid;
   grid-template-columns: minmax(220px, 1.2fr) repeat(5, 120px) 160px 150px 110px;
-  gap:.55rem;
+  /* korábban: gap:.55rem; */
+  row-gap: .55rem;
+  column-gap: 3rem; /* nagyobb vízszintes távolság a mezők között */
   align-items:center;
   background:#fff;
   border:1px solid #e8eef9;

@@ -108,10 +108,7 @@
               <div class="mb-2">
                 <label class="form-label small">Szerepkör</label>
                 <select v-model="role" class="form-select">
-                  <option value="Admin">Admin</option>
-                  <option value="Főadmin">Főadmin</option>
-                  <option value="Uni-Famulus">Uni-Famulus</option>
-                  <option value="Rendezvényszervező">Rendezvényszervező</option>
+                  <option v-for="r in ROLE_OPTIONS" :key="r" :value="r">{{ r }}</option>
                 </select>
               </div>
 
@@ -304,14 +301,17 @@ const targetDisplay = computed(() => {
   return '-';
 });
 
+const ROLE_OPTIONS = ['Admin','Főadmin','Uni-Famulus','Rendezvényszervező','Jog'];
+
 const assignRole = async () => {
   flash.value = '';
   if (!hasTarget.value) { setFlash('Adj meg célt (neptun vagy email)', 'danger'); return; }
+  if (!ROLE_OPTIONS.includes(role.value)) { setFlash('Ismeretlen szerepkör választva', 'danger'); return; }
 
   let targetNeptun = form.neptun_code ? form.neptun_code.trim().toUpperCase() : null;
   let targetEmail = form.email ? form.email.trim() : null;
-  if (!targetNeptun && user.value && user.value.neptun_code) targetNeptun = user.value.neptun_code;
-  if (!targetNeptun && !targetEmail && user.value && user.value.email) targetEmail = user.value.email;
+  if (!targetNeptun && user.value?.neptun_code) targetNeptun = user.value.neptun_code;
+  if (!targetEmail && user.value?.email) targetEmail = user.value.email;
 
   const payload = { neptun: targetNeptun, role: role.value, reason: reason.value || null, email: targetEmail };
 
@@ -323,11 +323,26 @@ const assignRole = async () => {
       body: JSON.stringify(payload)
     });
     const j = await res.json().catch(()=>({}));
-    if (!res.ok) { setFlash(j.error || 'Hiba a szerepkör kiosztásakor', 'danger'); return; }
-    setFlash('Szerepkör sikeresen kiosztva', 'success');
-    // frissítsük a felhasználót megjelenítéshez
-    if (targetNeptun) { qNeptun.value = targetNeptun; await lookup(); }
-    else if (targetEmail) { qEmail.value = targetEmail; await lookup(); }
+    if (!res.ok) {
+      setFlash(j.error || 'Hiba a szerepkör kiosztásakor', 'danger');
+      return;
+    }
+
+    // Backend bővítés esetén: j.requestedRole, j.storedRole
+    const stored = j.storedRole || j.role || payload.role;
+    role.value = stored;
+    if (user.value) {
+      user.value.role = stored;
+    }
+
+    setFlash(`Szerepkör kiosztva (kért: ${payload.role}, tárolt: ${stored})`, 'success');
+
+    // Friss lekérés, de egy kis késleltetéssel (DB commit biztosan látszódjon)
+    const refresh = async () => {
+      if (targetNeptun) { qNeptun.value = targetNeptun; await lookup(); }
+      else if (targetEmail) { qEmail.value = targetEmail; await lookup(); }
+    };
+    setTimeout(refresh, 250);
   } catch (e) {
     console.error(e);
     setFlash('Hálózati hiba', 'danger');

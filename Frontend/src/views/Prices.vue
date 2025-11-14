@@ -124,6 +124,18 @@
                 <input v-model="currentItem.unit" type="text" class="form-control" />
               </div>
 
+              <!-- ÚJ: Pricing típus -->
+              <div class="col-md-3">
+                <label class="form-label">Pricing típus</label>
+                <select v-model="currentItem.pricing_type" class="form-select">
+                  <option value="famulus">famulus (UF)</option>
+                  <option value="uni">uni (egyetemi)</option>
+                </select>
+                <div v-if="formErrors.pricing_type" class="text-danger small mt-1">
+                  {{ formErrors.pricing_type }}
+                </div>
+              </div>
+
               <!-- ÚJ: Áfa kapcsoló gomb -->
               <div class="col-md-2 d-flex align-items-end">
                 <button
@@ -206,7 +218,8 @@ export default {
       priceExternal: 0,
       priceExternalWeekend: 0,
       notes: '',
-      afa: false // <<< ÚJ
+      afa: false, // <<< ÚJ
+      pricing_type: 'famulus' // <<< ÚJ: uni | famulus
     });
     const formErrors = ref({});
     const modalError = ref('');
@@ -223,7 +236,8 @@ export default {
       priceExternalWeekend: Number(i.ar_kulso_hetvege ?? i.priceExternalWeekend ?? i.priceexternalweekend) || 0,
       notes: i.megjegyzes ?? i.notes ?? '',
       category: i.kategoria ?? i.category ?? 'Általános',
-      afa: !!(i.afa ?? false) // <<< ÚJ
+      afa: !!(i.afa ?? false), // <<< ÚJ
+      pricing_type: String(i.pricing_type ?? i.pricingtype ?? '').toLowerCase() || 'famulus' // <<< ÚJ
     });
 
     const fetchPrices = async () => {
@@ -265,7 +279,8 @@ export default {
         priceExternal: 0,
         priceExternalWeekend: 0,
         notes: '',
-        afa: false // <<< ÚJ
+        afa: false, // <<< ÚJ
+        pricing_type: 'famulus' // <<< ÚJ
       };
       priceModalInstance.show();
     };
@@ -284,7 +299,8 @@ export default {
         priceExternal: item.priceExternal,
         priceExternalWeekend: item.priceExternalWeekend,
         notes: item.notes || '',
-        afa: !!item.afa // <<< ÚJ
+        afa: !!item.afa, // <<< ÚJ
+        pricing_type: item.pricing_type || 'famulus' // <<< ÚJ
       };
       priceModalInstance.show();
     };
@@ -304,6 +320,11 @@ export default {
           ok = false;
         }
       });
+     const pt = String(currentItem.value.pricing_type || '').toLowerCase();
+     if (!['uni','famulus'].includes(pt)) {
+       formErrors.value.pricing_type = 'Válaszd ki: uni vagy famulus';
+       ok = false;
+     }
       return ok;
     };
 
@@ -321,7 +342,8 @@ export default {
           ar_kulso: Number(currentItem.value.priceExternal) || 0,
           ar_kulso_hetvege: Number(currentItem.value.priceExternalWeekend) || 0,
           megjegyzes: currentItem.value.notes || '',
-          afa: !!currentItem.value.afa // <<< ÚJ
+          afa: !!currentItem.value.afa, // <<< ÚJ
+          pricing_type: String(currentItem.value.pricing_type || 'famulus').toLowerCase() // <<< ÚJ
         };
 
         let res;
@@ -642,5 +664,15 @@ th[rowspan="2"] {
   .col-service { width: 260px; }
   .price-cell { width: 140px; }
   .fab-add { right: 14px; bottom: 14px; width:48px; height:48px; }
+}
+
+/* pricing_type jelvény (ha később megjeleníted a táblában) */
+.badge-pt {
+  margin-left: 6px;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
 }
 </style>

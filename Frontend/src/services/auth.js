@@ -112,10 +112,8 @@ async function ensureAuthUser() {
   try {
     const cached = localStorage.getItem('auth_user');
     if (cached) return JSON.parse(cached);
-
     const token = _getStoredToken();
     if (!token) return null;
-
     const res = await fetch('http://localhost:3003/api/auth/me', {
       headers: { Authorization: 'Bearer ' + token }
     });
@@ -125,7 +123,6 @@ async function ensureAuthUser() {
       return null;
     }
     const user = await res.json();
-    // normalizeáljuk a kapott payload-ot, majd mentsük ugyanabban a formátumban
     const normalized = _normalizePayload(user);
     localStorage.setItem('auth_user', JSON.stringify(normalized));
     return normalized;
@@ -146,3 +143,6 @@ export default {
   ensureAuthUser,
   logout,
 };
+
+// Named export (UniFamulusCostCalculator.vue importálhatja: import { ensureAuthUser } from '@/services/auth')
+export { ensureAuthUser };

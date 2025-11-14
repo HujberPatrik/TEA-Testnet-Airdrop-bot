@@ -115,6 +115,118 @@
               </tr>
             </thead>
             <tbody>
+              <!-- EREDETI: üres lista -->
+              <tr v-if="!isUfRole && sortedAndFilteredEvents.length === 0">
+                <td colspan="6" class="text-center">Nincs megjeleníthető rendezvény</td>
+              </tr>
+            </tbody>
+
+            <!-- TÁBLA TÖRZS CSERE: UF szerepkörre két szekció -->
+            <tbody v-if="isUfRole" class="uf-section">
+              <!-- 1) UF feladatai -->
+              <tr class="group-header">
+                <td colspan="6">
+                  <i class="fas fa-briefcase me-2"></i>UF feladatai (módosítható)
+                </td>
+              </tr>
+              <tr v-if="ufActionableEvents.length === 0">
+                <td colspan="6" class="text-center">Nincs UF-re váró rendezvény.</td>
+              </tr>
+              <tr
+                v-for="event in ufActionableEvents"
+                :key="'ufact-'+event.id"
+                :class="'phase-' + (getStatusPhase(event.statusz).toLowerCase())"
+                @click="showEventDetails(event)"
+                style="cursor:pointer;"
+              >
+                <td>
+                  <span
+                    class="status-badge"
+                    :class="getStatusClassFromCode(event.statusz)"
+                    :title="getStatusLabel(event.statusz)"
+                  >
+                    <i :class="getStatusIcon(event.statusz)"></i>
+                    {{ getStatusLabel(event.statusz) }}
+                  </span>
+                  <span
+                    v-if="modificationType(event)"
+                    class="badge ms-2"
+                    :class="modificationType(event) === 'UF' ? 'bg-warning text-dark' : 'bg-info text-dark'"
+                    :title="event.modositasi_indok"
+                  >
+                    {{ modificationType(event) }} módosítás kérve
+                  </span>
+                </td>
+                <td>{{ event.nev }}</td>
+                <td>{{ event.helyszin }}</td>
+                <td>{{ formatDateTime(event.kezdo_datum, event.kezdo_idopont) }}</td>
+                <td>{{ formatDateTime(event.veg_datum, event.veg_idopont) }}</td>
+                <td class="text-center">
+                  <div class="btn-group">
+                    <button class="doc-btn position-relative" @click.stop="exportDocument(event)">
+                      <i class="fas fa-file-word me-1"></i><span class="label d-none d-md-inline">DOCX</span>
+                    </button>
+                    <button
+                      :class="['chat-btn','position-relative', { 'has-unread': unreadByEvent[event.id] > 0 }]"
+                      @click.stop="openChat(event)"
+                    >
+                      <i class="fas fa-comments me-1"></i><span class="label d-none d-md-inline">Chat</span>
+                      <span v-if="unreadByEvent[event.id] > 0" class="chat-unread-badge">
+                        {{ Math.min(unreadByEvent[event.id], 99) }}<span class="pulse"></span>
+                      </span>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- 2) Egyéb rendezvények (read-only) -->
+              <tr class="group-header group-muted" v-if="ufOtherEvents.length > 0">
+                <td colspan="6">
+                  <i class="fas fa-list me-2"></i>Egyéb rendezvények (csak megtekintés)
+                </td>
+              </tr>
+              <tr
+                v-for="event in ufOtherEvents"
+                :key="'ufoth-'+event.id"
+                :class="['row-readonly','phase-' + (getStatusPhase(event.statusz).toLowerCase())]"
+                style="cursor:default;"
+                :title="'Csak az UF árajánlatra vár státusz módosítható.'"
+              >
+                <td>
+                  <span
+                    class="status-badge"
+                    :class="getStatusClassFromCode(event.statusz)"
+                    :title="getStatusLabel(event.statusz)"
+                  >
+                    <i :class="getStatusIcon(event.statusz)"></i>
+                    {{ getStatusLabel(event.statusz) }}
+                  </span>
+                </td>
+                <td>{{ event.nev }}</td>
+                <td>{{ event.helyszin }}</td>
+                <td>{{ formatDateTime(event.kezdo_datum, event.kezdo_idopont) }}</td>
+                <td>{{ formatDateTime(event.veg_datum, event.veg_idopont) }}</td>
+                <td class="text-center">
+                  <div class="btn-group">
+                    <button class="doc-btn position-relative" @click.stop="exportDocument(event)">
+                      <i class="fas fa-file-word me-1"></i><span class="label d-none d-md-inline">DOCX</span>
+                    </button>
+                    <button
+                      :class="['chat-btn','position-relative', { 'has-unread': unreadByEvent[event.id] > 0 }]"
+                      @click.stop="openChat(event)"
+                    >
+                      <i class="fas fa-comments me-1"></i><span class="label d-none d-md-inline">Chat</span>
+                      <span v-if="unreadByEvent[event.id] > 0" class="chat-unread-badge">
+                        {{ Math.min(unreadByEvent[event.id], 99) }}<span class="pulse"></span>
+                      </span>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+
+            <!-- NEM UF: az eredeti törzs marad -->
+            <tbody v-else>
               <tr v-if="sortedAndFilteredEvents.length === 0">
                 <td colspan="6" class="text-center">Nincs megjeleníthető rendezvény</td>
               </tr>
@@ -345,13 +457,6 @@ export default {
         filteredEvents = filteredEvents.filter(e => e.tipus === this.filters.type);
       }
 
-      // Uni-Famulus csak az UF_ARAJANLATRA_VAR státuszú rendezvényeket lássa
-      if (this.isUfRole) {
-        filteredEvents = filteredEvents.filter(
-          e => String(e.statusz || '').toUpperCase() === 'UF_ARAJANLATRA_VAR'
-        );
-      }
-
       return filteredEvents.sort((a,b) => {
         let av = a[this.sortColumn];
         let bv = b[this.sortColumn];
@@ -369,6 +474,20 @@ export default {
         return this.sortDirection === 'asc' ? res : -res;
       });
     },
+
+    ufActionableEvents() {
+      if (!this.isUfRole) return [];
+      return this.sortedAndFilteredEvents.filter(
+        e => String(e.statusz || '').toUpperCase() === 'UF_ARAJANLATRA_VAR'
+      );
+    },
+    ufOtherEvents() {
+      if (!this.isUfRole) return [];
+      return this.sortedAndFilteredEvents.filter(
+        e => String(e.statusz || '').toUpperCase() !== 'UF_ARAJANLATRA_VAR'
+      );
+    },
+
     effectiveUserRole() {                  // <<< HOZZÁADVA
       return JSON.parse(localStorage.getItem('auth_user'));
     }
@@ -482,6 +601,10 @@ export default {
       return this.sortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down';
     },
     showEventDetails(e) {
+      // UF csak UF_ARAJANLATRA_VAR esetén nyithatja
+      if (this.isUfRole && String(e?.statusz || '').toUpperCase() !== 'UF_ARAJANLATRA_VAR') {
+        return;
+      }
       this.selectedEvent = { ...e, statusz: this.normalizeStatusCode(e.statusz) };
       document.body.style.overflow = 'hidden';
       this.$nextTick(()=> {
@@ -774,12 +897,12 @@ export default {
 
 .status-badge i { font-size: .8rem; }
 
-/* Fázis színek */
+/* Fázis színek – kanonikus */
 .phase-beerkezett { background:#fde8cc; color:#a65f00; }
-.phase-szerzodes { background:#ffe0e3; color:#9d1d30; }
+.phase-szerzodes  { background:#ffe0e3; color:#9d1d30; }
 .phase-megvalositas { background:#d8eefc; color:#05537a; }
 .phase-elszamolas { background:#e1f5e8; color:#1f6d3f; }
-.phase-lezart { background:#e0e0e0; color:#555; }
+.phase-lezart     { background:#e0e0e0; color:#555; }
 
 .status-badge.terminal {
   border:1px solid rgba(0,0,0,.1);
@@ -1016,4 +1139,41 @@ tr.phase-lezart:hover td { background:#f7f7f7; }
 :deep(.dark) .filter-item i { color:#5a9cff; }
 :deep(.dark) .filter-input { color:#dbe6f4; }
 :deep(.dark) .filter-input::placeholder { color:#7e8da1; }
+
+/* UF szekció fejlécek és read-only sorok */
+.group-header {
+  background:#f1f5ff;
+  color:#224488;
+  font-weight:700;
+  letter-spacing:.3px;
+  text-transform: none;
+}
+.group-header td {
+  border-bottom:1px solid rgba(0,0,0,.06);
+  padding:.6rem .85rem;
+  border-radius:12px;
+}
+.group-header.group-muted {
+  background:#f8f9fb;
+  color:#5a677a;
+}
+
+.row-readonly {
+  opacity:.85;
+}
+.row-readonly:hover td {
+  background:#f7f9ff !important;
+  cursor: default;
+}
+
+@media (max-width: 768px) {
+  .uf-section td { padding: .28rem .40rem !important; }
+  .uf-section .status-badge { font-size:.55rem; padding:.1rem .35rem !important; }
+}
+
+/* Ha még mindig túl nagy, végső minimalizáláshoz (kommenteld ki ha nem kell) */
+/*
+.uf-section td { padding:.25rem .38rem !important; }
+.uf-section .status-badge { font-size:.52rem; padding:.08rem .32rem !important; }
+*/
 </style>
